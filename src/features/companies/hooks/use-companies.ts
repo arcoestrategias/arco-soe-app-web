@@ -29,7 +29,7 @@ export function useCompanies() {
     mutationFn: (payload: CreateCompanyPayload) => fullCreateCompany(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QKEY.companies });
-      toast.success("Empresa creada");
+      toast.success("Compañía creada");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e)),
   });
@@ -39,7 +39,7 @@ export function useCompanies() {
       updateCompany(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QKEY.companies });
-      toast.success("Empresa actualizada");
+      toast.success("Compañía actualizada");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e)),
   });
@@ -49,7 +49,7 @@ export function useCompanies() {
     mutationFn: (id: string) => inactivateCompany(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QKEY.companies });
-      toast.success("Empresa inactivada");
+      toast.success("Compañía inactivada");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e)),
   });

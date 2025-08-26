@@ -165,17 +165,17 @@ export function CompaniesDashboard() {
           </div>
           <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
             <Plus className="h-4 w-4 mr-2" />
-            Nueva Compañia
+            Nueva Compañía
           </Button>
         </div>
 
         {isLoading ? (
           <div className="p-4 text-sm text-muted-foreground">
-            Cargando compañias…
+            Cargando compañías…
           </div>
         ) : companies.length === 0 ? (
           <div className="p-4 text-sm text-muted-foreground">
-            No hay compañias registradas.
+            No hay compañías registradas.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -183,7 +183,7 @@ export function CompaniesDashboard() {
               <thead className="bg-muted/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2 text-left">Logo</th>
-                  <th className="px-4 py-2 text-left">Compañia</th>
+                  <th className="px-4 py-2 text-left">Compañía</th>
                   <th className="px-4 py-2 text-left">Identificación</th>
                   <th className="px-4 py-2 text-left">Descripción</th>
                   <th className="px-4 py-2 text-left">Estado</th>
@@ -288,7 +288,7 @@ export function CompaniesDashboard() {
         onClose={closeDocs}
         referenceId={docsModal.company?.id ?? ""}
         type="document"
-        title={`Documentos de ${docsModal.company?.name ?? "la compañia"}`}
+        title={`Documentos de ${docsModal.company?.name ?? "la compañía"}`}
       />
     </div>
   );

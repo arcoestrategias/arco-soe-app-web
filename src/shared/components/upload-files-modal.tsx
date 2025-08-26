@@ -169,8 +169,8 @@ export function UploadFilesModal({
           <DialogTitle>
             {title ??
               (type === "logo"
-                ? "Logo de la Empresa"
-                : "Documentos de la Empresa")}
+                ? "Logo de la Compañía"
+                : "Documentos de la Compañía")}
           </DialogTitle>
         </DialogHeader>
 

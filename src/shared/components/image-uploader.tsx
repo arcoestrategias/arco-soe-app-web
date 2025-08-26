@@ -14,7 +14,7 @@ import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import { QKEY } from "../api/query-keys";
 
 type ImageUploaderProps = {
-  referenceId: string; // id de la entidad (empresa, etc.)
+  referenceId: string; // id de la entidad (compañía, etc.)
   name?: string; // para alt/title
   size?: number; // diámetro del círculo en px (default 40)
   className?: string;
@@ -89,7 +89,7 @@ export function ImageUploader({
         onClose={() => setOpenModal(false)}
         referenceId={referenceId}
         type="logo"
-        title={`Logo de ${name ?? "la Empresa"}`}
+        title={`Logo de ${name ?? "la Compañía"}`}
         onUploaded={({ publicUrl }) => {
           // refresca el círculo
           qc.invalidateQueries({ queryKey: [QKEY.logo, referenceId] });

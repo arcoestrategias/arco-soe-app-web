@@ -51,6 +51,18 @@ export interface MeData {
   permissions?: string[];
 }
 
+export interface ForgotPasswordRes {
+  resetToken?: string;
+}
+
+export interface ConfirmEmailRes {
+  message?: string;
+}
+
+export interface ResetPasswordRes {
+  message?: string;
+}
+
 export const authService = {
   async login(dto: LoginDto): Promise<LoginResult> {
     const res = await http.post(routes.auth.login(), dto);
@@ -108,5 +120,26 @@ export const authService = {
     }
 
     return data;
+  },
+
+  async forgotPassword(email: string): Promise<ForgotPasswordRes> {
+    const res = await http.post(routes.auth.forgotPassword(), { email });
+    return unwrapAny<ForgotPasswordRes>(res);
+  },
+
+  async confirmEmail(token: string): Promise<ConfirmEmailRes> {
+    const res = await http.post(routes.auth.confirm(), { token });
+    return unwrapAny<ConfirmEmailRes>(res);
+  },
+
+  async resetPassword(
+    token: string,
+    newPassword: string
+  ): Promise<ResetPasswordRes> {
+    const res = await http.post(routes.auth.resetPassword(), {
+      token,
+      newPassword,
+    });
+    return unwrapAny<ResetPasswordRes>(res);
   },
 };

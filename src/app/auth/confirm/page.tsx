@@ -18,6 +18,8 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { routes } from "@/shared/api/routes";
+import { authService } from "@/features/auth/services/authService";
 
 export default function ConfirmEmailPage() {
   const search = useSearchParams();
@@ -37,9 +39,8 @@ export default function ConfirmEmailPage() {
     }
     try {
       setLoading(true);
-      const res = await http.post("/api/v1/auth/confirm", { token });
-      unwrapAny(res); // nos basta con que no lance error
-      toast.success("Correo confirmado correctamente.");
+      const data = authService.confirmEmail(token);
+      toast.success((await data).message);
       router.replace("/login");
     } catch (err) {
       toast.error(getHumanErrorMessage(err));

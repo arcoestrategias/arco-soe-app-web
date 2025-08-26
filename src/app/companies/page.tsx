@@ -4,7 +4,7 @@ import { CompaniesDashboard } from "@/features/companies/components/companies-da
 
 const CompaniesPage = () => {
   return (
-    <SidebarLayout currentPath="/companies" pageTitle="Empresas">
+    <SidebarLayout currentPath="/companies" pageTitle="Compañías">
       <CompaniesDashboard />
     </SidebarLayout>
   );

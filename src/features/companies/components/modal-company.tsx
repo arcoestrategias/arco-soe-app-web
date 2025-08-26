@@ -51,10 +51,10 @@ type ModalCompanyProps = {
 
 const fmtTitle = (m: ModalMode) =>
   m === "crear"
-    ? "Nueva Empresa"
+    ? "Nueva Compañía"
     : m === "editar"
-    ? "Editar Empresa"
-    : "Detalle de Empresa";
+    ? "Editar Compañía"
+    : "Detalle de Compañía";
 
 export function ModalCompany({
   isOpen,
@@ -90,7 +90,7 @@ export function ModalCompany({
     defaultValues: defaults,
   });
 
-  // Reset cuando cambie la empresa o el modo
+  // Reset cuando cambie la compañía o el modo
   React.useEffect(() => {
     reset(defaults);
   }, [isOpen, company, modo]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,10 +134,10 @@ export function ModalCompany({
           <DialogTitle>{fmtTitle(modo)}</DialogTitle>
           <DialogDescription>
             {modo === "crear"
-              ? "Completa los datos para registrar una nueva empresa."
+              ? "Completa los datos para registrar una nueva compañía."
               : modo === "editar"
-              ? "Actualiza los datos de la empresa."
-              : "Consulta la información de la empresa."}
+              ? "Actualiza los datos de la compañía."
+              : "Consulta la información de la compañía."}
           </DialogDescription>
         </DialogHeader>
 

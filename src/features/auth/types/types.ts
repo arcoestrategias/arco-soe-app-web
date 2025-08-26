@@ -45,13 +45,13 @@ export interface LoginFormData {
   rememberMe: boolean;
 }
 
-/** DTO que se envía al endpoint /api/v1/auth/login */
+/** DTO que se envía al endpoint /auth/login */
 export interface LoginDto {
   email: string;
   password: string;
 }
 
-/** Respuesta de /api/v1/auth/login dentro de { data } */
+/** Respuesta de /auth/login dentro de { data } */
 export interface LoginData {
   accessToken: string;
   refreshToken: string;

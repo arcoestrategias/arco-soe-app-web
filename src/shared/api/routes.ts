@@ -50,6 +50,9 @@ export const routes = {
     login: () => prefixed(Modules.AUTH, "login"),
     logout: () => prefixed(Modules.AUTH, "logout"),
     refresh: () => prefixed(Modules.AUTH, "refresh"),
+    confirm: () => prefixed(Modules.AUTH, "confirm"),
+    forgotPassword: () => prefixed(Modules.AUTH, "forgot-password"),
+    resetPassword: () => prefixed(Modules.AUTH, "reset-password"),
   },
 
   companies: {

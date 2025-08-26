@@ -22,6 +22,8 @@ import {
 
 // Icons
 import { Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { routes } from "@/shared/api/routes";
+import { authService } from "@/features/auth/services/authService";
 
 export default function ResetPasswordPage() {
   const search = useSearchParams();
@@ -59,12 +61,8 @@ export default function ResetPasswordPage() {
 
     try {
       setLoading(true);
-      const res = await http.post("/api/v1/auth/reset-password", {
-        token: tokenFromUrl,
-        newPassword: password,
-      });
-      unwrapAny(res);
-      toast.success("Contraseña actualizada. Ya puedes iniciar sesión.");
+      const data = await authService.resetPassword(tokenFromUrl, password);
+      toast.success(data.message);
       router.replace("/login");
     } catch (err) {
       toast.error(getHumanErrorMessage(err));

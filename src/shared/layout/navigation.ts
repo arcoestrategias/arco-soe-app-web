@@ -30,7 +30,7 @@ export const navigationSections = [
   {
     title: "Gestión",
     items: [
-      { title: "Compañias", url: "/companies", icon: Building2 },
+      { title: "Compañías", url: "/companies", icon: Building2 },
       { title: "Configuración", url: "/configuracion", icon: Settings },
     ],
   },

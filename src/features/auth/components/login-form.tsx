@@ -45,6 +45,9 @@ import {
   setCompanyId,
   clearAuthSession,
 } from "@/shared/auth/storage";
+import { routes } from "@/shared/api/routes";
+import { authService } from "../services/authService";
+import { ActionButton } from "@/components/ui/action-button";
 
 type Props = {
   defaultRedirectTo?: string;
@@ -247,13 +250,9 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
       }
       try {
         setRecovering(true);
-        // POST /api/v1/auth/forgot-password  -> { email }
-        const res = await http.post("/api/v1/auth/forgot-password", { email });
-        const data = unwrapAny<{ resetToken?: string }>(res);
+        const data = await authService.forgotPassword(email);
         toast.success("Si el correo existe, te enviaremos instrucciones.");
-        // Si quieres, puedes dejar el token en consola para QA
         if (data?.resetToken) console.log("resetToken:", data.resetToken);
-        // Volvemos a login
         setMode("login");
       } catch (err) {
         toast.error(getHumanErrorMessage(err));
@@ -290,8 +289,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         setBusinessUnitId(adminBuId);
         setPositionId(null);
         await reloadMe();
-
-        toast.success("Contexto de compañía aplicado.");
+        toast.success("Compañía y Unidad de negocio seleccionada");
         const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
         router.replace(go);
       } catch (err) {
@@ -635,12 +633,11 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
           </Button>
 
           {isLogged && showSelectorsSection && (
-            <Button
+            <ActionButton
+              label="Cambiar de cuenta"
               type="button"
               variant="secondary"
-              className="flex-1 h-11 text-base"
-              disabled={busy || pendingBU || submitting}
-              onClick={() => {
+              onAction={() => {
                 toast.info("Volviendo a login para cambiar de cuenta.");
                 clearAuthSession();
                 clearBusinessUnit();
@@ -648,9 +645,8 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 setPositionId(null);
                 setErrors({});
               }}
-            >
-              Cambiar de cuenta
-            </Button>
+              className="btn-gradient flex-1 h-11 text-base"
+            />
           )}
         </CardFooter>
       </form>
