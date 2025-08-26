@@ -4,7 +4,7 @@ import * as React from "react";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { getAccessToken } from "@/shared/auth/storage";
 
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password"];
+const PUBLIC_PREFIXES = ["/login", "/auth/confirm", "/auth/reset-password"];
 const isPublicRoute = (p: string | null) =>
   !!p && PUBLIC_PREFIXES.some((x) => p.startsWith(x));
 

@@ -39,6 +39,7 @@ export const Modules = {
   BUSINESS_UNITS: "business-units",
   PRIORITIES: "priorities",
   COMPANIES: "companies",
+  FILES: "files",
   // agrega aquí más módulos a futuro…
 } as const;
 
@@ -59,6 +60,17 @@ export const routes = {
     update: (id: string) => prefixed(Modules.COMPANIES, id),
     remove: (id: string) => prefixed(Modules.COMPANIES, id),
     fullCreate: () => prefixed(Modules.COMPANIES, "full-create"),
+  },
+
+  files: {
+    base: () => prefixed(Modules.FILES),
+    byQuery: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
+
+    list: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
+    upload: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
   },
 
   users: {

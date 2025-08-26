@@ -1,196 +1,336 @@
 "use client";
 
+import * as React from "react";
+import { useForm, Controller } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, X } from "lucide-react";
-import { useState, useEffect } from "react";
-import type { CompleteCompany, Documento, Nota } from "../types/types";
-import { SectionInformation } from "./section-information";
-import { SectionDocuments } from "./section-documents";
-import { SectionNotes } from "./section-notes";
-import { fmt } from "@/shared/utils/fmt";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
-interface ModalCompanyProps {
+import type { Company } from "../types";
+
+export type CompanyFormValues = {
+  name: string;
+  ide: string;
+  description?: string;
+  legalRepresentativeName?: string;
+  address?: string;
+  phone?: string;
+  order?: number | null;
+  isPrivate?: boolean;
+  isGroup?: boolean;
+  isActive?: boolean;
+};
+
+type ModalMode = "crear" | "editar" | "ver";
+
+type ModalCompanyProps = {
   isOpen: boolean;
+  modo: ModalMode;
+  company: Company | null;
   onClose: () => void;
-  company?: CompleteCompany | null;
-  onSave: (company: CompleteCompany) => void;
-  modo: "crear" | "editar" | "ver";
-}
+  // Resultado listo para pasar a tus mutations:
+  // - crear: createCompany(payload)
+  // - editar: updateCompany(id, payload)
+  onSave: (result: {
+    mode: Exclude<ModalMode, "ver">;
+    id?: string;
+    payload: CompanyFormValues;
+  }) => void;
+};
+
+const fmtTitle = (m: ModalMode) =>
+  m === "crear"
+    ? "Nueva Empresa"
+    : m === "editar"
+    ? "Editar Empresa"
+    : "Detalle de Empresa";
 
 export function ModalCompany({
   isOpen,
-  onClose,
-  company,
-  onSave,
   modo,
+  company,
+  onClose,
+  onSave,
 }: ModalCompanyProps) {
-  const [data, setData] = useState({
-    nombre: "",
-    identificacion: "",
-    descripcion: "",
-    logo: undefined as string | undefined,
-  });
-  const [documents, setDocuments] = useState<Documento[]>([]);
-  const [notes, setNotes] = useState<Nota[]>([]);
-  const [activeTab, setActiveTab] = useState("informacion");
+  const readOnly = modo === "ver";
 
-  useEffect(() => {
-    if (company) {
-      setData({
-        nombre: company.nombre,
-        identificacion: company.identificacion,
-        descripcion: company.descripcion ?? "",
-        logo: company.logo,
-      });
-      setDocuments(company.documentos || []);
-      setNotes(company.notas || []);
-    } else {
-      setData({
-        nombre: "",
-        identificacion: "",
-        descripcion: "",
-        logo: undefined,
-      });
-      setDocuments([]);
-      setNotes([]);
-    }
-    setActiveTab("informacion");
-  }, [company, isOpen]);
-
-  const handleSave = () => {
-    if (!data.nombre.trim() || !data.identificacion.trim()) {
-      alert("Por favor complete los campos obligatorios");
-      return;
-    }
-
-    const newCompany: CompleteCompany = {
-      id: company?.id || `emp-${fmt.format(new Date())}`,
-      ...data,
-      fechaCreacion: company?.fechaCreacion || new Date().toISOString(),
-      fechaModificacion: new Date().toISOString(),
-      creadoPor: company?.creadoPor || "Usuario Actual",
-      modificadoPor: "Usuario Actual",
-      activo: company?.activo ?? true,
-      documentos: documents,
-      notas: notes,
-    };
-
-    onSave(newCompany);
-    onClose();
+  // Valores iniciales (si hay company)
+  const defaults: CompanyFormValues = {
+    name: company?.name ?? "",
+    ide: company?.ide ?? "",
+    description: company?.description ?? "",
+    legalRepresentativeName: company?.legalRepresentativeName ?? "",
+    address: company?.address ?? "",
+    phone: company?.phone ?? "",
+    order: company?.order ?? null,
+    isPrivate: company?.isPrivate ?? false,
+    isGroup: company?.isGroup ?? false,
+    isActive: company?.isActive ?? true,
   };
 
-  const readonly = modo === "ver";
-  const title =
-    modo === "crear"
-      ? "Nueva Empresa"
-      : modo === "editar"
-      ? "Editar Empresa"
-      : "Ver Empresa";
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<CompanyFormValues>({
+    mode: "onTouched",
+    defaultValues: defaults,
+  });
+
+  // Reset cuando cambie la empresa o el modo
+  React.useEffect(() => {
+    reset(defaults);
+  }, [isOpen, company, modo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = (values: CompanyFormValues) => {
+    if (modo === "ver") return;
+
+    const payloadBase = {
+      ...values,
+      order:
+        values.order === undefined ||
+        values.order === null ||
+        Number.isNaN(Number(values.order))
+          ? null
+          : Number(values.order),
+      description: values.description?.trim() || undefined,
+      legalRepresentativeName:
+        values.legalRepresentativeName?.trim() || undefined,
+      address: values.address?.trim() || undefined,
+      phone: values.phone?.trim() || undefined,
+    };
+
+    if (modo === "crear") {
+      // ⬇️ quitar isActive para crear
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { isActive, ...createPayload } = payloadBase;
+      onSave({ mode: "crear", payload: createPayload }); // CreateCompanyPayload
+    } else {
+      onSave({
+        mode: "editar",
+        id: company?.id,
+        payload: payloadBase, // UpdateCompanyPayload (aquí sí puede ir isActive)
+      });
+    }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <DialogTitle className="text-xl font-semibold text-gray-900">
-                {title}
-              </DialogTitle>
-              {readonly && <Badge variant="secondary">Solo lectura</Badge>}
-            </div>
-            {!readonly && (
-              <Button
-                onClick={handleSave}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Guardar
-              </Button>
-            )}
-          </div>
+    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{fmtTitle(modo)}</DialogTitle>
+          <DialogDescription>
+            {modo === "crear"
+              ? "Completa los datos para registrar una nueva empresa."
+              : modo === "editar"
+              ? "Actualiza los datos de la empresa."
+              : "Consulta la información de la empresa."}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="h-full flex flex-col"
-          >
-            <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
-              <TabsTrigger value="informacion">Información</TabsTrigger>
-              <TabsTrigger value="documentos">
-                Documentos
-                {documents.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {documents.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="notas">
-                Notas
-                {notes.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {notes.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="flex-1 overflow-y-auto mt-4 px-1">
-              {/* <TabsContent value="informacion" className="mt-0">
-                <SectionInformation
-                  titulo="Información de la Empresa"
-                  datos={data}
-                  onDatosC  hange={setData}
-                  readonly={readonly}
-                />
-              </TabsContent> */}
-
-              <TabsContent value="documentos" className="mt-0">
-                <SectionDocuments
-                  titulo="Documentos de la Empresa"
-                  documentos={documents}
-                  onDocumentosChange={setDocuments}
-                  readonly={readonly}
-                />
-              </TabsContent>
-
-              <TabsContent value="notas" className="mt-0">
-                <SectionNotes
-                  titulo="Notas y Comentarios"
-                  notas={notes}
-                  onNotasChange={setNotes}
-                  readonly={readonly}
-                />
-              </TabsContent>
-            </div>
-          </Tabs>
-        </div>
-
-        {company && (
-          <div className="flex-shrink-0 border-t pt-4 mt-4">
-            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
-              <div>
-                <span className="font-medium">Creado:</span>{" "}
-                {fmt.format(new Date(company.fechaCreacion))} por{" "}
-                {company.creadoPor}
-              </div>
-              <div>
-                <span className="font-medium">Modificado:</span>{" "}
-                {new Date(company.fechaModificacion).toLocaleString()} por{" "}
-                {company.modificadoPor}
-              </div>
-            </div>
+        <form
+          onSubmit={handleSubmit(submit)}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
+          {/* Name */}
+          <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="name">Nombre *</Label>
+            <Input
+              id="name"
+              placeholder="Razón social"
+              {...register("name", {
+                required: "El nombre es obligatorio",
+                minLength: { value: 3, message: "Mínimo 3 caracteres" },
+                maxLength: { value: 150, message: "Máximo 150 caracteres" },
+              })}
+              disabled={readOnly || isSubmitting}
+            />
+            {errors.name && (
+              <p className="text-xs text-red-600">{errors.name.message}</p>
+            )}
           </div>
-        )}
+
+          {/* IDE */}
+          <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="ide">Identificación *</Label>
+            <Input
+              id="ide"
+              placeholder="CÉDULA / RUC"
+              inputMode="numeric"
+              {...register("ide", {
+                required: "La identificación es obligatoria",
+                pattern: {
+                  value: /^\d{10,13}$/,
+                  message: "Debe tener entre 10 y 13 dígitos",
+                },
+              })}
+              disabled={readOnly || isSubmitting}
+            />
+            {errors.ide && (
+              <p className="text-xs text-red-600">{errors.ide.message}</p>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="description">Descripción</Label>
+            <Textarea
+              id="description"
+              placeholder="Breve descripción…"
+              rows={3}
+              {...register("description", {
+                maxLength: { value: 500, message: "Máximo 500 caracteres" },
+              })}
+              disabled={readOnly || isSubmitting}
+            />
+            {errors.description && (
+              <p className="text-xs text-red-600">
+                {errors.description.message}
+              </p>
+            )}
+          </div>
+
+          {/* Legal Rep */}
+          <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="legalRepresentativeName">Representante legal</Label>
+            <Input
+              id="legalRepresentativeName"
+              placeholder="Nombre del representante"
+              {...register("legalRepresentativeName")}
+              disabled={readOnly || isSubmitting}
+            />
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="phone">Teléfono</Label>
+            <Input
+              id="phone"
+              placeholder="0999999999"
+              inputMode="numeric"
+              {...register("phone", {
+                pattern: {
+                  value: /^\d{7,15}$/,
+                  message: "Solo dígitos (7 a 15)",
+                },
+              })}
+              disabled={readOnly || isSubmitting}
+            />
+            {errors.phone && (
+              <p className="text-xs text-red-600">{errors.phone.message}</p>
+            )}
+          </div>
+
+          {/* Address */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="address">Dirección</Label>
+            <Input
+              id="address"
+              placeholder="Calle / Av. / N°"
+              {...register("address")}
+              disabled={readOnly || isSubmitting}
+            />
+          </div>
+
+          {/* Order (number) */}
+          {/* <div className="space-y-2 md:col-span-1">
+            <Label htmlFor="order">Orden</Label>
+            <Input
+              id="order"
+              type="number"
+              inputMode="numeric"
+              placeholder="1"
+              {...register("order", {
+                setValueAs: (v) => (v === "" || v === null ? null : Number(v)),
+              })}
+              disabled={readOnly || isSubmitting}
+            />
+          </div> */}
+
+          {/* Switches */}
+          <div className="md:col-span-1 grid grid-cols-1 gap-4">
+            {modo !== "crear" && (
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isActive" className="mr-4">
+                  Activa
+                </Label>
+                <Controller
+                  control={control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <Switch
+                      id="isActive"
+                      checked={!!field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={readOnly || isSubmitting}
+                    />
+                  )}
+                />
+              </div>
+            )}
+
+            {/* <div className="flex items-center justify-between">
+              <Label htmlFor="isPrivate" className="mr-4">
+                Privada
+              </Label>
+              <Controller
+                control={control}
+                name="isPrivate"
+                render={({ field }) => (
+                  <Switch
+                    id="isPrivate"
+                    checked={!!field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={readOnly || isSubmitting}
+                  />
+                )}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="isGroup" className="mr-4">
+                Grupo
+              </Label>
+              <Controller
+                control={control}
+                name="isGroup"
+                render={({ field }) => (
+                  <Switch
+                    id="isGroup"
+                    checked={!!field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={readOnly || isSubmitting}
+                  />
+                )}
+              />
+            </div> */}
+          </div>
+
+          <DialogFooter className="md:col-span-2 mt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              {readOnly ? "Cerrar" : "Cancelar"}
+            </Button>
+            {!readOnly && (
+              <Button
+                type="submit"
+                disabled={isSubmitting || (modo === "editar" && !isDirty)}
+              >
+                {modo === "crear" ? "Guardar" : "Guardar cambios"}
+              </Button>
+            )}
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

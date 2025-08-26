@@ -25,6 +25,7 @@ import type { HeaderProps } from "@/shared/layout/types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { toast } from "sonner";
+import { setBusinessUnitId } from "../auth/storage";
 
 export function Header({
   currentPageTitle = "Dashboard",
@@ -60,6 +61,7 @@ export function Header({
   }, [currentBU]);
 
   const handleChangeBU = async (nextId: string) => {
+    console.log(nextId, currentBU);
     if (!nextId || nextId === currentBU) return;
     setPending(true);
     const prev = buValue;
@@ -67,7 +69,7 @@ export function Header({
 
     try {
       // 1) persistir ID de BU
-      // setBusinessUnitId(nextId);
+      setBusinessUnitId(nextId);
       // 2) volver a pedir /users/me (actualiza permisos/ámbito)
       await reloadMe();
       // 3) toast

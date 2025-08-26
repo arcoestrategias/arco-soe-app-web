@@ -1,10 +1,11 @@
-import type { AxiosResponse } from "axios";
+import axios, { AxiosError, AxiosResponse } from "axios";
 
-export type ApiEnvelope<T> = {
-  success?: boolean;
-  message?: string;
-  statusCode?: number;
-  data?: T;
+/** Envelope estándar del backend */
+export type ApiEnvelope<T = unknown> = {
+  success: boolean;
+  message: string | string[] | Record<string, unknown>;
+  statusCode: number;
+  data: T;
   error?: unknown;
   errors?: unknown;
   path?: string;
@@ -12,91 +13,169 @@ export type ApiEnvelope<T> = {
 
 export class ApiError extends Error {
   statusCode?: number;
-  details?: unknown;
-  constructor(message: string, statusCode?: number, details?: unknown) {
-    super(message);
+  messages?: string[];
+  raw?: unknown;
+
+  constructor(
+    message: string | string[] | Record<string, unknown>,
+    statusCode?: number,
+    raw?: unknown
+  ) {
+    const text = normalizeMessage(message) ?? "Operación no exitosa";
+    super(text);
     this.name = "ApiError";
     this.statusCode = statusCode;
-    this.details = details;
+    this.messages = Array.isArray(message)
+      ? message.map(String)
+      : typeof message === "string"
+      ? [message]
+      : text
+      ? [text]
+      : [];
+    this.raw = raw;
   }
 }
 
-function pickData<T>(body: any): T {
-  // 1) Envelope { data }
-  if (body && typeof body === "object" && "data" in body) {
-    return body.data as T;
+/* ----------------------- helpers internos ----------------------- */
+
+function isAxiosResponse(x: any): x is AxiosResponse {
+  return (
+    !!x &&
+    typeof x === "object" &&
+    "data" in x &&
+    "status" in x &&
+    "config" in x
+  );
+}
+
+function isApiEnvelope(x: any): x is ApiEnvelope<any> {
+  if (!x || typeof x !== "object") return false;
+  // ser tolerantes: muchos backends siempre incluyen success/statusCode
+  return "success" in x && "statusCode" in x && ("data" in x || "message" in x);
+}
+
+/** Convierte string | string[] | objeto {campo:[msgs]} en string amigable */
+function normalizeMessage(msg: unknown): string | null {
+  if (!msg) return null;
+  if (Array.isArray(msg)) return msg.map(String).join("\n");
+  if (typeof msg === "string") return msg;
+
+  if (typeof msg === "object") {
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(msg as Record<string, unknown>)) {
+      if (Array.isArray(v))
+        parts.push(`${k}: ${(v as unknown[]).map(String).join(", ")}`);
+      else parts.push(`${k}: ${String(v)}`);
+    }
+    return parts.join("\n");
   }
-  // 2) Paginado { items, total }
-  if (body && typeof body === "object" && "items" in body && "total" in body) {
-    return body as T;
+  return null;
+}
+
+/* ----------------------- API unwraps ----------------------- */
+
+/**
+ * Extrae el payload real desde:
+ *  - AxiosResponse con envelope o payload plano
+ *  - envelope directo
+ *  - payload plano
+ * Si success=false → lanza ApiError con los mensajes del back.
+ */
+export function unwrapAny<T = unknown>(resOrData: unknown): T {
+  const body = isAxiosResponse(resOrData)
+    ? (resOrData as AxiosResponse).data
+    : resOrData;
+
+  if (isApiEnvelope(body)) {
+    const env = body as ApiEnvelope<T>;
+    if (env.success) return (env.data ?? (undefined as any)) as T;
+
+    // success=false
+    throw new ApiError(env.message, env.statusCode, env);
   }
-  // 3) Payload plano (array/objeto)
+
+  // payload plano
   return body as T;
 }
 
-function pickStatus(body: any): number | undefined {
-  if (body && typeof body === "object" && "statusCode" in body) {
-    return body.statusCode as number;
+/**
+ * Estricto: exige envelope. Si no es envelope o success=false, lanza.
+ */
+export function unwrap<T = unknown>(resOrEnv: unknown): T {
+  const env = isAxiosResponse(resOrEnv)
+    ? (resOrEnv as AxiosResponse).data
+    : resOrEnv;
+
+  if (!isApiEnvelope(env)) {
+    throw new ApiError("Respuesta inválida del servidor (envelope ausente)");
   }
-  return undefined;
+  if (!env.success) {
+    throw new ApiError(env.message, env.statusCode, env);
+  }
+  return (env.data ?? (undefined as any)) as T;
 }
 
-function pickMessage(body: any): string | undefined {
-  if (body && typeof body === "object" && "message" in body) {
-    return body.message as string;
-  }
-  return undefined;
-}
-
-function pickSuccess(body: any): boolean | undefined {
-  if (body && typeof body === "object" && "success" in body) {
-    return body.success as boolean;
-  }
-  return undefined;
-}
-
-export function unwrapAny<T>(
-  resOrEnv: AxiosResponse | ApiEnvelope<T> | any
-): T {
-  const body =
-    "data" in (resOrEnv ?? {}) && "status" in (resOrEnv ?? {})
-      ? (resOrEnv as AxiosResponse).data
-      : resOrEnv;
-
-  const status = pickStatus(body);
-  const success = pickSuccess(body);
-
-  if (typeof status === "number" && status >= 400) {
-    throw new ApiError(
-      pickMessage(body) ?? "Operación no exitosa",
-      status,
-      body?.error ?? body?.errors
-    );
-  }
-  if (typeof success !== "undefined" && success === false) {
-    throw new ApiError(
-      pickMessage(body) ?? "Operación no exitosa",
-      status,
-      body?.error ?? body?.errors
-    );
-  }
-  return pickData<T>(body);
-}
-
-export function unwrapOrAny<T>(
-  resOrEnv: AxiosResponse | ApiEnvelope<T> | any,
-  fallback: T
-): T {
+/**
+ * Devuelve payload o fallback si algo falla (envelope o plano).
+ */
+export function unwrapOrAny<T = unknown>(resOrData: unknown, fallback: T): T {
   try {
-    return unwrapAny<T>(resOrEnv);
-  } catch (e) {
+    return unwrapAny<T>(resOrData);
+  } catch {
     return fallback;
   }
 }
 
-export function getHumanErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message || "Operación no exitosa";
-  if (err && typeof err === "object" && "message" in err)
-    return (err as any).message || "Error";
-  return "Algo salió mal";
+/**
+ * Variante de unwrap estricto con fallback.
+ */
+export function unwrapOr<T = unknown>(resOrEnv: unknown, fallback: T): T {
+  try {
+    return unwrap<T>(resOrEnv);
+  } catch {
+    return fallback;
+  }
+}
+
+/* ----------------------- errores amigables ----------------------- */
+
+/**
+ * Mensaje humano para toasts. Lee:
+ *  - ApiError (nuestro)
+ *  - AxiosError con envelope del backend
+ *  - Error.message estándar
+ */
+export function getHumanErrorMessage(
+  err: unknown,
+  fallback = "Ocurrió un error"
+): string {
+  if (err instanceof ApiError) {
+    return err.messages?.length
+      ? err.messages.join("\n")
+      : err.message || fallback;
+  }
+
+  if (axios.isAxiosError(err)) {
+    const ax = err as AxiosError<any>;
+    const data = ax.response?.data;
+
+    if (isApiEnvelope(data)) {
+      const msg = normalizeMessage((data as ApiEnvelope).message);
+      return msg || fallback;
+    }
+
+    // Algunos backends usan { error: "..."} o { errors: {...} }
+    const msg =
+      normalizeMessage((data && (data.message as any)) ?? null) ||
+      normalizeMessage((data && (data.error as any)) ?? null) ||
+      normalizeMessage((data && (data.errors as any)) ?? null);
+
+    return msg || ax.message || fallback;
+  }
+
+  if (err && typeof err === "object" && "message" in (err as any)) {
+    return String((err as any).message) || fallback;
+  }
+
+  return fallback;
 }

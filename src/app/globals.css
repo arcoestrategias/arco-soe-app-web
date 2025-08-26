@@ -204,3 +204,38 @@ body {
 .hover\:bg-soe-orange-dark:hover {
   background-color: var(--color-soe-orange-dark);
 }
+
+/* === Gradiente estándar de botones SOE === */
+:root {
+  --soe-grad-from: #ffa466; /* igual que login */
+  --soe-grad-to: #f25c4c;
+}
+.dark {
+  /* puedes ajustar si quieres variación en dark; por ahora igual */
+  --soe-grad-from: #ffa466;
+  --soe-grad-to: #f25c4c;
+}
+
+@layer components {
+  .btn-gradient {
+    background: linear-gradient(
+      90deg,
+      var(--soe-grad-from) 0%,
+      var(--soe-grad-to) 100%
+    ) !important;
+    color: var(--color-primary-foreground) !important;
+    border: none;
+  }
+  .btn-gradient:hover {
+    opacity: 0.95;
+  }
+  .btn-gradient:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-gradient:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px
+      color-mix(in oklch, var(--color-ring), transparent 50%);
+  }
+}

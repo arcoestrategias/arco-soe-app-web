@@ -1,36 +1,33 @@
-export interface Company {
+export type Company = {
   id: string;
-  nombre: string;
-  identificacion: string;
-  descripcion: string;
-  logo?: string;
-  fechaCreacion: string;
-  fechaModificacion: string;
-  creadoPor: string;
-  modificadoPor: string;
-  activo: boolean;
-}
+  name: string;
+  description?: string | null;
+  ide: string;
+  legalRepresentativeName?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  order?: number | null;
+  isPrivate?: boolean | null;
+  isGroup?: boolean | null;
+  isActive: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
-export interface Documento {
-  id: string;
-  nombre: string;
-  tipo: string;
-  tamaño: number;
-  url: string;
-  fechaSubida: string;
-  subidoPor: string;
-}
+export type CreateCompanyPayload = {
+  name: string;
+  ide: string;
+  description?: string;
+  legalRepresentativeName?: string;
+  address?: string;
+  phone?: string;
+  order?: number | null;
+  isPrivate?: boolean;
+  isGroup?: boolean;
+};
 
-export interface Nota {
-  id: string;
-  contenido: string;
-  fechaCreacion: string;
-  creadoPor: string;
-  fechaModificacion?: string;
-  modificadoPor?: string;
-}
-
-export interface CompleteCompany extends Company {
-  documentos: Documento[];
-  notas: Nota[];
-}
+export type UpdateCompanyPayload = Partial<CreateCompanyPayload> & {
+  isActive?: boolean | null;
+};
