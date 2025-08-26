@@ -2,6 +2,7 @@
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/ui/action-button";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -33,15 +34,16 @@ export function ConfirmModal({
         {children && <div className="mt-3">{children}</div>}
 
         <div className="flex justify-end gap-2 mt-5">
-          <Button variant="outline" onClick={onCancel}>
-            {cancelText}
-          </Button>
-          <Button
-            className="bg-red-600 hover:bg-red-700 text-white"
-            onClick={onConfirm}
-          >
-            {confirmText}
-          </Button>
+          <ActionButton
+            label={cancelText}
+            variant="outline"
+            onAction={onCancel}
+          />
+          <ActionButton
+            label={confirmText}
+            className="btn-cancel-gradient "
+            onAction={onConfirm}
+          />
         </div>
       </DialogContent>
     </Dialog>

@@ -16,6 +16,7 @@ import { Upload, Eye, Download } from "lucide-react";
 import { listFiles, uploadFiles } from "@/shared/files/filesService";
 import type { UploadType, FileItem } from "@/shared/files/types";
 import { getHumanErrorMessage } from "@/shared/api/response";
+import { ActionButton } from "@/components/ui/action-button";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -193,14 +194,19 @@ export function UploadFilesModal({
               ? "Logo: máx. 5 MB (solo imágenes)"
               : "Documentos: máx. 20 MB c/u"}
           </p>
-          <Button
+          {/* <Button
             type="button"
             variant="secondary"
             onClick={chooseFiles}
             disabled={uploading}
           >
             Seleccionar Archivos
-          </Button>
+          </Button> */}
+          <ActionButton
+            label="Seleccionar Archivos"
+            onAction={chooseFiles}
+            disabled={uploading}
+          />
 
           <input
             ref={inputRef}
@@ -284,14 +290,13 @@ export function UploadFilesModal({
         </div>
 
         <DialogFooter>
-          <Button
+          <ActionButton
             type="button"
-            variant="outline"
-            onClick={onClose}
+            label="Cerrar"
+            variant={"outline"}
+            onAction={onClose}
             disabled={uploading}
-          >
-            Cerrar
-          </Button>
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

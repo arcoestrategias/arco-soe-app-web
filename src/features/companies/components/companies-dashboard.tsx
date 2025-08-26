@@ -165,17 +165,17 @@ export function CompaniesDashboard() {
           </div>
           <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
             <Plus className="h-4 w-4 mr-2" />
-            Nueva Empresa
+            Nueva Compañia
           </Button>
         </div>
 
         {isLoading ? (
           <div className="p-4 text-sm text-muted-foreground">
-            Cargando empresas…
+            Cargando compañias…
           </div>
         ) : companies.length === 0 ? (
           <div className="p-4 text-sm text-muted-foreground">
-            No hay empresas registradas.
+            No hay compañias registradas.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -183,49 +183,49 @@ export function CompaniesDashboard() {
               <thead className="bg-muted/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2 text-left">Logo</th>
-                  <th className="px-4 py-2 text-left">Empresa</th>
+                  <th className="px-4 py-2 text-left">Compañia</th>
                   <th className="px-4 py-2 text-left">Identificación</th>
                   <th className="px-4 py-2 text-left">Descripción</th>
                   <th className="px-4 py-2 text-left">Estado</th>
-                  <th className="px-4 py-2 text-left">Acciones</th>
+                  <th className="px-4 py-2 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map((empresa) => (
-                  <tr key={empresa.id} className="border-t">
+                {companies.map((company) => (
+                  <tr key={company.id} className="border-t">
                     <td className="px-4 py-2">
                       <ImageUploader
-                        referenceId={empresa.id}
-                        name={empresa.name}
+                        referenceId={company.id}
+                        name={company.name}
                         size={40}
                       />
                     </td>
                     <td className="px-4 py-2 font-medium">
-                      <div>{empresa.name}</div>
+                      <div>{company.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        Creado: {fmtDate.format(new Date(empresa.createdAt))}
+                        Creado: {fmtDate.format(new Date(company.createdAt))}
                       </div>
                     </td>
-                    <td className="px-4 py-2">{empresa.ide}</td>
+                    <td className="px-4 py-2">{company.ide}</td>
                     <td className="px-4 py-2 truncate max-w-[300px]">
-                      {empresa.description ?? ""}
+                      {company.description ?? ""}
                     </td>
                     <td className="px-4 py-2">
                       <Badge
                         className={
-                          empresa.isActive
+                          company.isActive
                             ? "bg-green-500 text-white"
                             : "bg-gray-300 text-gray-800"
                         }
                       >
-                        {empresa.isActive ? "Activa" : "Inactiva"}
+                        {company.isActive ? "Activa" : "Inactiva"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-2 flex flex-wrap gap-2">
+                    <td className="px-4 py-2 flex flex-wrap gap-2 justify-center">
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => openView(empresa)}
+                        onClick={() => openView(company)}
                         title="Ver"
                       >
                         <Eye className="h-4 w-4" />
@@ -233,7 +233,7 @@ export function CompaniesDashboard() {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => openDocs(empresa)}
+                        onClick={() => openDocs(company)}
                         title="Documentos"
                       >
                         <Paperclip className="h-4 w-4" />
@@ -241,7 +241,7 @@ export function CompaniesDashboard() {
                       <Button
                         variant="secondary"
                         size="icon"
-                        onClick={() => openEdit(empresa)}
+                        onClick={() => openEdit(company)}
                         title="Editar"
                         className="btn-gradient"
                       >
@@ -250,8 +250,9 @@ export function CompaniesDashboard() {
                       <Button
                         variant="destructive"
                         size="icon"
-                        onClick={() => askInactivate(empresa)}
+                        onClick={() => askInactivate(company)}
                         title="Inactivar"
+                        className="btn-cancel-gradient"
                       >
                         <Trash className="h-4 w-4" />
                       </Button>
@@ -287,7 +288,7 @@ export function CompaniesDashboard() {
         onClose={closeDocs}
         referenceId={docsModal.company?.id ?? ""}
         type="document"
-        title={`Documentos de ${docsModal.company?.name ?? "la Empresa"}`}
+        title={`Documentos de ${docsModal.company?.name ?? "la compañia"}`}
       />
     </div>
   );

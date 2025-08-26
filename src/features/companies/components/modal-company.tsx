@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 import type { Company } from "../types";
+import { ActionButton } from "@/components/ui/action-button";
 
 export type CompanyFormValues = {
   name: string;
@@ -280,54 +281,22 @@ export function ModalCompany({
                 />
               </div>
             )}
-
-            {/* <div className="flex items-center justify-between">
-              <Label htmlFor="isPrivate" className="mr-4">
-                Privada
-              </Label>
-              <Controller
-                control={control}
-                name="isPrivate"
-                render={({ field }) => (
-                  <Switch
-                    id="isPrivate"
-                    checked={!!field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={readOnly || isSubmitting}
-                  />
-                )}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="isGroup" className="mr-4">
-                Grupo
-              </Label>
-              <Controller
-                control={control}
-                name="isGroup"
-                render={({ field }) => (
-                  <Switch
-                    id="isGroup"
-                    checked={!!field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={readOnly || isSubmitting}
-                  />
-                )}
-              />
-            </div> */}
           </div>
 
           <DialogFooter className="md:col-span-2 mt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {readOnly ? "Cerrar" : "Cancelar"}
-            </Button>
+            <ActionButton
+              label={readOnly ? "Cerrar" : "Cancelar"}
+              variant="outline"
+              onAction={onClose}
+            />
             {!readOnly && (
-              <Button
+              <ActionButton
                 type="submit"
+                className="btn-gradient"
+                label={modo === "crear" ? "Registrar" : "Actualizar"}
+                loading={isSubmitting}
                 disabled={isSubmitting || (modo === "editar" && !isDirty)}
-              >
-                {modo === "crear" ? "Guardar" : "Guardar cambios"}
-              </Button>
+              />
             )}
           </DialogFooter>
         </form>

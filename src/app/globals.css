@@ -209,11 +209,19 @@ body {
 :root {
   --soe-grad-from: #ffa466; /* igual que login */
   --soe-grad-to: #f25c4c;
+  --cancel-grad-from: #ec757b;
+  --cancel-grad-to: #e91924;
+  --success-grad-from: #00e15a;
+  --success-grad-to: #0bb14e;
 }
 .dark {
   /* puedes ajustar si quieres variación en dark; por ahora igual */
   --soe-grad-from: #ffa466;
   --soe-grad-to: #f25c4c;
+  --cancel-grad-from: #ec757b;
+  --cancel-grad-to: #e91924;
+  --success-grad-from: #00e15a;
+  --success-grad-to: #01b448;
 }
 
 @layer components {
@@ -234,6 +242,50 @@ body {
     cursor: not-allowed;
   }
   .btn-gradient:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px
+      color-mix(in oklch, var(--color-ring), transparent 50%);
+  }
+
+  .btn-cancel-gradient {
+    background: linear-gradient(
+      90deg,
+      var(--cancel-grad-from) 0%,
+      var(--cancel-grad-to) 100%
+    ) !important;
+    color: var(--color-primary-foreground) !important;
+    border: none;
+  }
+  .btn-cancel-gradient:hover {
+    opacity: 0.95;
+  }
+  .btn-cancel-gradient:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-cancel-gradient:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px
+      color-mix(in oklch, var(--color-ring), transparent 50%);
+  }
+
+  .btn-success-gradient {
+    background: linear-gradient(
+      90deg,
+      var(--success-grad-from) 0%,
+      var(--success-grad-to) 100%
+    ) !important;
+    color: var(--color-primary-foreground) !important;
+    border: none;
+  }
+  .btn-success-gradient:hover {
+    opacity: 0.95;
+  }
+  .btn-success-gradient:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-success-gradient:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px
       color-mix(in oklch, var(--color-ring), transparent 50%);
