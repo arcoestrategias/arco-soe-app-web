@@ -10,7 +10,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -39,9 +38,6 @@ type ModalCompanyProps = {
   modo: ModalMode;
   company: Company | null;
   onClose: () => void;
-  // Resultado listo para pasar a tus mutations:
-  // - crear: createCompany(payload)
-  // - editar: updateCompany(id, payload)
   onSave: (result: {
     mode: Exclude<ModalMode, "ver">;
     id?: string;
@@ -168,7 +164,7 @@ export function ModalCompany({
             <Label htmlFor="ide">Identificación *</Label>
             <Input
               id="ide"
-              placeholder="CÉDULA / RUC"
+              placeholder="RUC/CÉDULA"
               inputMode="numeric"
               {...register("ide", {
                 required: "La identificación es obligatoria",

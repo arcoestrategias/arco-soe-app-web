@@ -1,6 +1,4 @@
-// src/shared/api/routes.ts
-
-// Versión de API centralizada aquí
+// Versión de API centralizada
 export const API_PREFIX = "/api/v1" as const;
 
 // Sanitiza y une segmentos sin duplicar slashes
@@ -35,10 +33,12 @@ export const qs = (
 // Módulos conocidos (literal-friendly)
 export const Modules = {
   AUTH: "auth",
-  USERS: "users",
-  BUSINESS_UNITS: "business-units",
-  PRIORITIES: "priorities",
+  ROLES: "roles",
   COMPANIES: "companies",
+  BUSINESS_UNITS: "business-units",
+  USERS: "users",
+  PRIORITIES: "priorities",
+
   FILES: "files",
   // agrega aquí más módulos a futuro…
 } as const;
@@ -79,13 +79,39 @@ export const routes = {
   users: {
     base: () => prefixed(Modules.USERS),
     me: () => prefixed(Modules.USERS, "me"),
+    list: () => prefixed(Modules.USERS),
+    create: () => prefixed(Modules.USERS),
+    update: (id: string) => prefixed(Modules.USERS, id),
+    assign: () => prefixed(`${Modules.USERS}/assign`),
+    assignToBusinessUnit: () =>
+      prefixed(`${Modules.USERS}/assign-to-business-unit`),
+    patchUserBusinessUnit: (userId: string, businessUnitId: string) =>
+      prefixed(Modules.USERS, userId, "business-units", businessUnitId),
+  },
+
+  roles: {
+    list: () => prefixed(Modules.ROLES),
+  },
+
+  notifications: {
+    send: () => prefixed("/notifications/send"),
   },
 
   businessUnits: {
     base: () => prefixed(Modules.BUSINESS_UNITS),
+    list: () => prefixed(Modules.BUSINESS_UNITS),
     byId: (id: string) => prefixed(Modules.BUSINESS_UNITS, id),
-    // si en algún momento tienes endpoints específicos, agrégalos aquí:
-    // members: (id: string) => prefixed(Modules.BUSINESS_UNITS, id, "members"),
+    create: () => prefixed(Modules.BUSINESS_UNITS),
+    update: (id: string) => prefixed(Modules.BUSINESS_UNITS, id),
+    remove: (id: string) => prefixed(Modules.BUSINESS_UNITS, id),
+    userPermissions: (businessUnitId: string, userId: string) =>
+      prefixed(
+        Modules.BUSINESS_UNITS,
+        businessUnitId,
+        "users",
+        userId,
+        "permissions"
+      ),
   },
 
   priorities: {

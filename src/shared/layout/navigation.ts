@@ -8,6 +8,8 @@ import {
   TrendingUp,
   Settings,
   Building2,
+  Layers3,
+  Users2,
 } from "lucide-react";
 
 export const navigationSections = [
@@ -31,6 +33,8 @@ export const navigationSections = [
     title: "Gestión",
     items: [
       { title: "Compañías", url: "/companies", icon: Building2 },
+      { title: "Unidades de Negocio", url: "/business-units", icon: Layers3 },
+      { title: "Usuarios", url: "/users", icon: Users2 },
       { title: "Configuración", url: "/configuracion", icon: Settings },
     ],
   },
