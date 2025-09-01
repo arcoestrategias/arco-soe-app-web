@@ -37,8 +37,15 @@ export const Modules = {
   COMPANIES: "companies",
   BUSINESS_UNITS: "business-units",
   USERS: "users",
-  PRIORITIES: "priorities",
+  POSITIONS: "positions",
+  STRATEGIC_PLANS: "strategic-plans",
+  STRATEGIC_SUCCESS_FACTORS: "strategic-success-factors",
+  OBJECTIVES: "objectives",
+  STRATEGIC_PROJECTS: "strategic-projects",
+  STRATEGIC_VALUES: "strategic-values",
+  LEVERS: "levers",
 
+  PRIORITIES: "priorities",
   FILES: "files",
   // agrega aquí más módulos a futuro…
 } as const;
@@ -55,6 +62,10 @@ export const routes = {
     resetPassword: () => prefixed(Modules.AUTH, "reset-password"),
   },
 
+  roles: {
+    list: () => prefixed(Modules.ROLES),
+  },
+
   companies: {
     base: () => prefixed(Modules.COMPANIES),
     list: () => prefixed(Modules.COMPANIES),
@@ -63,38 +74,6 @@ export const routes = {
     update: (id: string) => prefixed(Modules.COMPANIES, id),
     remove: (id: string) => prefixed(Modules.COMPANIES, id),
     fullCreate: () => prefixed(Modules.COMPANIES, "full-create"),
-  },
-
-  files: {
-    base: () => prefixed(Modules.FILES),
-    byQuery: (params: { type: "logo" | "document"; referenceId: string }) =>
-      prefixed(Modules.FILES) + qs(params),
-
-    list: (params: { type: "logo" | "document"; referenceId: string }) =>
-      prefixed(Modules.FILES) + qs(params),
-    upload: (params: { type: "logo" | "document"; referenceId: string }) =>
-      prefixed(Modules.FILES) + qs(params),
-  },
-
-  users: {
-    base: () => prefixed(Modules.USERS),
-    me: () => prefixed(Modules.USERS, "me"),
-    list: () => prefixed(Modules.USERS),
-    create: () => prefixed(Modules.USERS),
-    update: (id: string) => prefixed(Modules.USERS, id),
-    assign: () => prefixed(`${Modules.USERS}/assign`),
-    assignToBusinessUnit: () =>
-      prefixed(`${Modules.USERS}/assign-to-business-unit`),
-    patchUserBusinessUnit: (userId: string, businessUnitId: string) =>
-      prefixed(Modules.USERS, userId, "business-units", businessUnitId),
-  },
-
-  roles: {
-    list: () => prefixed(Modules.ROLES),
-  },
-
-  notifications: {
-    send: () => prefixed("/notifications/send"),
   },
 
   businessUnits: {
@@ -112,17 +91,103 @@ export const routes = {
         userId,
         "permissions"
       ),
+    users: (businessUnitId: string) =>
+      `/api/v1/business-units/${businessUnitId}/users`,
+  },
+
+  users: {
+    base: () => prefixed(Modules.USERS),
+    me: () => prefixed(Modules.USERS, "me"),
+    list: () => prefixed(Modules.USERS),
+    create: () => prefixed(Modules.USERS),
+    update: (id: string) => prefixed(Modules.USERS, id),
+    assign: () => prefixed(`${Modules.USERS}/assign`),
+    assignToBusinessUnit: () =>
+      prefixed(`${Modules.USERS}/assign-to-business-unit`),
+    patchUserBusinessUnit: (userId: string, businessUnitId: string) =>
+      prefixed(Modules.USERS, userId, "business-units", businessUnitId),
+  },
+
+  positions: {
+    list: () => prefixed(Modules.POSITIONS),
+    byId: (positionId: string) => prefixed(Modules.POSITIONS, positionId),
+    create: () => prefixed(Modules.POSITIONS),
+    update: (positionId: string) => prefixed(Modules.POSITIONS, positionId),
+  },
+
+  strategicPlans: {
+    list: () => prefixed(Modules.STRATEGIC_PLANS),
+    create: () => prefixed(Modules.STRATEGIC_PLANS),
+    update: (strategicPlanId: string) =>
+      prefixed(Modules.STRATEGIC_PLANS, strategicPlanId),
+    show: (strategicPlanId: string) =>
+      prefixed(Modules.STRATEGIC_PLANS, strategicPlanId),
+  },
+
+  strategicSuccessFactors: {
+    index: () => prefixed(Modules.STRATEGIC_SUCCESS_FACTORS),
+    create: () => prefixed(Modules.STRATEGIC_SUCCESS_FACTORS),
+    update: (strategicSuccessFactorId: string) =>
+      prefixed(Modules.STRATEGIC_SUCCESS_FACTORS, strategicSuccessFactorId),
+    reorder: () => prefixed(Modules.STRATEGIC_SUCCESS_FACTORS, "reorder"),
+  },
+
+  objectives: {
+    listByPlan: () => prefixed(Modules.OBJECTIVES),
+    create: () => prefixed(Modules.OBJECTIVES),
+    update: (objectiveId: string) => prefixed(Modules.OBJECTIVES, objectiveId),
+    reorder: () => prefixed(Modules.OBJECTIVES, "reorder"),
+  },
+
+  strategicProjects: {
+    listByPlanPosition: () => prefixed(Modules.STRATEGIC_PROJECTS),
+    structure: (strategicPlanId: string, positionId: string) =>
+      `/api/v1/strategic-projects/structure?strategicPlanId=${strategicPlanId}&positionId=${positionId}`,
+    create: `/api/v1/strategic-projects`,
+    update: (strategicProjectId: string) =>
+      `/api/v1/strategic-projects/${strategicProjectId}`,
+    setActive: (strategicProjectId: string) =>
+      `/api/v1/strategic-projects/${strategicProjectId}/active`,
+    reorder: `/api/v1/strategic-projects/reorder`,
+  },
+
+  strategicValues: {
+    listByPlan: () => prefixed(Modules.STRATEGIC_VALUES),
+    create: () => `/api/v1/strategic-values`,
+    update: (strategicValueId: string) =>
+      `/api/v1/strategic-values/${strategicValueId}`,
+    reorder: `/api/v1/strategic-values/reorder`,
+  },
+
+  levers: {
+    list: () => prefixed(Modules.LEVERS),
+    create: () => prefixed(Modules.LEVERS),
+    update: (leverId: string) => prefixed(Modules.LEVERS, leverId),
+    reorder: () => prefixed(Modules.LEVERS, "reorder"),
   },
 
   priorities: {
-    base: () => prefixed(Modules.PRIORITIES),
-    list: (params?: {
-      month?: number;
-      year?: number;
-      positionId?: string;
-      monthlyClass?: string;
-    }) => prefixed(Modules.PRIORITIES) + qs(params),
-    byId: (id: string) => prefixed(Modules.PRIORITIES, id),
+    base: "/api/v1/priorities",
+    list: () => "/api/v1/priorities",
+    create: () => "/api/v1/priorities",
+    update: (id: string) => `/api/v1/priorities/${id}`,
+    toggleActive: (id: string) => `/api/v1/priorities/${id}/active`,
+    icpSeries: "/api/v1/priorities/icp/series",
+  },
+
+  files: {
+    base: () => prefixed(Modules.FILES),
+    byQuery: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
+
+    list: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
+    upload: (params: { type: "logo" | "document"; referenceId: string }) =>
+      prefixed(Modules.FILES) + qs(params),
+  },
+
+  notifications: {
+    send: () => prefixed("/notifications/send"),
   },
 } as const;
 

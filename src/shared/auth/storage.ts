@@ -4,6 +4,7 @@ const KEYS = {
   businessUnitId: "soe.businessUnitId",
   companyId: "soe.companyId",
   positionId: "soe.positionId",
+  strategicPlanId: "soe.strategicPlanId",
   buChangedAt: "soe.bu.changed.at",
 } as const;
 
@@ -107,12 +108,26 @@ export function clearPositionId() {
   remove("positionId");
 }
 
+// ------- StrategicPlan -------
+export function getStrategicPlanId(): string | null {
+  return get("strategicPlanId");
+}
+
+export function setStrategicPlanId(strategicPlanId: string | null) {
+  set("strategicPlanId", strategicPlanId);
+}
+
+export function clearStrategicPlanId() {
+  remove("strategicPlanId");
+}
+
 // ------- Limpieza total de sesión (para logout) -------
 export function clearAuthSession() {
   clearTokens();
   clearBusinessUnit();
   clearSelectedCompanyId();
   clearPositionId();
+  clearStrategicPlanId();
 }
 
 // Exponemos KEYS por si quieres escuchar `storage` cross-tab en BU/Company/Position

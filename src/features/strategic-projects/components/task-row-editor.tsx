@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 
 import { CurrencyInput } from "@/shared/components/currency-input";
-import { DateRangePicker } from "@/shared/components/date-range-picker";
+import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
 import { formatDateRange } from "@/shared/utils";
 

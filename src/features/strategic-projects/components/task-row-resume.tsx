@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/shared/components/date-range-picker";
+import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { Task } from "../types/types";
 import { format } from "date-fns";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";

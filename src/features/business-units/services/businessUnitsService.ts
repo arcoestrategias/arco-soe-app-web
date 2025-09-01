@@ -6,6 +6,7 @@ import type {
   CreateBusinessUnitPayload,
   UpdateBusinessUnitPayload,
 } from "../types/business-unit";
+import { BusinessUnitUser } from "../types/business-unit-users";
 
 export async function getBusinessUnits() {
   const res = await http.get(routes.businessUnits.list());
@@ -31,4 +32,11 @@ export async function inactivateBusinessUnit(id: string) {
     isActive: false,
   });
   return unwrapAny<BusinessUnit>(res);
+}
+
+export async function getBusinessUnitUsers(
+  businessUnitId: string
+): Promise<BusinessUnitUser[]> {
+  const { data } = await http.get(routes.businessUnits.users(businessUnitId));
+  return unwrapAny<BusinessUnitUser[]>(data);
 }
