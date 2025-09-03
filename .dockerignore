@@ -1,6 +1,5 @@
 node_modules
-.next/cache
+.next
 .git
 .env*
-Dockerfile
-README.md
+*.log
