@@ -1,27 +1,27 @@
-# --- 1) Dependencias ---
+# --- deps ---
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Recomendado para binarios nativos (sharp/libvips)
+RUN apk add --no-cache libc6-compat
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# --- 2) Build ---
+# --- builder ---
 FROM node:22-alpine AS builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+# Paquetes de build (si tu app usa sharp u otros nativos)
+RUN apk add --no-cache python3 make g++ pkgconfig libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# asegura build standalone
-# (si no lo tienes, en next.config.js: module.exports = { output: 'standalone' })
 RUN npm run build
 
-# --- 3) Runtime ---
+# --- runner ---
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
-# usuario no root por seguridad
-RUN useradd -m nextjs
-# Copiamos el bundle standalone
+# En Alpine usa adduser/addgroup (no existe useradd)
+RUN addgroup -S nextjs && adduser -S -G nextjs nextjs
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
