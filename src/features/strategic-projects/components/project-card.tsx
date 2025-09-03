@@ -3,12 +3,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CheckSquare, FileText, Settings, Target } from "lucide-react";
+import { CheckSquare, FileText, Settings, Target, Edit3 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/shared/utils";
 import { TextWithTooltip } from "@/components/ui/text-with-tooltip";
+import { parseYmdOrIsoToLocalDate } from "@/shared/utils/dateFormatters";
+import { format } from "date-fns";
 
 interface ProjectCardProps {
-  id: number;
+  id: string;
   iniciales: string;
   color: string;
   titulo: string;
@@ -25,10 +27,18 @@ interface ProjectCardProps {
   animatedProgress: number;
   onOpenModal: (
     type: "factors" | "tasks",
-    projectId: number,
+    projectId: string,
     projectName: string
   ) => void;
+
+  onEdit?: (projectId: string) => void;
+  showEditIcon?: boolean;
 }
+
+const fmtShort = (s?: string) => {
+  const d = parseYmdOrIsoToLocalDate(s);
+  return d ? format(d, "dd/MM/yyyy") : "";
+};
 
 export function ProjectCard({
   id,
@@ -47,9 +57,25 @@ export function ProjectCard({
   factoresClave,
   animatedProgress,
   onOpenModal,
+  onEdit,
+  showEditIcon = true,
 }: ProjectCardProps) {
   return (
-    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl bg-white overflow-hidden flex flex-col">
+    <Card className="relative group border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl bg-white overflow-hidden flex flex-col">
+      {/* Botón de edición (hover top-right) */}
+      {showEditIcon && (
+        <button
+          type="button"
+          onClick={() => onEdit?.(id)}
+          title="Editar proyecto"
+          aria-label="Editar proyecto"
+          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100
+                     opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Edit3 className="w-4 h-4" />
+        </button>
+      )}
+
       <CardContent className="pt-4 flex-1 flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
@@ -94,13 +120,13 @@ export function ProjectCard({
             variant="secondary"
             className="bg-green-100 text-green-700 text-xs"
           >
-            {formatDate(fechaInicio)}
+            {fmtShort(fechaInicio)}
           </Badge>
           <Badge
             variant="secondary"
             className="bg-red-100 text-red-700 text-xs"
           >
-            {formatDate(fechaFin)}
+            {fmtShort(fechaFin)}
           </Badge>
         </div>
 

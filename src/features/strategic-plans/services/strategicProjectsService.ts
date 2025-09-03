@@ -8,6 +8,8 @@ import type {
   SetStrategicProjectActivePayload,
   ReorderStrategicProjectsPayload,
 } from "../types/strategicProjects";
+import { StrategicProjectsDashboardData } from "@/features/strategic-projects/types/dashboard";
+import { StrategicProjectStructureResponse } from "@/features/strategic-projects/types/strategicProjectStructure";
 
 export async function getStrategicProjectsByPlanPosition(
   strategicPlanId: string,
@@ -27,6 +29,25 @@ export async function getStrategicProjectsByStructure(
     routes.strategicProjects.structure(strategicPlanId, positionId)
   );
   return unwrapAny<StrategicProject[]>(data);
+}
+
+export async function getStrategicProjectsDashboard(
+  strategicPlanId: string,
+  positionId: string
+): Promise<StrategicProjectsDashboardData> {
+  const res = await http.get(
+    routes.strategicProjects.dashboard(strategicPlanId, positionId)
+  );
+  return unwrapAny<StrategicProjectsDashboardData>(res.data);
+}
+
+export async function getStrategicProjectStructure(
+  projectId: string
+): Promise<StrategicProjectStructureResponse> {
+  const res = await http.get(
+    routes.strategicProjects.structureByProjectId(projectId)
+  );
+  return unwrapAny<StrategicProjectStructureResponse>(res.data);
 }
 
 export async function createStrategicProject(

@@ -1,8 +1,11 @@
 "use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
-import { Factor, Task } from "../types/types";
+import {
+  StrategicProjectStructureFactor as Factor,
+  StrategicProjectStructureTask as Task,
+} from "../types/strategicProjectStructure";
 import { SortableFactor } from "./sortable-factor";
-import { toast } from "sonner";
 
 import {
   DndContext,
@@ -21,25 +24,42 @@ import {
 interface HierarchicalTableProps {
   factors: Factor[];
   loading: boolean;
-  toggleExpandFactor: (factorId: number) => void;
-  editFactor: (factorId: number) => void;
+  expandedMap?: Record<string, boolean>;
+  editingFactorId?: string | null;
+  editingTaskByFactor?: Record<string, string | null>;
+
+  toggleExpandFactor: (factorId: number | string) => void;
+
+  editFactor: (factorRowNumber: number) => void;
   saveFactor: (factor: Factor) => void;
-  cancelFactor: (factorId: number, isNew?: boolean) => void;
-  deleteFactor: (factorId: number) => void;
+  cancelFactor: (factorRowNumber: number, isNew?: boolean) => void;
+  deleteFactor: (factorRowNumber: number) => void;
   reorderFactors: (newOrder: Factor[]) => void;
-  addTask: (factorId: number) => void;
-  editTask: (factorId: number, taskId: number) => void;
-  saveTask: (factorId: number, task: Task) => void;
-  cancelTask: (factorId: number, taskId: number, isNew?: boolean) => void;
-  deleteTask: (factorId: number, taskId: number) => void;
-  reorderTasks: (factorId: number, newOrder: Task[]) => void;
+
+  addTask: (factorRowNumber: number) => void;
+  editTask: (factorRowNumber: number, taskRowNumber: number) => void;
+  saveTask: (factorRowNumber: number, task: Task) => void;
+  cancelTask: (
+    factorRowNumber: number,
+    taskRowNumber: number,
+    isNew?: boolean
+  ) => void;
+  deleteTask: (factorRowNumber: number, taskRowNumber: number) => void;
+  reorderTasks: (factorRowNumber: number, newOrder: Task[]) => void;
+
   countCompletedTasks: (tasks: Task[]) => number;
   hasItemInCreation: () => boolean;
+
+  dragDisabled?: boolean;
+  dragDisabledReason?: string;
 }
 
 export function HierarchicalTable({
   factors,
   loading,
+  expandedMap = {},
+  editingFactorId,
+  editingTaskByFactor = {},
   toggleExpandFactor,
   editFactor,
   saveFactor,
@@ -54,31 +74,12 @@ export function HierarchicalTable({
   reorderTasks,
   countCompletedTasks,
   hasItemInCreation,
+  dragDisabled = false,
+  dragDisabledReason = "",
 }: HierarchicalTableProps) {
   const sensors = useSensors(useSensor(PointerSensor));
 
   const handleDragEnd = (event: DragEndEvent) => {
-    // Validación: ¿hay factor en edición?
-    const editingFactor = factors.find((f) => f.enEdicion);
-    if (editingFactor) {
-      toast.error(
-        `No se puede cambiar el orden del factor porque se está editando el factor: ${editingFactor.descripcion}`
-      );
-      return;
-    }
-
-    // Validación: ¿hay tarea en edición?
-    const editingTask = factors
-      .flatMap((f) => f.tareas)
-      .find((t) => t.enEdicion);
-    if (editingTask) {
-      toast.error(
-        `No se puede cambiar el orden del factor porque se está editando la tarea: ${editingTask.nombre}`
-      );
-      return;
-    }
-
-    // Continúa con el drag si todo está libre
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -87,7 +88,10 @@ export function HierarchicalTable({
 
     if (oldIndex !== -1 && newIndex !== -1) {
       const reordered = arrayMove(factors, oldIndex, newIndex).map(
-        (factor, index) => ({ ...factor, orden: index + 1 })
+        (factor, index) => ({
+          ...factor,
+          order: index + 1,
+        })
       );
       reorderFactors(reordered);
     }
@@ -98,10 +102,7 @@ export function HierarchicalTable({
       <div className="space-y-4">
         {[1, 2].map((i) => (
           <div key={i} className="space-y-2">
-            {/* Fila del factor */}
             <Skeleton className="h-12 w-full rounded-md" />
-
-            {/* Fila de una tarea asociada */}
             <div className="pl-8">
               <Skeleton className="h-10 w-full rounded-md" />
             </div>
@@ -115,7 +116,7 @@ export function HierarchicalTable({
     <div className="rounded-md border">
       {/* Encabezado */}
       <div className="grid grid-cols-12 gap-2 bg-gray-100 p-3 text-xs font-medium text-gray-600">
-        <div className="col-span-4">Descripción</div>
+        <div className="col-span-4">Nombre</div>
         <div className="col-span-4">Resultado / Entregable</div>
         <div className="col-span-2">Estado</div>
         <div className="col-span-2 text-right">Acciones</div>
@@ -132,23 +133,39 @@ export function HierarchicalTable({
             items={factors.map((f) => f.id)}
             strategy={verticalListSortingStrategy}
           >
-            {factors.map((factor) => (
+            {factors.map((factor, idx) => (
               <div key={factor.id} className="py-1">
                 <SortableFactor
+                  rowNumber={idx + 1}
                   factor={factor}
+                  isExpanded={!!expandedMap[factor.id]}
+                  isEditing={editingFactorId === factor.id}
+                  editingTaskId={editingTaskByFactor[factor.id] ?? null}
                   onToggleExpand={() => toggleExpandFactor(factor.id)}
-                  onEdit={() => editFactor(factor.id)}
+                  onEdit={() => editFactor(idx + 1)}
                   onSave={saveFactor}
-                  onCancel={() => cancelFactor(factor.id, factor.esNuevo)}
-                  onDelete={() => deleteFactor(factor.id)}
-                  onAddTask={() => addTask(factor.id)}
-                  countCompletedTasks={() => countCompletedTasks(factor.tareas)}
+                  onCancel={() => cancelFactor(idx + 1, false)}
+                  onDelete={() => deleteFactor(idx + 1)}
+                  onAddTask={() => addTask(idx + 1)}
+                  countCompletedTasks={() =>
+                    countCompletedTasks(factor.tasks ?? [])
+                  }
                   hasItemInCreation={hasItemInCreation}
-                  onEditTask={editTask}
-                  onSaveTask={saveTask}
-                  onCancelTask={cancelTask}
-                  onDeleteTask={deleteTask}
-                  onReorderTasks={reorderTasks}
+                  onEditTask={(factorNum, taskNum) =>
+                    editTask(factorNum, taskNum)
+                  }
+                  onSaveTask={(factorNum, t) => saveTask(factorNum, t)}
+                  onCancelTask={(factorNum, taskNum, isNew) =>
+                    cancelTask(factorNum, taskNum, isNew)
+                  }
+                  onDeleteTask={(factorNum, taskNum) =>
+                    deleteTask(factorNum, taskNum)
+                  }
+                  onReorderTasks={(factorNum, next) =>
+                    reorderTasks(factorNum, next)
+                  }
+                  dragDisabled={dragDisabled}
+                  dragDisabledReason={dragDisabledReason}
                 />
               </div>
             ))}

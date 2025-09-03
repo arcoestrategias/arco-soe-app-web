@@ -36,6 +36,9 @@ export default function ObjectiveSelect({
   stacked = false, // ← cuando true, pone el switch arriba del select
   switchLabel = "Permitir objetivos de terceros",
   triggerClassName, // para personalizar ancho si lo necesitas
+
+  // NUEVO: ocultar forzosamente el switch (y con ello, no permitir terceros)
+  hideSwitch = false,
 }: {
   planId?: string;
   positionId?: string;
@@ -47,13 +50,14 @@ export default function ObjectiveSelect({
   stacked?: boolean;
   switchLabel?: string;
   triggerClassName?: string;
+  hideSwitch?: boolean; // ← NUEVO
 }) {
   const [allowThirdParty, setAllowThirdParty] = useState(
     defaultAllowThirdParty
   );
   const switchId = useId();
 
-  // Mis objetivos
+  // Mis objetivos (de la posición actual)
   const ownEnabled = !!planId && !!positionId && !disabled;
   const { objectives: ownObjectives, isLoading: loadingOwn } = useObjectives(
     planId!,
@@ -79,14 +83,25 @@ export default function ObjectiveSelect({
   useEffect(() => {
     if (!value) return;
     if (selectedInOwn) return;
-    if (!allowThirdParty && otherPositions?.length) {
+    // Solo activar terceros automáticamente si NO estamos ocultando el switch
+    if (!hideSwitch && !allowThirdParty && otherPositions?.length) {
       setAllowThirdParty(true);
     }
-  }, [value, selectedInOwn, allowThirdParty, otherPositions]);
+  }, [value, selectedInOwn, allowThirdParty, otherPositions, hideSwitch]);
 
-  // Candidatos “terceros” solo si activas el switch
-  const thirdPositions =
-    allowThirdParty && planId && otherPositions?.length ? otherPositions : [];
+  // Si ocultamos el switch, nunca permitimos terceros (fuerza OFF)
+  useEffect(() => {
+    if (hideSwitch && allowThirdParty) {
+      setAllowThirdParty(false);
+    }
+  }, [hideSwitch, allowThirdParty]);
+
+  // Candidatos “terceros” solo si está permitido (y no oculto)
+  const canShowSwitch = !hideSwitch && !!otherPositions?.length;
+  const canUseThirdParty =
+    !hideSwitch && allowThirdParty && !!planId && !!otherPositions?.length;
+
+  const thirdPositions = canUseThirdParty ? otherPositions! : [];
 
   const thirdQueries = useQueries({
     queries: thirdPositions.map((pos) => ({
@@ -98,7 +113,7 @@ export default function ObjectiveSelect({
   });
 
   const thirdGroups = useMemo(() => {
-    if (!allowThirdParty) return {} as Record<string, ObjectiveOpt[]>;
+    if (!canUseThirdParty) return {} as Record<string, ObjectiveOpt[]>;
     const groups: Record<string, ObjectiveOpt[]> = {};
     thirdQueries.forEach((q, idx) => {
       const pos = thirdPositions[idx];
@@ -109,17 +124,17 @@ export default function ObjectiveSelect({
       }));
     });
     return groups;
-  }, [allowThirdParty, thirdQueries, thirdPositions]);
+  }, [canUseThirdParty, thirdQueries, thirdPositions]);
 
   const isLoadingThird = thirdQueries.some((q) => q.isPending);
 
-  // Layout: stacked = switch arriba del select; sino, en fila como antes
+  // Layout
   return (
     <div
       className={stacked ? "flex flex-col gap-2" : "flex items-center gap-3"}
     >
-      {/* Switch + Label (arriba si stacked, a la derecha si no) */}
-      {stacked && (
+      {/* Switch + Label (arriba si stacked) */}
+      {stacked && canShowSwitch && (
         <label
           htmlFor={switchId}
           className="flex items-center gap-2 text-xs text-muted-foreground"
@@ -135,7 +150,7 @@ export default function ObjectiveSelect({
       )}
 
       <Select
-        value={value ?? ""}
+        value={value ?? ""} // El componente controla value; no hay <SelectItem value=""> en la lista
         onValueChange={(v) => onChange?.(v || undefined)}
         disabled={disabled || loadingOwn || isLoadingThird}
       >
@@ -148,6 +163,7 @@ export default function ObjectiveSelect({
             }
           />
         </SelectTrigger>
+
         <SelectContent>
           <SelectGroup>
             <SelectLabel>Mis objetivos</SelectLabel>
@@ -164,7 +180,7 @@ export default function ObjectiveSelect({
             )}
           </SelectGroup>
 
-          {allowThirdParty &&
+          {canUseThirdParty &&
             Object.entries(thirdGroups).map(([cargo, list]) => (
               <SelectGroup key={cargo}>
                 <SelectLabel>{cargo}</SelectLabel>
@@ -184,7 +200,8 @@ export default function ObjectiveSelect({
         </SelectContent>
       </Select>
 
-      {!stacked && (
+      {/* Switch a la derecha (solo si NO stacked) */}
+      {!stacked && canShowSwitch && (
         <div className="flex items-center gap-2">
           <Switch
             id={switchId}

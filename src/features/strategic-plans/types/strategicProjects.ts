@@ -22,6 +22,7 @@ export type CreateStrategicProjectPayload = {
   strategicPlanId: string; // requerido
   objectiveId?: string | null; // opcional
   positionId: string; // requerido (CEO)
+  budget?: number | null;
 };
 
 export type UpdateStrategicProjectPayload =

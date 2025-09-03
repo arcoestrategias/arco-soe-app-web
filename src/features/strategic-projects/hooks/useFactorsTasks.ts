@@ -9,7 +9,7 @@ import {
   deactivateTask,
   updateTask,
   createTask,
-} from "../services/factorsService";
+} from "../services/projectFactorsService";
 
 export function useFactorsTasks(projectId: number) {
   const [factors, setFactors] = useState<Factor[]>([]);

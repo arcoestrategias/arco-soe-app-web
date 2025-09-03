@@ -143,12 +143,29 @@ export const routes = {
     listByPlanPosition: () => prefixed(Modules.STRATEGIC_PROJECTS),
     structure: (strategicPlanId: string, positionId: string) =>
       `/api/v1/strategic-projects/structure?strategicPlanId=${strategicPlanId}&positionId=${positionId}`,
+    dashboard: (strategicPlanId: string, positionId: string) =>
+      `/api/v1/strategic-projects/dashboard?strategicPlanId=${strategicPlanId}&positionId=${positionId}`,
+    structureByProjectId: (projectId: string) =>
+      `/api/v1/strategic-projects/${projectId}/structure`,
     create: `/api/v1/strategic-projects`,
     update: (strategicProjectId: string) =>
       `/api/v1/strategic-projects/${strategicProjectId}`,
     setActive: (strategicProjectId: string) =>
       `/api/v1/strategic-projects/${strategicProjectId}/active`,
     reorder: `/api/v1/strategic-projects/reorder`,
+  },
+
+  projectFactors: {
+    create: () => prefixed("project-factors"),
+    update: (id: string) => prefixed("project-factors", id),
+    setActive: (id: string) => prefixed("project-factors", id, "active"),
+    reorder: () => prefixed("project-factors", "reorder"),
+  },
+  projectTasks: {
+    create: () => prefixed("project-tasks"),
+    update: (id: string) => prefixed("project-tasks", id),
+    setActive: (id: string) => prefixed("project-tasks", id, "active"),
+    reorder: () => prefixed("project-tasks", "reorder"),
   },
 
   strategicValues: {

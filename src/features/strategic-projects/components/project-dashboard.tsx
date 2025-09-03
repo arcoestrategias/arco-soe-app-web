@@ -1,90 +1,161 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Target,
-  CheckSquare,
-  DollarSign,
-  TrendingUp,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Target, CheckSquare, DollarSign, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-
-import { mockProjects } from "../data/mock-projects";
 import { formatCurrency } from "@/shared/utils";
-import { ModalFactorsTasks } from "./modal-factors-tasks";
 import { ProjectCard } from "./project-card";
+import { useProjectsDashboard } from "@/features/strategic-plans/hooks/use-projects-dashboard";
+import type { StrategicProjectsDashboardProject } from "@/features/strategic-projects/types/dashboard";
+import { ModalFactorsTasks } from "./modal-factors-tasks";
+import { useQueryClient } from "@tanstack/react-query";
+import { ModalStrategicProject } from "./modal-strategic-project";
+import { updateStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
+import { toast } from "sonner";
+import { getHumanErrorMessage } from "@/shared/api/response";
+import { QKEY } from "@/shared/api/query-keys";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
-export function StrategicProjectsDashboard() {
-  const [animatedProgress, setAnimatedProgress] = useState<{
-    [key: number]: number;
-  }>({});
+type Props = {
+  strategicPlanId?: string;
+  positionId?: string;
+};
+
+function initialsFrom(name: string) {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "PR";
+}
+function colorFromId(id: string) {
+  const colors = [
+    "bg-blue-500",
+    "bg-purple-500",
+    "bg-emerald-500",
+    "bg-amber-500",
+    "bg-pink-500",
+  ];
+  let sum = 0;
+  for (let i = 0; i < id.length; i++) sum += id.charCodeAt(i);
+  return colors[sum % colors.length];
+}
+
+export function StrategicProjectsDashboard({
+  strategicPlanId,
+  positionId,
+}: Props) {
+  const { data, isLoading, enabled } = useProjectsDashboard(
+    strategicPlanId,
+    positionId
+  );
+
+  const qc = useQueryClient();
+
+  // proyecto que se está editando
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  // confirmación de actualización
+  const [pendingUpdate, setPendingUpdate] = useState<null | {
+    id: string;
+    payload: {
+      name: string;
+      description?: string | null;
+      fromAt?: string;
+      untilAt?: string;
+      order?: number | null;
+      strategicPlanId: string;
+      objectiveId?: string | null;
+      positionId: string;
+      budget?: number | null;
+    };
+  }>(null);
+
+  function onEditProject(projectId: string) {
+    const raw = (data?.projects ?? []).find((p: any) => p.id === projectId);
+    if (!raw) return;
+    console.log(raw);
+    setEditing(raw);
+    setEditOpen(true);
+  }
+
+  // Estado para animar barras y manejar modal
+  const [animatedProgress, setAnimatedProgress] = useState<
+    Record<string, number>
+  >({});
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"factors" | "tasks">("factors");
   const [selectedProject, setSelectedProject] = useState<{
-    id: number;
+    id: string;
     name: string;
   } | null>(null);
 
+  const mappedProjects = useMemo(() => {
+    const apiProjects = data?.projects ?? [];
+    return apiProjects.map((p: StrategicProjectsDashboardProject) => ({
+      id: p.id, // id numérico de UI
+      iniciales: initialsFrom(p.name ?? ""),
+      color: colorFromId(p.id),
+      titulo: p.name,
+      descripcion: p.description ?? "",
+      fechaInicio: p.fromAt ?? "", // ProjectCardProps exige string
+      fechaFin: p.untilAt ?? "", // ProjectCardProps exige string
+      presupuestoProyecto: p.budget ?? 0,
+      presupuestoReal: p.executed ?? 0,
+      totalTareas: p.tasksTotal ?? 0,
+      tareasCompletadas: p.tasksClosed ?? 0,
+      cumplimiento: p.compliance ?? 0,
+      metaEstrategica: p.objectiveName ?? "", // <- FALLO corregido: string, no undefined
+      factoresClave: p.factorsTotal ?? 0,
+    }));
+  }, [data?.projects]);
+
+  // Animación de progreso cuando llega data
   useEffect(() => {
+    if (!mappedProjects.length) return;
     const timer = setTimeout(() => {
-      const newProgress: { [key: number]: number } = {};
-      mockProjects.forEach((project) => {
-        newProgress[project.id] = project.cumplimiento;
-      });
-      setAnimatedProgress(newProgress);
-    }, 500);
-
+      const next: Record<string, number> = {};
+      for (const proj of mappedProjects) {
+        next[proj.id] = proj.cumplimiento ?? 0;
+      }
+      setAnimatedProgress(next);
+    }, 300);
     return () => clearTimeout(timer);
-  }, []);
+  }, [mappedProjects]);
 
+  // Handlers de modal (sin cambiar contratos)
   const openModal = (
     type: "factors" | "tasks",
-    projectId: number,
+    projectId: string,
     projectName: string
   ) => {
     setModalType(type);
     setSelectedProject({ id: projectId, name: projectName });
     setModalOpen(true);
   };
-
   const closeModal = () => {
     setModalOpen(false);
     setSelectedProject(null);
   };
 
-  const totalProjects = mockProjects.length;
-  const avgProgress = Math.round(
-    mockProjects.reduce((acc, p) => acc + p.cumplimiento, 0) / totalProjects
-  );
-  const totalBudget = mockProjects.reduce(
-    (acc, p) => acc + p.presupuestoProyecto,
-    0
-  );
-  const totalExecuted = mockProjects.reduce(
-    (acc, p) => acc + p.presupuestoReal,
-    0
-  );
+  // Resumen (usa backend si enabled; si no hay datos, muestra 0)
+  const totalProjects = data?.summary?.totalProjects ?? 0;
+  const avgProgress =
+    typeof data?.summary?.avgCompliance === "number"
+      ? Math.round(data!.summary!.avgCompliance)
+      : 0;
+  const totalBudget = data?.summary?.totalBudget ?? 0;
+  const totalExecuted = data?.summary?.totalExecuted ?? 0;
+
+  // Mensaje cuando faltan filtros (igual que en DefinitionTab)
+  if (!enabled) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        Selecciona un plan y una posición para ver el dashboard de proyectos.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-system">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Proyectos Estratégicos
-          </h1>
-          <p className="text-sm text-gray-600">
-            Gestiona y monitorea el progreso de todos los proyectos estratégicos
-          </p>
-        </div>
-        <Button className="bg-gradient-to-r from-[#FF6B35] to-[#E55A2B] hover:from-[#E55A2B] hover:to-[#D14A1F] text-white">
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Proyecto
-        </Button>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-blue-100">
@@ -96,7 +167,7 @@ export function StrategicProjectsDashboard() {
               <div>
                 <p className="text-xs text-blue-600">Total Proyectos</p>
                 <p className="text-xl font-bold text-blue-700">
-                  {totalProjects}
+                  {isLoading ? "…" : totalProjects}
                 </p>
               </div>
             </div>
@@ -112,7 +183,7 @@ export function StrategicProjectsDashboard() {
               <div>
                 <p className="text-xs text-green-600">Promedio Cumplimiento</p>
                 <p className="text-xl font-bold text-green-700">
-                  {avgProgress}%
+                  {isLoading ? "…" : `${avgProgress}%`}
                 </p>
               </div>
             </div>
@@ -128,7 +199,7 @@ export function StrategicProjectsDashboard() {
               <div>
                 <p className="text-xs text-purple-600">Presupuesto Total</p>
                 <p className="text-xl font-bold text-purple-700">
-                  {formatCurrency(totalBudget)}
+                  {isLoading ? "…" : formatCurrency(totalBudget)}
                 </p>
               </div>
             </div>
@@ -144,7 +215,7 @@ export function StrategicProjectsDashboard() {
               <div>
                 <p className="text-xs text-orange-600">Ejecutado</p>
                 <p className="text-xl font-bold text-orange-700">
-                  {formatCurrency(totalExecuted)}
+                  {isLoading ? "…" : formatCurrency(totalExecuted)}
                 </p>
               </div>
             </div>
@@ -154,14 +225,25 @@ export function StrategicProjectsDashboard() {
 
       {/* Grid de proyectos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-        {mockProjects.map((project) => (
-          <ProjectCard
-            key={project.id}
-            {...project}
-            animatedProgress={animatedProgress[project.id] || 0}
-            onOpenModal={openModal}
-          />
-        ))}
+        {isLoading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="border-0 shadow-sm">
+                <CardContent className="p-6 space-y-3">
+                  <div className="h-6 w-2/3 bg-gray-200 rounded" />
+                  <div className="h-4 w-1/2 bg-gray-200 rounded" />
+                  <div className="h-24 w-full bg-gray-200 rounded" />
+                </CardContent>
+              </Card>
+            ))
+          : mappedProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                {...project}
+                animatedProgress={animatedProgress[project.id] || 0}
+                onOpenModal={openModal}
+                onEdit={onEditProject}
+              />
+            ))}
       </div>
 
       {/* Modal */}
@@ -173,6 +255,69 @@ export function StrategicProjectsDashboard() {
           projectName={selectedProject.name}
         />
       )}
+
+      {editOpen && editing && (
+        <ModalStrategicProject
+          isOpen={editOpen}
+          modo="editar"
+          projectId={editing.id}
+          strategicPlanId={strategicPlanId}
+          positionId={positionId}
+          onClose={() => {
+            setEditOpen(false);
+            setEditing(null);
+          }}
+          onSave={(res) => {
+            if (res.mode === "editar" && res.id) {
+              setPendingUpdate({ id: res.id, payload: res.payload });
+            }
+          }}
+          initial={{
+            name: editing.name ?? "",
+            description: editing.description ?? "",
+            objectiveId: editing.objectiveId ?? null,
+            fromAt: editing.fromAt ?? undefined,
+            untilAt: editing.untilAt ?? undefined,
+            budget: editing.budget ?? null,
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!pendingUpdate}
+        title="Guardar cambios"
+        message="¿Deseas guardar los cambios del proyecto?"
+        onCancel={() => setPendingUpdate(null)}
+        onConfirm={async () => {
+          if (!pendingUpdate) return;
+          try {
+            await updateStrategicProject(
+              pendingUpdate.id,
+              pendingUpdate.payload
+            );
+
+            // Invalida el dashboard actual
+            if (strategicPlanId && positionId) {
+              await qc.invalidateQueries({
+                queryKey: QKEY.strategicProjectsDashboard(
+                  strategicPlanId,
+                  positionId
+                ),
+              });
+            }
+
+            toast.success("Proyecto actualizado correctamente");
+            setPendingUpdate(null);
+            setEditOpen(false);
+            setEditing(null);
+          } catch (err) {
+            toast.error(getHumanErrorMessage(err));
+          }
+        }}
+        confirmText="Guardar"
+      />
     </div>
   );
 }
+
+export default StrategicProjectsDashboard;

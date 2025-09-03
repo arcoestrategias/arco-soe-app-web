@@ -42,6 +42,12 @@ export const QKEY = {
 
   levers: (positionId: string) => ["levers", positionId] as const,
 
+  strategicProjectsDashboard: (planId: string, positionId: string) =>
+    ["strategic-projects", "dashboard", planId, positionId] as const,
+
+  strategicProjectStructure: (projectId: string) =>
+    ["strategic-projects", "structure", projectId] as const,
+
   priorities: ["priorities"] as const,
 
   prioritiesByPMY: (

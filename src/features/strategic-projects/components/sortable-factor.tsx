@@ -2,12 +2,19 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Factor, Task } from "../types/types";
+import {
+  StrategicProjectStructureFactor as Factor,
+  StrategicProjectStructureTask as Task,
+} from "../types/strategicProjectStructure";
 import { FactorRow } from "./factor-row";
 import type { DraggableAttributes } from "@dnd-kit/core";
 
 interface SortableFactorProps {
+  rowNumber: number;
   factor: Factor;
+  isExpanded: boolean;
+  isEditing?: boolean;
+  editingTaskId?: string | null;
   onToggleExpand: () => void;
   onEdit: () => void;
   onSave: (factor: Factor) => void;
@@ -16,15 +23,25 @@ interface SortableFactorProps {
   onAddTask: () => void;
   countCompletedTasks: () => number;
   hasItemInCreation: () => boolean;
-  onEditTask: (factorId: number, taskId: number) => void;
-  onSaveTask: (factorId: number, task: Task) => void;
-  onCancelTask: (factorId: number, taskId: number, isNew?: boolean) => void;
-  onDeleteTask: (factorId: number, taskId: number) => void;
-  onReorderTasks: (factorId: number, newOrder: Task[]) => void;
+  onEditTask: (factorRowNumber: number, taskRowNumber: number) => void;
+  onSaveTask: (factorRowNumber: number, task: Task) => void;
+  onCancelTask: (
+    factorRowNumber: number,
+    taskRowNumber: number,
+    isNew?: boolean
+  ) => void;
+  onDeleteTask: (factorRowNumber: number, taskRowNumber: number) => void;
+  onReorderTasks: (factorRowNumber: number, newOrder: Task[]) => void;
+  dragDisabled?: boolean;
+  dragDisabledReason?: string;
 }
 
 export function SortableFactor({
+  rowNumber,
   factor,
+  isExpanded,
+  isEditing,
+  editingTaskId,
   onToggleExpand,
   onEdit,
   onSave,
@@ -38,6 +55,8 @@ export function SortableFactor({
   onCancelTask,
   onDeleteTask,
   onReorderTasks,
+  dragDisabled = false,
+  dragDisabledReason = "",
 }: SortableFactorProps) {
   const {
     attributes,
@@ -46,17 +65,21 @@ export function SortableFactor({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: factor.id });
+  } = useSortable({
+    id: factor.id,
+    disabled: dragDisabled,
+  });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <div ref={setNodeRef} style={style}>
       <FactorRow
+        rowNumber={rowNumber}
         factor={factor}
+        isExpanded={isExpanded}
+        isEditing={!!isEditing}
+        editingTaskId={editingTaskId ?? null}
         isDragging={isDragging}
         onToggleExpand={onToggleExpand}
         onEdit={onEdit}
@@ -72,7 +95,9 @@ export function SortableFactor({
         onDeleteTask={onDeleteTask}
         onReorderTasks={onReorderTasks}
         listeners={listeners ?? {}}
-        attributes={attributes ?? {}}
+        attributes={attributes ?? ({} as DraggableAttributes)}
+        dragDisabled={dragDisabled}
+        dragDisabledReason={dragDisabledReason}
       />
     </div>
   );

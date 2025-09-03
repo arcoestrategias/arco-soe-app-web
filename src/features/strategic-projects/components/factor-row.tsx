@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   useSensor,
   useSensors,
@@ -16,8 +17,11 @@ import {
 } from "@dnd-kit/sortable";
 
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { useRef, useState } from "react";
-import { Factor, Task } from "../types/types";
+import { useState } from "react";
+import {
+  StrategicProjectStructureFactor as Factor,
+  StrategicProjectStructureTask as Task,
+} from "../types/strategicProjectStructure";
 import { Button } from "@/components/ui/button";
 import {
   GripVertical,
@@ -32,9 +36,14 @@ import {
 import { SortableTask } from "./sortable-task";
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
+import { toast } from "sonner";
 
 interface FactorRowProps {
+  rowNumber: number;
   factor: Factor;
+  isExpanded: boolean;
+  isEditing: boolean;
+  editingTaskId?: string | null;
   onToggleExpand: () => void;
   onEdit: () => void;
   onSave: (factor: Factor) => void;
@@ -44,17 +53,27 @@ interface FactorRowProps {
   countCompletedTasks: () => number;
   hasItemInCreation?: () => boolean;
   isDragging?: boolean;
-  onEditTask: (factorId: number, taskId: number) => void;
-  onSaveTask: (factorId: number, task: Task) => void;
-  onCancelTask: (factorId: number, taskId: number, isNew?: boolean) => void;
-  onDeleteTask: (factorId: number, taskId: number) => void;
-  onReorderTasks: (factorId: number, newOrder: Task[]) => void;
+  onEditTask: (factorNumber: number, taskNumber: number) => void;
+  onSaveTask: (factorNumber: number, task: Task) => void;
+  onCancelTask: (
+    factorNumber: number,
+    taskNumber: number,
+    isNew?: boolean
+  ) => void;
+  onDeleteTask: (factorNumber: number, taskNumber: number) => void;
+  onReorderTasks: (factorNumber: number, newOrder: Task[]) => void;
+  dragDisabled?: boolean;
+  dragDisabledReason?: string;
   listeners: SyntheticListenerMap;
   attributes: DraggableAttributes;
 }
 
 export function FactorRow({
+  rowNumber,
   factor,
+  isExpanded,
+  isEditing,
+  editingTaskId,
   onToggleExpand,
   onEdit,
   onSave,
@@ -69,43 +88,78 @@ export function FactorRow({
   onCancelTask,
   onDeleteTask,
   onReorderTasks,
+  dragDisabled = false,
+  dragDisabledReason = "",
   listeners,
   attributes,
 }: FactorRowProps) {
   const [editedFactor, setEditedFactor] = useState<Factor>({ ...factor });
   const [showConfirm, setShowConfirm] = useState(false);
-  const resultadosRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleChange = (field: keyof Factor, value: string) => {
+  // ✅ Hooks SIEMPRE en top-level, nunca dentro de condicionales
+  const taskDnDSensors = useSensors(useSensor(PointerSensor));
+
+  const handleChange = (field: keyof Factor, value: any) => {
     setEditedFactor({ ...editedFactor, [field]: value });
   };
 
-  const handleSave = () => {
-    onSave(editedFactor);
-  };
-
-  const sensors = useSensors(useSensor(PointerSensor));
+  const handleSave = () => onSave(editedFactor);
 
   const handleDragEndTask = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = factor.tareas.findIndex((t) => t.id === active.id);
-    const newIndex = factor.tareas.findIndex((t) => t.id === over.id);
+    const list = factor.tasks ?? [];
+    const oldIndex = list.findIndex((t) => t.id === active.id);
+    const newIndex = list.findIndex((t) => t.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const reordered = arrayMove(factor.tareas, oldIndex, newIndex).map(
-        (t, i) => ({
-          ...t,
-          orden: i + 1,
-        })
-      );
-      onReorderTasks(factor.id, reordered);
+      const reordered = arrayMove(list, oldIndex, newIndex).map((t, i) => ({
+        ...t,
+        order: i + 1,
+      }));
+      onReorderTasks(rowNumber, reordered);
     }
   };
 
   const tareasTerminadas = countCompletedTasks();
-  const totalTareas = factor.tareas.length;
+  const totalTareas = (factor.tasks ?? []).length;
+
+  const showBlocked = () => {
+    toast.info(
+      dragDisabledReason ||
+        "No puedes reordenar mientras hay cambios sin guardar."
+    );
+  };
+
+  // Handlers tipados correctamente (no hay casts peligrosos)
+  const blockedMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showBlocked();
+  };
+  const blockedPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showBlocked();
+  };
+  const blockedTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showBlocked();
+  };
+
+  // Props cuando está bloqueado
+  const blockedProps: React.HTMLAttributes<HTMLDivElement> = {
+    onMouseDown: blockedMouseDown,
+    onPointerDown: blockedPointerDown,
+    onTouchStart: blockedTouchStart,
+  };
+
+  // Props “sortable” (coaccionamos tipos de dnd-kit a HTMLAttributes)
+  const sortableProps = (!dragDisabled
+    ? { ...(listeners ?? {}), ...(attributes ?? {}) }
+    : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
 
   return (
     <div
@@ -113,68 +167,22 @@ export function FactorRow({
         isDragging ? "bg-blue-50" : "bg-white hover:bg-gray-50"
       }`}
     >
+      {/* Fila del factor */}
       <div className="grid grid-cols-12 gap-2 items-center">
-        {factor.enEdicion ? (
-          <>
-            <div className="col-span-4 flex items-center gap-2">
-              <GripVertical size={16} className="text-gray-400" />
-              <TextareaWithCounter
-                value={editedFactor.descripcion}
-                onChange={(val) => handleChange("descripcion", val)}
-                maxLength={120}
-                placeholder="Describa el factor clave de éxito"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    resultadosRef.current?.focus();
-                  }
-                }}
-                rows={1}
-              />
-            </div>
-            <div className="col-span-4">
-              <TextareaWithCounter
-                ref={resultadosRef}
-                value={editedFactor.resultado}
-                onChange={(val) => handleChange("resultado", val)}
-                maxLength={300}
-                placeholder="Resultado (entregable)"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSave();
-                  }
-                }}
-                rows={1}
-              />
-            </div>
-            <div className="col-span-2 text-xs text-gray-500">N/A</div>
-            <div className="col-span-2 flex justify-end gap-1">
-              <Button
-                onClick={onCancel}
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-red-500 hover:bg-red-50"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleSave}
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-green-500 hover:bg-green-50"
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            </div>
-          </>
-        ) : (
+        {/* Modo edición de factor */}
+        {isEditing ? (
           <>
             <div className="col-span-4 flex items-center gap-2">
               <div
-                className="cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
-                {...listeners}
-                {...attributes}
+                className={`flex items-center gap-2 px-3 py-2 ${
+                  dragDisabled ? "cursor-not-allowed opacity-60" : "cursor-grab"
+                }`}
+                title={
+                  dragDisabled
+                    ? dragDisabledReason || "No puedes reordenar ahora"
+                    : "Arrastra para reordenar"
+                }
+                {...(dragDisabled ? blockedProps : sortableProps)}
               >
                 <GripVertical size={16} />
               </div>
@@ -182,19 +190,92 @@ export function FactorRow({
                 onClick={onToggleExpand}
                 className="hover:text-gray-700 p-1 rounded hover:bg-gray-100"
               >
-                {factor.expandido ? (
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Nombre
+                </label>
+                <TextareaWithCounter
+                  value={editedFactor.name ?? ""}
+                  onChange={(val) => handleChange("name", val)}
+                  maxLength={150}
+                />
+              </div>
+            </div>
+
+            <div className="col-span-4">
+              <label className="text-xs text-gray-500 mb-1 block">
+                Descripción
+              </label>
+              <TextareaWithCounter
+                value={editedFactor.description ?? ""}
+                onChange={(val) => handleChange("description", val)}
+                maxLength={300}
+              />
+            </div>
+
+            <div className="col-span-2 text-xs text-gray-500 flex items-center">
+              Tareas: {tareasTerminadas} / {totalTareas}
+            </div>
+
+            <div className="col-span-2 flex justify-end items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => onCancel()}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-green-600 hover:text-green-700"
+                onClick={handleSave}
+              >
+                <Save className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          // Vista lectura
+          <>
+            <div className="col-span-4 flex items-center gap-2">
+              <div
+                className={`text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 ${
+                  dragDisabled ? "cursor-not-allowed opacity-60" : "cursor-grab"
+                }`}
+                title={
+                  dragDisabled
+                    ? dragDisabledReason || "No puedes reordenar ahora"
+                    : "Arrastra para reordenar"
+                }
+                {...(dragDisabled ? blockedProps : sortableProps)}
+              >
+                <GripVertical size={16} />
+              </div>
+              <button
+                onClick={onToggleExpand}
+                className="hover:text-gray-700 p-1 rounded hover:bg-gray-100"
+              >
+                {isExpanded ? (
                   <ChevronDown className="h-4 w-4" />
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
               </button>
               <span className="text-sm font-medium text-gray-800 truncate">
-                {factor.descripcion}
+                {factor.description ?? ""}
               </span>
             </div>
             <div className="col-span-4">
               <span className="text-sm text-gray-600 line-clamp-2">
-                {factor.resultado}
+                {factor.result ?? ""}
               </span>
             </div>
             <div className="col-span-2">
@@ -207,7 +288,7 @@ export function FactorRow({
                 onClick={onEdit}
                 size="icon"
                 variant="ghost"
-                className="h-7 w-7 text-gray-500 hover:bg-gray-100"
+                className="h-7 w-7"
               >
                 <Edit className="h-3.5 w-3.5" />
               </Button>
@@ -215,8 +296,7 @@ export function FactorRow({
                 onClick={onAddTask}
                 size="icon"
                 variant="ghost"
-                disabled={hasItemInCreation?.()}
-                className="h-7 w-7 text-blue-500 hover:bg-blue-50 disabled:opacity-50"
+                className="h-7 w-7 text-blue-500 hover:bg-blue-50"
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
@@ -234,52 +314,55 @@ export function FactorRow({
       </div>
 
       {/* Tareas del factor */}
-      {factor.expandido && factor.tareas.length > 0 && (
+      {isExpanded && (factor.tasks?.length ?? 0) > 0 && (
         <div className="mt-2 pl-8 bg-gray-50 border-t border-gray-100">
           <DndContext
-            sensors={sensors}
+            sensors={taskDnDSensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEndTask}
           >
             <SortableContext
-              items={factor.tareas.map((t) => t.id)}
+              items={(factor.tasks ?? []).map((t) => t.id)}
               strategy={verticalListSortingStrategy}
             >
-              {factor.tareas.map((task) => (
+              {(factor.tasks ?? []).map((task, idx) => (
                 <SortableTask
                   key={task.id}
                   task={task}
-                  onEdit={() => onEditTask(factor.id, task.id)}
-                  onSave={(t) => onSaveTask(factor.id, t)}
-                  onCancel={() =>
-                    onCancelTask(factor.id, task.id, task.esNuevo)
-                  }
-                  onDelete={() => onDeleteTask(factor.id, task.id)}
+                  isEditing={editingTaskId === task.id}
+                  onEdit={() => onEditTask(rowNumber, idx + 1)}
+                  onSave={(t) => onSaveTask(rowNumber, t)}
+                  onCancel={() => onCancelTask(rowNumber, idx + 1, false)}
+                  onDelete={() => onDeleteTask(rowNumber, idx + 1)}
+                  dragDisabled={dragDisabled}
+                  dragDisabledReason={dragDisabledReason}
                 />
               ))}
             </SortableContext>
           </DndContext>
         </div>
       )}
+
+      {/* Confirmación eliminar factor (inactivar) */}
       <ConfirmModal
         open={showConfirm}
         title="Eliminación de factor"
         message={
-          factor.tareas.length > 0
-            ? "Esto eliminará el factor seleccionado y también las siguientes tareas asociadas:"
-            : "¿Estás seguro de que deseas eliminar este factor?"
+          (factor.tasks?.length ?? 0) > 0
+            ? "Esto inactivará el factor y sus tareas relacionadas."
+            : "¿Estás seguro de que deseas inactivar este factor?"
         }
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => {
           onDelete();
           setShowConfirm(false);
         }}
-        confirmText="Eliminar de todas maneras"
+        confirmText="Inactivar"
       >
-        {factor.tareas.length > 0 && (
+        {(factor.tasks?.length ?? 0) > 0 && (
           <ul className="list-disc list-inside text-sm text-gray-700 max-h-32 overflow-auto pr-2">
-            {factor.tareas.map((t) => (
-              <li key={t.id}>{t.nombre || "Sin nombre"}</li>
+            {(factor.tasks ?? []).map((t) => (
+              <li key={t.id}>{t.name || "Sin nombre"}</li>
             ))}
           </ul>
         )}
