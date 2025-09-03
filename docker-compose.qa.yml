@@ -20,4 +20,4 @@ services:
 networks:
   soe-qa-network:
     external: true
-    name: arco-soe-api_soe-qa-network
+    name: soe-qa-network
