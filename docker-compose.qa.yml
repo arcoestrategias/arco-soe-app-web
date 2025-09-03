@@ -3,15 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL}
     container_name: frontend-qa
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: ${FRONT_PORT:-3000}
-      # Público (browser)
+      PORT: ${FRONT_PORT}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
-      # Interno (SSR/ISR) por la red Docker compartida
-      API_BASE_URL_INTERNAL: http://backend-qa:4000/api/v1
+      API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL}
     ports:
       - "${HOST_DOCKER_FRONT_PORT:-3000}:${FRONT_PORT:-3000}"
     networks:

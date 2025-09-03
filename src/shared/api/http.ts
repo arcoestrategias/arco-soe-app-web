@@ -18,9 +18,17 @@ import {
  * BASE_URL solo contiene dominio/host.
  * El prefijo (/api/v1) lo agrega routes.ts en cada endpoint.
  */
-const API_BASE =
+const apiPublic =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "";
-const BASE_URL = API_BASE || "/";
+
+const apiInternal =
+  process.env.API_BASE_URL_INTERNAL?.replace(/\/+$/, "") ?? "";
+
+// SSR usa interna > pública > "/"; Cliente usa pública > "/"
+const BASE_URL =
+  typeof window === "undefined"
+    ? apiInternal || apiPublic || "/"
+    : apiPublic || "/";
 
 export const http: AxiosInstance = axios.create({
   baseURL: BASE_URL,

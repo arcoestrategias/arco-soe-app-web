@@ -16,6 +16,10 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG API_BASE_URL_INTERNAL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV API_BASE_URL_INTERNAL=$API_BASE_URL_INTERNAL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Asegura standalone en tu next.config.js:
