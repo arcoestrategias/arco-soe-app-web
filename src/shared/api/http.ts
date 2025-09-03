@@ -91,7 +91,6 @@ async function doRefresh(): Promise<string | null> {
         headers: new AxiosHeaders({
           "Content-Type": "application/json",
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         }),
       }
     );
@@ -120,8 +119,6 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   const bu = getBusinessUnitId();
   if (bu) headers.set("x-business-unit-id", bu);
-
-  headers.set("ngrok-skip-browser-warning", "true");
 
   return config;
 });
