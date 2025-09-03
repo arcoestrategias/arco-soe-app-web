@@ -1,7 +1,7 @@
 import "./globals.css";
+import { Suspense } from "react";
 import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { QueryProvider } from "@/shared/react-query/query-provider";
-// import { Toaster } from "sonner";
 import AppShell from "./AppShell";
 import ClientToaster from "@/shared/utils/client-toaster";
 
@@ -15,7 +15,9 @@ export default function RootLayout({
       <body>
         <QueryProvider>
           <AuthProvider>
-            <AppShell>{children}</AppShell>
+            <Suspense fallback={null}>
+              <AppShell>{children}</AppShell>
+            </Suspense>
           </AuthProvider>
           <ClientToaster />
         </QueryProvider>
