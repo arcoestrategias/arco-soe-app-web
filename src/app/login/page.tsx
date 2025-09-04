@@ -27,7 +27,6 @@ export default function LoginPage() {
       {/* Formulario */}
       <div className="flex-1 lg:w-1/2 bg-gray-50 flex flex-col">
         <div className="flex-1 flex items-center justify-center p-8">
-          {/* 👇 usa la prop soportada por LoginForm */}
           <LoginForm defaultRedirectTo="/resumen" />
         </div>
 

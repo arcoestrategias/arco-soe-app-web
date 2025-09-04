@@ -35,8 +35,6 @@ import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 // storage helpers
 import {
-  clearBusinessUnit,
-  clearSelectedCompanyId,
   getAccessToken,
   setBusinessUnitId,
   setPositionId,
@@ -54,6 +52,7 @@ type Props = {
 };
 
 export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
+  // console.log(defaultRedirectTo);
   // Modo de la pantalla: login normal o recuperación
   const [mode, setMode] = React.useState<"login" | "recover">("login");
   // Estado local para enviar correo de recuperación
@@ -152,7 +151,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     if (!isAdmin && !needsSelection) {
       if (!didRedirectRef.current) {
         didRedirectRef.current = true;
-        const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
+        const go =
+          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+            ? redirectTo
+            : "/resumen";
         router.replace(go);
       }
       return;
@@ -162,7 +164,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     if (isAdmin && getCompanyId() && getBusinessUnitId()) {
       if (!didRedirectRef.current) {
         didRedirectRef.current = true;
-        const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
+        const go =
+          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+            ? redirectTo
+            : "/resumen";
         router.replace(go);
       }
       return;
@@ -185,7 +190,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         setBusinessUnitId(only.id);
         setPositionId(only?.positionId ?? null);
         await reloadMe();
-        const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
+        const go =
+          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+            ? redirectTo
+            : "/resumen";
         router.replace(go);
       } catch (err) {
         toast.error(getHumanErrorMessage(err));
@@ -288,9 +296,11 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         setCompanyId(adminCompanyId);
         setBusinessUnitId(adminBuId);
         setPositionId(null);
-        await reloadMe();
         toast.success("Compañía y Unidad de negocio seleccionada");
-        const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
+        const go =
+          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+            ? redirectTo
+            : "/resumen";
         router.replace(go);
       } catch (err) {
         const msg = getHumanErrorMessage(err);
@@ -318,7 +328,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         setPositionId(sel?.positionId ?? null);
         await reloadMe();
         toast.success("Unidad de negocio seleccionada");
-        const go = redirectTo && redirectTo !== "/login" ? redirectTo : "/";
+        const go =
+          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+            ? redirectTo
+            : "/resumen";
         router.replace(go);
       } catch (err) {
         const msg = getHumanErrorMessage(err);
@@ -343,7 +356,6 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     try {
       setLoggingIn(true);
       await login({ email, password });
-      await reloadMe();
       toast.success("Inicio de sesión exitoso");
       // Si falta contexto, aparecerán los selects y el botón dirá "Aplicar".
     } catch (err) {
@@ -640,9 +652,6 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
               onAction={() => {
                 toast.info("Volviendo a login para cambiar de cuenta.");
                 clearAuthSession();
-                clearBusinessUnit();
-                clearSelectedCompanyId();
-                setPositionId(null);
                 setErrors({});
               }}
               className="btn-gradient flex-1 h-11 text-base"

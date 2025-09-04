@@ -26,7 +26,7 @@ function get(key: KeyName): string | null {
 function set(key: KeyName, value: string | null) {
   if (!isBrowser()) return;
   try {
-    if (value == null) localStorage.removeItem(KEYS[key]);
+    if (value === null) localStorage.removeItem(KEYS[key]);
     else localStorage.setItem(KEYS[key], value);
   } catch {}
 }
@@ -73,13 +73,10 @@ export function getBusinessUnitId(): string | null {
 
 export function setBusinessUnitId(buId: string) {
   set("businessUnitId", buId);
-  // limpiamos posible residuo legacy
-  remove("buChangedAt");
 }
 
 export function clearBusinessUnit() {
   remove("businessUnitId");
-  remove("buChangedAt"); // legacy
 }
 
 // ------- Company -------

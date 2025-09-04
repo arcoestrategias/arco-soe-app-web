@@ -36,10 +36,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     const token = getAccessToken();
     const canStay = isPublic || !!token;
-
     setAllowed(canStay);
     setAuthChecked(true);
-
     if (canStay) {
       redirectedRef.current = false; // reset guard
       return;

@@ -87,15 +87,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  // Extrae un "status" usable desde distintos tipos de error (fetch/axios/custom)
+  function extractStatus(err: unknown): number | undefined {
+    const anyE = err as any;
+    if (typeof anyE?.status === "number") return anyE.status;
+    if (typeof anyE?.response?.status === "number") return anyE.response.status;
+    if (typeof anyE?.code === "number") return anyE.code;
+    if (typeof anyE?.code === "string") {
+      const n = Number(anyE.code);
+      if (Number.isFinite(n)) return n;
+    }
+    return undefined;
+  }
+
   // --- /users/me ---
   const reloadMe = useCallback(async () => {
     setLoading(true);
     try {
       const data = await authService.me();
       applyMe(data ?? null);
-    } catch (e) {
-      // sin sesión válida → limpiar estado
-      clearSession();
+    } catch (e: unknown) {
+      // Solo invalidar sesión si es 401/403. Mantener contexto (BU/Company) en otros errores.
+      const status = extractStatus(e);
+      const isAuthError = status === 401 || status === 403;
+      if (isAuthError) {
+        clearSession();
+      } else {
+        setState((s) => ({ ...s, loading: false }));
+      }
     } finally {
       setLoading(false);
     }

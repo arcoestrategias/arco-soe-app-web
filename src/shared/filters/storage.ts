@@ -25,6 +25,7 @@
 const NAMESPACE = "soe.filters";
 
 const SUBKEYS = {
+  company: "companyId",
   businessUnit: "businessUnitId",
   plan: "strategicPlanId",
   project: "strategicProjectId",
