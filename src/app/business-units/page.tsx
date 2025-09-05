@@ -5,10 +5,7 @@ import { BusinessUnitsDashboard } from "@/features/business-units/components/bus
 
 const BusinessUnitsPage = () => {
   return (
-    <SidebarLayout
-      currentPath="/business-units"
-      pageTitle="Unidades de Negocio"
-    >
+    <SidebarLayout currentPath="/business-units">
       <BusinessUnitsDashboard />
     </SidebarLayout>
   );

@@ -22,11 +22,7 @@ export default function PositionsPage() {
   const [positionId, setPositionId] = useState<string | null>(null);
 
   return (
-    <SidebarLayout
-      currentPath="/positions"
-      pageTitle="Positions"
-      onNavigate={() => {}}
-    >
+    <SidebarLayout currentPath="/positions" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         {/* Encabezado */}
         <div className="flex items-center justify-between">

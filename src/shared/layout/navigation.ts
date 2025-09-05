@@ -16,35 +16,76 @@ import {
 
 export const navigationSections = [
   {
-    title: "Main",
+    title: "MANAGEMENT SYSTEM",
     items: [
-      { title: "Resumen", url: "/resumen", icon: LayoutGrid },
-      { title: "Plan Estratégico", url: "/strategic-plans", icon: Target },
-      { title: "Posiciones", url: "/positions", icon: Users },
+      { title: "Resumen", url: "/resumen", icon: LayoutGrid, module: "resume" },
+      {
+        title: "Plan Estratégico",
+        url: "/strategic-plans",
+        icon: Target,
+        module: "strategicPlan",
+      },
+      {
+        title: "Posiciones",
+        url: "/positions",
+        icon: Users,
+        module: "position",
+      },
       {
         title: "Proyectos Estratégicos",
         url: "/strategic-projects",
         icon: Briefcase,
+        module: "strategicProject",
       },
 
-      { title: "Objetivos", url: "/objetivos", icon: Trophy },
-      { title: "Prioridades", url: "/priorities", icon: Star },
-      { title: "Performance", url: "/performance", icon: TrendingUp },
+      {
+        title: "Objetivos",
+        url: "/objectives",
+        icon: Target,
+        module: "objective",
+      },
+      {
+        title: "Prioridades",
+        url: "/priorities",
+        icon: Star,
+        module: "priority",
+      },
+      {
+        title: "Performance",
+        url: "/performance",
+        icon: TrendingUp,
+        module: "performance",
+      },
     ],
   },
   {
-    title: "Gestión",
+    title: "CONFIGURACIONES",
     items: [
-      { title: "Compañías", url: "/companies", icon: Building2 },
-      { title: "Unidades de Negocio", url: "/business-units", icon: Layers3 },
-      { title: "Usuarios", url: "/users", icon: Users2 },
-      { title: "Posiciones", url: "/positions/manage", icon: IdCardLanyard },
       {
-        title: "Planes Estrategicos",
+        title: "Compañías",
+        url: "/companies",
+        icon: Building2,
+        module: "company",
+      },
+      {
+        title: "Unidades de Negocio",
+        url: "/business-units",
+        icon: Layers3,
+        module: "businessUnit",
+      },
+      { title: "Usuarios", url: "/users", icon: Users2, module: "user" },
+      {
+        title: "Posiciones",
+        url: "/positions/manage",
+        icon: IdCardLanyard,
+        module: "position",
+      },
+      {
+        title: "Planes Estratégicos",
         url: "/strategic-plans/manage",
         icon: BookOpenCheck,
+        module: "strategicPlan",
       },
-      { title: "Configuración", url: "/configuracion", icon: Settings },
     ],
   },
 ];

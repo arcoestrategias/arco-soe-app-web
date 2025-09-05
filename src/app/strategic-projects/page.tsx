@@ -74,11 +74,7 @@ export default function StrategicProjectsPage() {
   }
 
   return (
-    <SidebarLayout
-      currentPath="/strategic-projects"
-      pageTitle="Proyectos Estratégicos"
-      onNavigate={() => {}}
-    >
+    <SidebarLayout currentPath="/strategic-projects" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         {/* Encabezado + Filtros */}
         <div className="flex items-center justify-between">

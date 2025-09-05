@@ -37,7 +37,10 @@ type AuthContextValue = AuthState & {
   login: (dto: LoginDto) => Promise<void>;
   logout: () => Promise<void>;
   reloadMe: () => Promise<void>;
-  selectBusinessUnit: (buId: string) => Promise<void>;
+  selectBusinessUnit: (
+    buId: string,
+    opts?: { fireAndForget?: boolean }
+  ) => Promise<void>;
   clearSession: () => void;
 };
 
@@ -148,10 +151,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- selección de BU ---
   const selectBusinessUnit = useCallback(
-    async (buId: string) => {
-      // Persistimos SOLO el ID de la BU
+    async (buId: string, opts?: { fireAndForget?: boolean }) => {
+      if (!buId) return;
       setBusinessUnitId(buId);
-      // Volvemos a pedir /me para que el backend calcule permisos con ese header
+      if (opts?.fireAndForget) {
+        // refresca /me sin bloquear la UI
+        reloadMe().catch(() => {});
+        return;
+      }
       await reloadMe();
     },
     [reloadMe]

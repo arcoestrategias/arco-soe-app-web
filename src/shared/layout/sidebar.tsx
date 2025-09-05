@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/tooltip";
 import { navigationSections } from "@/shared/layout/navigation";
 import type { SidebarProps } from "@/shared/layout/types";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "../auth/access-control";
+import Link from "next/link";
 
 export function Sidebar({
   currentPath,
@@ -23,6 +26,8 @@ export function Sidebar({
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  const { me } = useAuth();
+  const isAdmin = !!me?.isPlatformAdmin;
 
   const shouldShowExpanded = !isCollapsed || isHovered;
 
@@ -42,10 +47,20 @@ export function Sidebar({
     onToggle?.(next);
   };
 
-  const handleClick = (url: string) => {
-    router.push(url);
-    onNavigate?.(url);
-  };
+  const sections = navigationSections
+    .map((sec) => ({
+      ...sec,
+      items: sec.items.filter((it: any) => {
+        // 1) adminOnly → sólo admin
+        if (it.adminOnly) return isAdmin;
+        // 2) sin module → visible para todos
+        if (!it.module) return true;
+        // 3) con module → requiere access=true
+        return hasAccess(me, it.module, "access");
+      }),
+    }))
+    // opcional: oculta secciones vacías
+    .filter((sec) => sec.items.length > 0);
 
   return (
     <TooltipProvider>
@@ -53,7 +68,7 @@ export function Sidebar({
         role="navigation"
         aria-label="Sidebar navigation"
         className={cn(
-          "fixed left-0 top-0 h-screen bg-white border-r border-gray-200 z-40 transition-all duration-300 ease-in-out overflow-hidden font-system",
+          "fixed left-0 top-0 h-svh min-h-0 bg-white border-r border-gray-200 z-40 transition-all duration-300 ease-in-out overflow-hidden font-system flex flex-col",
           shouldShowExpanded ? "w-64" : "w-16"
         )}
         onMouseEnter={() => setIsHovered(true)}
@@ -95,8 +110,8 @@ export function Sidebar({
           </Button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4">
-          {navigationSections.map((section, i) => (
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 pr-1">
+          {sections.map((section, i) => (
             <div
               key={section.title}
               className={cn("mb-6", i > 0 && "border-t pt-4 border-gray-100")}
@@ -115,43 +130,35 @@ export function Sidebar({
               </div>
 
               <div className="space-y-1 px-3">
-                {section.items.map((item) => {
+                {section.items.map((item: any) => {
                   const isActive = currentPath?.startsWith(item.url);
 
                   return (
-                    <div
-                      key={item.title}
-                      onClick={() => handleClick(item.url)}
-                      className={cn(
-                        "group flex items-center w-full cursor-pointer transition-all rounded-lg px-3 py-2.5",
-                        isActive
-                          ? "bg-orange-50 text-orange-600"
-                          : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                      )}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      <span
+                    <ul key={item.title}>
+                      <Link
+                        href={item.url}
+                        prefetch
                         className={cn(
-                          "transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap",
-                          shouldShowExpanded
-                            ? "opacity-100 ml-3 w-auto"
-                            : "opacity-0 ml-0 w-0"
+                          "group flex items-center w-full transition-all rounded-lg px-3 py-2.5 cursor-pointer",
+                          isActive
+                            ? "bg-orange-50 text-orange-600"
+                            : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                         )}
+                        aria-current={isActive ? "page" : undefined}
                       >
-                        {item.title}
-                      </span>
-                      {!shouldShowExpanded && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="absolute inset-0" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right">
-                            {item.title}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        <span
+                          className={cn(
+                            "transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap",
+                            shouldShowExpanded
+                              ? "opacity-100 ml-3 w-auto"
+                              : "opacity-0 ml-0 w-0"
+                          )}
+                        >
+                          {item.title}
+                        </span>
+                      </Link>
+                    </ul>
                   );
                 })}
               </div>

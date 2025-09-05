@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { setBusinessUnitId } from "../auth/storage";
 
 export function Header({
-  currentPageTitle = "Dashboard",
+  currentPageTitle,
   userName,
   userEmail,
   onLogout,
@@ -148,7 +148,7 @@ export function Header({
               {hasMultipleBU && (
                 <>
                   <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5">
+                  <div className="px-2 py-1.5 w-full">
                     <p className="text-[10px] text-gray-500 mb-1">
                       Unidad de negocio
                     </p>
@@ -157,14 +157,14 @@ export function Header({
                       onValueChange={handleChangeBU}
                       disabled={loading || pending}
                     >
-                      <SelectTrigger className="h-8">
+                      <SelectTrigger className="h-8 w-full">
                         <SelectValue
                           placeholder={
                             me?.currentBusinessUnit?.name ?? "Selecciona unidad"
                           }
                         />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)]">
                         {businessUnits?.map((bu) => (
                           <SelectItem key={bu.id} value={bu.id}>
                             {bu.name}

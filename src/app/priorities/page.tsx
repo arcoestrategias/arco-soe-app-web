@@ -27,11 +27,7 @@ export default function PrioritiesPage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
   return (
-    <SidebarLayout
-      currentPath="/priorities"
-      pageTitle="Priorities"
-      onNavigate={() => {}}
-    >
+    <SidebarLayout currentPath="/priorities" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         {/* Encabezado: IZQ (título/descr) + DER (filtros) */}
         <div className="flex items-start justify-between">

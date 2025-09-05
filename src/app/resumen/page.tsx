@@ -17,11 +17,7 @@ export default function ResumenPage() {
   const scatterData = mapToScatterData(allRoles);
 
   return (
-    <SidebarLayout
-      pageTitle="Executive Summary"
-      currentPath="/resumen"
-      onNavigate={() => {}}
-    >
+    <SidebarLayout currentPath="/resumen" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         <SectionHeader
           title="SOE Executive Summary"

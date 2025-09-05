@@ -2,14 +2,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { getHumanErrorMessage, unwrapAny } from "@/shared/api/response";
-import http from "@/shared/api/http";
+import { getHumanErrorMessage } from "@/shared/api/response";
 
-// shadcn/ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,10 +27,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-// icons
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
-// storage helpers
 import {
   getAccessToken,
   setBusinessUnitId,
@@ -43,7 +38,7 @@ import {
   setCompanyId,
   clearAuthSession,
 } from "@/shared/auth/storage";
-import { routes } from "@/shared/api/routes";
+
 import { authService } from "../services/authService";
 import { ActionButton } from "@/components/ui/action-button";
 
@@ -52,15 +47,20 @@ type Props = {
 };
 
 export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
-  // console.log(defaultRedirectTo);
-  // Modo de la pantalla: login normal o recuperación
+  // --- Modo de pantalla
   const [mode, setMode] = React.useState<"login" | "recover">("login");
-  // Estado local para enviar correo de recuperación
-  const [recovering, setRecovering] = React.useState(false);
 
-  // Estados de envío (submit) para otras ramas
+  // --- Estados de envío
+  const [recovering, setRecovering] = React.useState(false);
   const [loggingIn, setLoggingIn] = React.useState(false);
-  const [applying, setApplying] = React.useState(false); // admin apply
+  const [applying, setApplying] = React.useState(false); // admin: aplicar company/BU
+  const [pendingBU, setPendingBU] = React.useState(false); // no-admin: aplicar BU
+
+  // *** BLOQUEO DURO DE UI ***
+  // Evita clics repetidos incluso antes de que React marque disabled por estado.
+  // Se activa al iniciar un flujo async real y NO se desactiva en éxito (redirecciona).
+  // Solo se desactiva en errores o validaciones fallidas.
+  const [uiLocked, setUiLocked] = React.useState(false);
 
   const router = useRouter();
   const search = useSearchParams();
@@ -76,14 +76,13 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     initializing,
   } = useAuth();
 
-  // ---- estado común ----
+  // --- Estado común de formulario
   const [form, setForm] = React.useState({ email: "", password: "" });
   const [errors, setErrors] = React.useState<{
     email?: string;
     password?: string;
     root?: string;
   }>({});
-  const [pendingBU, setPendingBU] = React.useState(false);
   const [showPwd, setShowPwd] = React.useState(false);
 
   const redirectTo = React.useMemo(() => {
@@ -91,24 +90,28 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     return q && q.startsWith("/") ? q : defaultRedirectTo;
   }, [search, defaultRedirectTo]);
 
-  const didRedirectRef = React.useRef(false);
-  const didAutoSelectRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!redirectTo) return;
+    const go =
+      redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+        ? redirectTo
+        : "/resumen";
+    router.prefetch(go);
+  }, [redirectTo, router]);
 
   const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-  // ---- logged state desde storage (inmediato tras login) ----
+  // ---- logged state desde storage
   const isLogged = !!getAccessToken();
 
-  // ---- NO ADMIN (selector de BU) ----
+  // ---- NO ADMIN (selector BU)
   const buCount = businessUnits?.length ?? 0;
   const [buId, setBuId] = React.useState<string>("");
 
-  // ---- ADMIN (selectores locales de compañía y BU) ----
+  // ---- ADMIN (selectores locales)
   const isAdmin = !!me?.isPlatformAdmin;
   const adminCompanies = React.useMemo(() => me?.companies ?? [], [me]);
   const companiesCount = adminCompanies?.length ?? 0;
-
-  // Estado LOCAL (no persistimos hasta submit)
   const [adminCompanyId, setAdminCompanyId] = React.useState<string>("");
   const adminSelectedCompany = React.useMemo(
     () => adminCompanies?.find((c) => c.id === adminCompanyId) || null,
@@ -117,7 +120,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
   const adminCompanyBUs = adminSelectedCompany?.businessUnits ?? [];
   const [adminBuId, setAdminBuId] = React.useState<string>("");
 
-  // ---- Persistir positionId según /me (NO admin) o null (admin) ----
+  // Persistir positionId según /me (NO admin) o null (admin)
   React.useEffect(() => {
     if (!isLogged) return;
     if (isAdmin) {
@@ -128,53 +131,48 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     setPositionId(pos);
   }, [isLogged, isAdmin, me?.currentBusinessUnit?.positionId]);
 
-  // ---- Flags de UI ----
+  // ---- Flags de UI
   const nonAdminNeedsSelector =
     isLogged && !isAdmin && needsSelection && buCount > 1;
 
-  // Para admin necesitamos “Aplicar” mientras NO tengamos contexto persistido:
   const adminNeedsSelector =
     isLogged && isAdmin && (!getCompanyId() || !getBusinessUnitId());
 
-  // Sólo mostrar selectores cuando estamos en modo "login"
   const showSelectorsSection =
     mode === "login" && (adminNeedsSelector || nonAdminNeedsSelector);
 
-  // ---- Redirección automática si ya no se requiere selección ----
+  // ---- Redirección automática si ya no se requiere selección
+  const didRedirectRef = React.useRef(false);
   React.useEffect(() => {
     if (initializing) return;
 
     const token = getAccessToken();
     if (!token) return;
 
-    // NO admin
+    const go =
+      redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+        ? redirectTo
+        : "/resumen";
+
     if (!isAdmin && !needsSelection) {
       if (!didRedirectRef.current) {
         didRedirectRef.current = true;
-        const go =
-          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
-            ? redirectTo
-            : "/resumen";
         router.replace(go);
       }
       return;
     }
 
-    // ADMIN: si ya hay contexto persistido, fuera
     if (isAdmin && getCompanyId() && getBusinessUnitId()) {
       if (!didRedirectRef.current) {
         didRedirectRef.current = true;
-        const go =
-          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
-            ? redirectTo
-            : "/resumen";
         router.replace(go);
       }
       return;
     }
   }, [initializing, isAdmin, needsSelection, router, redirectTo]);
 
-  // ---- Auto-selección NO admin si solo hay 1 BU ----
+  // ---- Auto-selección NO admin si solo hay 1 BU
+  const didAutoSelectRef = React.useRef(false);
   React.useEffect(() => {
     if (!isLogged || isAdmin) return;
     if (!needsSelection) return;
@@ -187,9 +185,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
 
     (async () => {
       try {
+        // flujo silencioso
         setBusinessUnitId(only.id);
         setPositionId(only?.positionId ?? null);
-        await reloadMe();
+        reloadMe().catch(() => {});
         const go =
           redirectTo && redirectTo !== "/login" && redirectTo !== "/"
             ? redirectTo
@@ -210,7 +209,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     redirectTo,
   ]);
 
-  // ---- Inicializa selects ADMIN (solo cuando hay compañías) ----
+  // ---- Inicializa selects ADMIN
   const adminInitedRef = React.useRef(false);
   React.useEffect(() => {
     if (!adminNeedsSelector) {
@@ -220,7 +219,6 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     if (adminInitedRef.current) return;
     if (!companiesCount) return;
 
-    // Si hay algo en storage de sesiones previas, proponlo como default local
     const storedCompanyId = getCompanyId();
     const firstCompanyId = adminCompanies?.[0]?.id ?? "";
     const candidateCompanyId =
@@ -240,138 +238,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     adminInitedRef.current = true;
   }, [adminNeedsSelector, companiesCount, adminCompanies]);
 
-  // ---- Submit único ----
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    // ---- Recuperación de contraseña ----
-    if (mode === "recover") {
-      const email = form.email.trim();
-      if (!email) {
-        setErrors((p) => ({ ...p, email: "Ingresa tu correo" }));
-        return;
-      }
-      const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      if (!isEmail(email)) {
-        setErrors((p) => ({ ...p, email: "Correo inválido" }));
-        return;
-      }
-      try {
-        setRecovering(true);
-        const data = await authService.forgotPassword(email);
-        toast.success("Si el correo existe, te enviaremos instrucciones.");
-        if (data?.resetToken) console.log("resetToken:", data.resetToken);
-        setMode("login");
-      } catch (err) {
-        toast.error(getHumanErrorMessage(err));
-      } finally {
-        setRecovering(false);
-      }
-      return;
-    }
-
-    // ADMIN: aplicar selección (NO persistimos hasta aquí)
-    if (adminNeedsSelector) {
-      setApplying(true);
-      if (!companiesCount) {
-        setErrors((p) => ({
-          ...p,
-          root: "Cargando compañías… intenta en unos segundos.",
-        }));
-        setApplying(false);
-        return;
-      }
-      if (!adminCompanyId) {
-        setErrors((p) => ({ ...p, root: "Selecciona una compañía." }));
-        setApplying(false);
-        return;
-      }
-      if (!adminBuId) {
-        setErrors((p) => ({ ...p, root: "Selecciona una unidad de negocio." }));
-        setApplying(false);
-        return;
-      }
-      try {
-        // Persistimos AHORA
-        setCompanyId(adminCompanyId);
-        setBusinessUnitId(adminBuId);
-        setPositionId(null);
-        toast.success("Compañía y Unidad de negocio seleccionada");
-        const go =
-          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
-            ? redirectTo
-            : "/resumen";
-        router.replace(go);
-      } catch (err) {
-        const msg = getHumanErrorMessage(err);
-        setErrors((p) => ({ ...p, root: msg }));
-        toast.error(msg);
-      } finally {
-        setApplying(false);
-      }
-      return;
-    }
-
-    // NO admin: Selector BU (>1)
-    if (nonAdminNeedsSelector) {
-      if (!buId) {
-        setErrors((p) => ({
-          ...p,
-          root: "Selecciona una unidad de negocio para continuar.",
-        }));
-        return;
-      }
-      try {
-        setPendingBU(true);
-        await selectBusinessUnit(buId);
-        const sel = businessUnits?.find((b) => b.id === buId);
-        setPositionId(sel?.positionId ?? null);
-        await reloadMe();
-        toast.success("Unidad de negocio seleccionada");
-        const go =
-          redirectTo && redirectTo !== "/login" && redirectTo !== "/"
-            ? redirectTo
-            : "/resumen";
-        router.replace(go);
-      } catch (err) {
-        const msg = getHumanErrorMessage(err);
-        setErrors((p) => ({ ...p, root: msg }));
-        toast.error(msg);
-      } finally {
-        setPendingBU(false);
-      }
-      return;
-    }
-
-    // LOGIN
-    const email = form.email.trim();
-    const password = form.password;
-
-    if (!email) return setErrors((p) => ({ ...p, email: "Ingresa tu correo" }));
-    if (!isEmail(email))
-      return setErrors((p) => ({ ...p, email: "Correo inválido" }));
-    if (!password || password.length < 6)
-      return setErrors((p) => ({ ...p, password: "Mínimo 6 caracteres" }));
-
-    try {
-      setLoggingIn(true);
-      await login({ email, password });
-      toast.success("Inicio de sesión exitoso");
-      // Si falta contexto, aparecerán los selects y el botón dirá "Aplicar".
-    } catch (err) {
-      const msg = getHumanErrorMessage(err);
-      setErrors((p) => ({ ...p, root: msg }));
-      toast.error(msg);
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-
+  // ---- Estado visual de botón principal
   const busy = loading || initializing;
-  // Estado de envío real del botón principal, según cada modo/fase
+  const inSelectionPhase = adminNeedsSelector || nonAdminNeedsSelector;
+
   const submitting =
     mode === "recover"
       ? recovering
@@ -381,8 +251,6 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
       ? pendingBU
       : loggingIn;
 
-  // El label será "Aplicar" si estamos en fase de selección (admin o no admin)
-  const inSelectionPhase = adminNeedsSelector || nonAdminNeedsSelector;
   const primaryLabel =
     mode === "recover"
       ? recovering
@@ -396,25 +264,172 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
       ? "Aplicar"
       : "Iniciar sesión";
 
-  const header =
-    mode === "recover"
-      ? {
-          title: "Recuperar contraseña",
-          desc: "Ingresa tu correo y te enviaremos instrucciones para restablecerla",
-        }
-      : {
-          title: "Iniciar sesión en SOE",
-          desc: "Accede a tu cuenta para continuar",
-        };
+  // ---- Helpers de navegación
+  const goAfter = React.useCallback(() => {
+    const go =
+      redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+        ? redirectTo
+        : "/resumen";
+    router.replace(go);
+  }, [redirectTo, router]);
+
+  // ---- Handler del botón principal
+  const handlePrimary = async () => {
+    setErrors({});
+
+    // Si está bloqueado por un flujo previo, ignorar
+    if (uiLocked) return;
+
+    // Validaciones sin bloquear UI (rápidas)
+    if (mode === "recover") {
+      const email = form.email.trim();
+      if (!email) {
+        setErrors((p) => ({ ...p, email: "Ingresa tu correo" }));
+        return;
+      }
+      if (!isEmail(email)) {
+        setErrors((p) => ({ ...p, email: "Correo inválido" }));
+        return;
+      }
+    } else if (!isLogged && !inSelectionPhase) {
+      // Login normal: valida campos antes de bloquear
+      const email = form.email.trim();
+      const password = form.password;
+      if (!email) {
+        setErrors((p) => ({ ...p, email: "Ingresa tu correo" }));
+        return;
+      }
+      if (!isEmail(email)) {
+        setErrors((p) => ({ ...p, email: "Correo inválido" }));
+        return;
+      }
+      if (!password || password.length < 6) {
+        setErrors((p) => ({ ...p, password: "Mínimo 6 caracteres" }));
+        return;
+      }
+    } else if (adminNeedsSelector) {
+      if (!companiesCount) {
+        setErrors((p) => ({
+          ...p,
+          root: "Cargando compañías… intenta en unos segundos.",
+        }));
+        return;
+      }
+      if (!adminCompanyId) {
+        setErrors((p) => ({ ...p, root: "Selecciona una compañía." }));
+        return;
+      }
+      if (!adminBuId) {
+        setErrors((p) => ({ ...p, root: "Selecciona una unidad de negocio." }));
+        return;
+      }
+      // Si ya coincide con lo persistido, evita re-aplicar
+      const alreadyApplied =
+        getCompanyId() === adminCompanyId && getBusinessUnitId() === adminBuId;
+      if (alreadyApplied) {
+        toast.info("Contexto ya aplicado.");
+        goAfter();
+        return;
+      }
+    } else if (nonAdminNeedsSelector) {
+      if (!buId) {
+        setErrors((p) => ({
+          ...p,
+          root: "Selecciona una unidad de negocio para continuar.",
+        }));
+        return;
+      }
+    }
+
+    // A partir de aquí sí bloqueamos duro la UI para evitar doble click
+    setUiLocked(true);
+
+    try {
+      // Recuperación
+      if (mode === "recover") {
+        setRecovering(true);
+        const data = await authService.forgotPassword(form.email.trim());
+        toast.success("Si el correo existe, te enviaremos instrucciones.");
+        if (data?.resetToken) console.log("resetToken:", data.resetToken);
+        setMode("login");
+        // éxito: no des-bloqueamos; no hay endpoint repetible aquí y el usuario puede seguir
+        setUiLocked(false); // en recover sí desbloqueamos para permitir login
+        setRecovering(false);
+        return;
+      }
+
+      // ADMIN: aplicar selección (persistir y salir)
+      if (adminNeedsSelector) {
+        setApplying(true);
+        setCompanyId(adminCompanyId);
+        setBusinessUnitId(adminBuId);
+        setPositionId(null);
+        toast.success("Compañía y Unidad de negocio seleccionadas");
+        goAfter(); // éxito => mantenemos uiLocked=true hasta navegar
+        return;
+      }
+
+      // NO admin: aplicar BU (>1)
+      if (nonAdminNeedsSelector) {
+        setPendingBU(true);
+        await selectBusinessUnit(buId, { fireAndForget: true });
+        const sel = businessUnits?.find((b) => b.id === buId);
+        setPositionId(sel?.positionId ?? null);
+        toast.success("Unidad de negocio seleccionada");
+        goAfter(); // éxito => mantenemos uiLocked=true hasta navegar
+        return;
+      }
+
+      // LOGIN normal
+      setLoggingIn(true);
+      await login({ email: form.email.trim(), password: form.password });
+      toast.success("Inicio de sesión exitoso");
+      // Si falta contexto, aparecerán los selectores
+      setUiLocked(false); // tras login permitimos interacción con selectores
+      setLoggingIn(false);
+    } catch (err) {
+      const msg = getHumanErrorMessage(err);
+      setErrors((p) => ({ ...p, root: msg }));
+      toast.error(msg);
+      // ERROR => desbloqueamos para permitir reintentar
+      setUiLocked(false);
+      setRecovering(false);
+      setApplying(false);
+      setPendingBU(false);
+      setLoggingIn(false);
+    }
+  };
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   return (
     <Card className="mx-auto w-full max-w-lg shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">{header.title}</CardTitle>
-        <CardDescription>{header.desc}</CardDescription>
+        <CardTitle className="text-2xl">
+          {mode === "recover"
+            ? "Recuperar contraseña"
+            : "Iniciar sesión en SOE"}
+        </CardTitle>
+        <CardDescription>
+          {mode === "recover"
+            ? "Ingresa tu correo y te enviaremos instrucciones para restablecerla"
+            : "Accede a tu cuenta para continuar"}
+        </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
+      {/* Evitamos submit nativo y bloqueamos Enter en fase de selección */}
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (
+            (adminNeedsSelector || nonAdminNeedsSelector) &&
+            e.key === "Enter"
+          ) {
+            e.preventDefault();
+          }
+        }}
+      >
         <CardContent className="space-y-6 px-6 sm:px-8">
           {/* Login siempre visible */}
           <div className="grid grid-cols-1 gap-5">
@@ -432,7 +447,11 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                   value={form.email}
                   onChange={onChange}
                   disabled={
-                    busy || (mode === "login" && isLogged) || submitting
+                    loading ||
+                    initializing ||
+                    (mode === "login" && isLogged) ||
+                    recovering ||
+                    uiLocked
                   }
                   autoComplete="username"
                   required
@@ -458,7 +477,13 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                     placeholder="••••••••"
                     value={form.password}
                     onChange={onChange}
-                    disabled={busy || isLogged || submitting}
+                    disabled={
+                      loading ||
+                      initializing ||
+                      isLogged ||
+                      loggingIn ||
+                      uiLocked
+                    }
                     autoComplete="current-password"
                     required
                     className="h-11 pl-11 text-base"
@@ -470,7 +495,13 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                     aria-label={
                       showPwd ? "Ocultar contraseña" : "Ver contraseña"
                     }
-                    disabled={busy || isLogged || submitting}
+                    disabled={
+                      loading ||
+                      initializing ||
+                      isLogged ||
+                      loggingIn ||
+                      uiLocked
+                    }
                   >
                     {showPwd ? (
                       <EyeOff className="h-4 w-4" />
@@ -489,7 +520,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
             {mode === "login" ? (
               <div className="pt-2 mb-3 flex items-center justify-between flex-wrap gap-x-3 gap-y-2">
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox id="remember" disabled={busy || isLogged} />
+                  <Checkbox
+                    id="remember"
+                    disabled={loading || initializing || isLogged}
+                  />
                   <span className="select-none text-muted-foreground">
                     Recordarme
                   </span>
@@ -520,20 +554,25 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
           {/* Sección condicional debajo del login */}
           {adminNeedsSelector && (
             <div className="grid grid-cols-1 gap-5 pt-2">
-              {/* ADMIN: Compañía (solo estado local) */}
+              {/* ADMIN: Compañía (estado local) */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Compañía</Label>
                 <Select
                   value={adminCompanyId}
                   onValueChange={(v) => {
                     setAdminCompanyId(v);
-                    // NO persistimos aquí
                     const firstBu =
                       adminCompanies?.find((c) => c.id === v)
                         ?.businessUnits?.[0]?.id ?? "";
                     setAdminBuId(firstBu);
                   }}
-                  disabled={busy || companiesCount <= 0 || submitting}
+                  disabled={
+                    loading ||
+                    initializing ||
+                    companiesCount <= 0 ||
+                    applying ||
+                    uiLocked
+                  }
                 >
                   <SelectTrigger className="w-full h-11 text-base">
                     <SelectValue
@@ -554,20 +593,19 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 </Select>
               </div>
 
-              {/* ADMIN: BU por compañía (solo estado local) */}
+              {/* ADMIN: Unidad de Negocio (estado local) */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Unidad de Negocio</Label>
                 <Select
                   value={adminBuId}
-                  onValueChange={(v) => {
-                    setAdminBuId(v);
-                    // NO persistimos aquí
-                  }}
+                  onValueChange={(v) => setAdminBuId(v)}
                   disabled={
-                    busy ||
+                    loading ||
+                    initializing ||
                     !adminCompanyId ||
                     adminCompanyBUs.length <= 0 ||
-                    submitting
+                    applying ||
+                    uiLocked
                   }
                 >
                   <SelectTrigger className="w-full h-11 text-base">
@@ -603,7 +641,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 <Select
                   value={buId}
                   onValueChange={setBuId}
-                  disabled={pendingBU || buCount <= 1 || submitting}
+                  disabled={pendingBU || buCount <= 1 || uiLocked}
                 >
                   <SelectTrigger className="w-full h-11 text-base">
                     <SelectValue placeholder="Elige una unidad" />
@@ -629,12 +667,14 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
 
         <CardFooter className="flex items-center gap-3 mt-4">
           <Button
-            type="submit"
-            className="flex-1 btn-gradient h-11 text-base"
-            disabled={submitting}
-            aria-busy={submitting}
+            type="button"
+            onClick={handlePrimary}
+            className={`flex-1 btn-gradient h-11 text-base`}
+            // disabled si hay envío OR bloqueo duro de UI
+            disabled={submitting || uiLocked}
+            aria-busy={submitting || uiLocked}
           >
-            {submitting ? (
+            {submitting || uiLocked ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {primaryLabel}

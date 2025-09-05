@@ -49,7 +49,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // Construye el redirect SOLO si no hay token y la ruta no es pública
     const qs = searchParams?.toString();
     const dest = `${pathname}${qs ? `?${qs}` : ""}`;
-    router.replace(`/login?redirect=${encodeURIComponent(dest)}`);
+    if (dest === "/" || dest === "") {
+      router.replace("/login");
+    } else {
+      router.replace(`/login?redirect=${encodeURIComponent(dest)}`);
+    }
   }, [mounted, isPublic, pathname, searchParams, router]);
 
   // Hasta terminar la verificación, no pintes nada (así no hay flash)

@@ -8,26 +8,30 @@ import { Header } from "./header";
 export function SidebarLayout({
   children,
   currentPath,
-  pageTitle = "Dashboard",
+  pageTitle,
   onNavigate,
 }: SidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex h-svh overflow-hidden bg-gray-50">
       <Sidebar
         currentPath={currentPath}
         onToggle={setIsCollapsed}
         onNavigate={onNavigate}
       />
-      <Header currentPageTitle={pageTitle} isCollapsed={isCollapsed} />
-      <main
-        className={`pt-16 transition-all duration-300 ease-in-out ${
-          isCollapsed ? "ml-[72px]" : "ml-64"
-        }`}
-      >
-        <div className="p-6">{children}</div>
-      </main>
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <Header currentPageTitle={pageTitle} isCollapsed={isCollapsed} />
+        <main
+          className={`
+            transition-all duration-300 ease-in-out
+            ${isCollapsed ? "ml-[72px]" : "ml-64"}
+            pt-16 h-full overflow-y-auto
+          `}
+        >
+          <div className="p-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
