@@ -26,3 +26,15 @@ export type UpdatePositionPayload = Partial<CreatePositionPayload> & {
   mission?: string | null;
   vision?: string | null;
 };
+
+export type PositionsByCompanyGroupBU = {
+  businessUnitId: string;
+  businessUnitName: string;
+  positions: Array<
+    Position & {
+      userFullName?: string | null;
+      userId?: string | null;
+      userName?: string | null;
+    }
+  >;
+};

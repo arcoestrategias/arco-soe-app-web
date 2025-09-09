@@ -18,6 +18,20 @@ export type User = {
   updatedAt: string;
   isEmailConfirmed?: boolean; // ← para mostrar el check “Enviar confirmación”
   userBusinessUnits?: UserBusinessUnitLink[] | null; // ← NUEVO
+  lastLoginAt?: string | null;
+};
+
+export type CompanyUsersGroupedByBU = {
+  businessUnitId: string;
+  businessUnitName: string;
+  users: Array<
+    User & {
+      roleId?: string | null;
+      roleName?: string | null;
+      positionId?: string | null;
+      positionName?: string | null;
+    }
+  >;
 };
 
 export type CreateUserPayload = {

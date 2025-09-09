@@ -2,6 +2,7 @@ import http from "@/shared/api/http";
 import { routes } from "@/shared/api/routes";
 import { unwrapAny } from "@/shared/api/response";
 import type {
+  CompanyUsersGroupedByBU,
   CreateUserAssignPayload,
   UpdateUserPayload,
   User,
@@ -10,6 +11,20 @@ import type {
 export async function getUsers() {
   const res = await http.get(routes.users.list()); // o .index(), según tu routes
   return unwrapAny<User[]>(res.data); // ← usar res.data
+}
+
+export async function getCompanyUsersGrouped(
+  companyId: string
+): Promise<CompanyUsersGroupedByBU[]> {
+  const res = await http.get(routes.users.listByCompanyGrouped(companyId));
+  return unwrapAny<CompanyUsersGroupedByBU[]>(res.data);
+}
+
+export async function getUsersByBusinessUnit(
+  businessUnitId: string
+): Promise<User[]> {
+  const res = await http.get(routes.users.listByBusinessUnit(businessUnitId));
+  return unwrapAny<User[]>(res.data);
 }
 
 export async function createUserAssign(payload: CreateUserAssignPayload) {
@@ -22,7 +37,6 @@ export async function updateUser(
   raw: UpdateUserPayload & Record<string, any>
 ) {
   const {
-    // 👇 Estos NO van al PATCH de /users/:id (se usan en el vínculo)
     roleId,
     businessUnitId,
     positionId,

@@ -5,6 +5,7 @@ import type {
   Position,
   CreatePositionPayload,
   UpdatePositionPayload,
+  PositionsByCompanyGroupBU,
 } from "../types/positions";
 
 export async function getPositions(): Promise<Position[]> {
@@ -24,6 +25,13 @@ export async function getPositionsByBusinessUnit(
     params: { businessUnitId },
   });
   return unwrapAny<Position[]>(data);
+}
+
+export async function getPositionsByCompanyGrouped(
+  companyId: string
+): Promise<PositionsByCompanyGroupBU[]> {
+  const res = await http.get(routes.positions.listByCompanyGrouped(companyId));
+  return unwrapAny<PositionsByCompanyGroupBU[]>(res.data);
 }
 
 export async function createPosition(

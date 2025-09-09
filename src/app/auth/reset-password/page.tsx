@@ -4,10 +4,8 @@ import * as React from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import http from "@/shared/api/http";
-import { unwrapAny, getHumanErrorMessage } from "@/shared/api/response";
+import { getHumanErrorMessage } from "@/shared/api/response";
 
-// shadcn/ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +20,6 @@ import {
 
 // Icons
 import { Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
-import { routes } from "@/shared/api/routes";
 import { authService } from "@/features/auth/services/authService";
 
 export default function ResetPasswordPage() {
@@ -93,19 +90,18 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Logo arriba */}
-        <div className="mb-6 flex justify-center">
-          <Image
-            src="/logo-soe.svg"
-            alt="SOE"
-            width={160}
-            height={40}
-            priority
-            className="h-auto w-40"
-          />
-        </div>
-
         <Card className="shadow-lg">
+          <div className="mb-6 flex justify-center">
+            <Image
+              src="/logo-soe.svg"
+              alt="SOE"
+              width={160}
+              height={40}
+              priority
+              className="h-auto w-40"
+            />
+          </div>
+
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Restablecer contraseña</CardTitle>
             <CardDescription>Usaremos el token del enlace.</CardDescription>

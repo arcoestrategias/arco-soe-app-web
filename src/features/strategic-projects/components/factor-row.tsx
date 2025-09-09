@@ -270,7 +270,7 @@ export function FactorRow({
                 )}
               </button>
               <span className="text-sm font-medium text-gray-800 truncate">
-                {factor.description ?? ""}
+                {factor.name ?? ""}
               </span>
             </div>
             <div className="col-span-4">

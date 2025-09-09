@@ -26,7 +26,9 @@ import { useQuery } from "@tanstack/react-query";
 import { QKEY } from "@/shared/api/query-keys";
 import { getBusinessUnits } from "@/features/business-units/services/businessUnitsService";
 import { useBusinessUnitUsers } from "@/features/business-units/hooks/use-business-unit-users";
+import { getCompanyId, getBusinessUnitId } from "@/shared/auth/storage";
 import type { Position } from "../../types/positions";
+import { Button } from "@/components/ui/button";
 
 type ModalMode = "crear" | "editar" | "ver";
 
@@ -73,14 +75,17 @@ export function ModalPosition({
     enabled: isOpen,
   });
 
-  // RHF
-  const defaults: PositionFormValues = {
-    name: position?.name ?? "",
-    businessUnitId: position?.businessUnitId ?? "",
-    userId: position?.userId ?? "",
-    isCeo: !!position?.isCeo,
-  };
+  // IDs del storage
+  const storageCompanyId = getCompanyId() ?? "";
+  const storageBUId = getBusinessUnitId() ?? "";
 
+  // Filtrar BUs por compañía del storage (igual que en ModalUser)
+  const filteredBUs = React.useMemo(() => {
+    if (!storageCompanyId) return businessUnits;
+    return businessUnits.filter((b: any) => b.companyId === storageCompanyId);
+  }, [businessUnits, storageCompanyId]);
+
+  // RHF
   const {
     handleSubmit,
     register,
@@ -90,7 +95,12 @@ export function ModalPosition({
     formState: { errors, isDirty, isSubmitting },
   } = useForm<PositionFormValues>({
     mode: "onTouched",
-    defaultValues: defaults,
+    defaultValues: {
+      name: "",
+      businessUnitId: "",
+      userId: "",
+      isCeo: false,
+    },
   });
 
   // Controllers para Selects
@@ -105,7 +115,6 @@ export function ModalPosition({
   const { field: userField } = useController({
     name: "userId",
     control,
-    rules: !readOnly ? { required: "Selecciona un usuario" } : undefined,
   });
 
   // Usuarios por BU seleccionada
@@ -113,18 +122,52 @@ export function ModalPosition({
     buField.value
   );
 
-  // Reset al abrir/cambiar registro/modo
-  useEffect(() => {
-    reset(defaults);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, modo, position?.id]);
+  // defaults MEMO – evita recrear objeto en cada render
+  const defaults = React.useMemo<PositionFormValues>(() => {
+    const buIdForCreate = filteredBUs.some((b: any) => b.id === storageBUId)
+      ? storageBUId
+      : "";
 
-  // Si cambias BU y no hay user seleccionado, limpia userId
+    return {
+      name: position?.name ?? "",
+      businessUnitId:
+        modo === "crear" ? buIdForCreate : position?.businessUnitId ?? "",
+      userId: position?.userId ?? "",
+      isCeo: !!position?.isCeo,
+    };
+  }, [
+    modo,
+    position?.id,
+    position?.name,
+    position?.businessUnitId,
+    position?.userId,
+    position?.isCeo,
+    storageBUId,
+    filteredBUs.length,
+  ]);
+
+  // reset SOLO al abrir / cambiar modo / cambiar registro / cambiar defaults
+  useEffect(() => {
+    if (!isOpen) return;
+    reset(defaults);
+  }, [isOpen, modo, position?.id, defaults, reset]);
+
+  // limpiar userId solo cuando la BU CAMBIA realmente (no en cada render)
+  const prevBURef = React.useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!isOpen || readOnly) return;
-    setValue("userId", "", { shouldDirty: true, shouldValidate: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buField.value]);
+
+    // primera pasada con modal abierta: registrar valor inicial sin limpiar
+    if (prevBURef.current === undefined) {
+      prevBURef.current = buField.value;
+      return;
+    }
+
+    if (prevBURef.current !== buField.value) {
+      prevBURef.current = buField.value;
+      setValue("userId", "", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [isOpen, readOnly, buField.value, setValue]);
 
   const submit = (values: PositionFormValues) => {
     if (readOnly) return;
@@ -132,13 +175,41 @@ export function ModalPosition({
     const payload: PositionFormValues = {
       name: String(values.name || "").trim(),
       businessUnitId: values.businessUnitId,
-      userId: values.userId,
+      userId: values.userId || "",
       isCeo: !!values.isCeo,
     };
 
     if (modo === "crear") onSave({ mode: "crear", payload });
     else onSave({ mode: "editar", id: position?.id, payload });
   };
+
+  const usersForSelect = React.useMemo(() => {
+    if (
+      modo === "editar" &&
+      position?.userId &&
+      buField.value &&
+      position.businessUnitId === buField.value &&
+      !users.some((u) => u.id === position.userId)
+    ) {
+      return [
+        {
+          id: position.userId,
+          firstName: position.userFullName ?? "", // si tienes userFullName, úsalo
+          lastName: "",
+          email: "", // fallback
+        },
+        ...users,
+      ];
+    }
+    return users;
+  }, [
+    modo,
+    position?.userId,
+    position?.userFullName,
+    position?.businessUnitId,
+    buField.value,
+    users,
+  ]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
@@ -172,7 +243,7 @@ export function ModalPosition({
             )}
           </div>
 
-          {/* Unidad de Negocio */}
+          {/* Unidad de Negocio (¡ahora usa filteredBUs!) */}
           <div className="space-y-2">
             <Label>Unidad de negocio *</Label>
             <Select
@@ -186,10 +257,17 @@ export function ModalPosition({
               disabled={readOnly || isSubmitting}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona una unidad" />
+                <SelectValue
+                  placeholder={
+                    filteredBUs.length
+                      ? "Selecciona una unidad"
+                      : "No hay unidades para la compañía seleccionada"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {businessUnits.map((b: any) => (
+                {/* <SelectItem value="">{`— Sin usuario —`}</SelectItem> */}
+                {filteredBUs.map((b: any) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name}
                   </SelectItem>
@@ -207,7 +285,7 @@ export function ModalPosition({
           <div className="space-y-2">
             <Label>Usuario asignado *</Label>
             <Select
-              value={userField.value ?? ""}
+              value={userField.value || undefined}
               onValueChange={(v) =>
                 setValue("userId", v, {
                   shouldDirty: true,
@@ -230,7 +308,7 @@ export function ModalPosition({
                 />
               </SelectTrigger>
               <SelectContent>
-                {users.map((u) => (
+                {usersForSelect.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.firstName && u.lastName
                       ? `${u.firstName} ${u.lastName}`
@@ -269,11 +347,9 @@ export function ModalPosition({
           </div>
 
           <DialogFooter className="md:col-span-2 mt-4">
-            <ActionButton
-              label={readOnly ? "Cerrar" : "Cancelar"}
-              variant="outline"
-              onAction={onClose}
-            />
+            <Button variant="outline" type="button" onClick={onClose}>
+              Cancelar
+            </Button>
             {!readOnly && (
               <ActionButton
                 type="submit"

@@ -60,6 +60,8 @@ export const routes = {
     confirm: () => prefixed(Modules.AUTH, "confirm"),
     forgotPassword: () => prefixed(Modules.AUTH, "forgot-password"),
     resetPassword: () => prefixed(Modules.AUTH, "reset-password"),
+    sendConfirmationEmail: (id: string) =>
+      prefixed(Modules.USERS, id, "send-confirmation-email"),
   },
 
   roles: {
@@ -99,9 +101,13 @@ export const routes = {
     base: () => prefixed(Modules.USERS),
     me: () => prefixed(Modules.USERS, "me"),
     list: () => prefixed(Modules.USERS),
+    listByBusinessUnit: (businessUnitId: string) =>
+      prefixed(Modules.USERS, `/business-unit/${businessUnitId}`),
+    listByCompanyGrouped: (companyId: string) =>
+      prefixed("users", "company", companyId, "group-by-business-unit"),
     create: () => prefixed(Modules.USERS),
     update: (id: string) => prefixed(Modules.USERS, id),
-    assign: () => prefixed(`${Modules.USERS}/assign`),
+    assign: () => prefixed(`${Modules.USERS}/create-user-with-role-business`),
     assignToBusinessUnit: () =>
       prefixed(`${Modules.USERS}/assign-to-business-unit`),
     patchUserBusinessUnit: (userId: string, businessUnitId: string) =>
@@ -110,6 +116,8 @@ export const routes = {
 
   positions: {
     list: () => prefixed(Modules.POSITIONS),
+    listByCompanyGrouped: (companyId: string) =>
+      prefixed("positions", "company", companyId, "group-by-business-unit"),
     byId: (positionId: string) => prefixed(Modules.POSITIONS, positionId),
     create: () => prefixed(Modules.POSITIONS),
     update: (positionId: string) => prefixed(Modules.POSITIONS, positionId),

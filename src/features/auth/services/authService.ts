@@ -127,6 +127,11 @@ export const authService = {
     return unwrapAny<ForgotPasswordRes>(res);
   },
 
+  async sendEmailConfirmation(id: string) {
+    const res = await http.post(routes.auth.sendConfirmationEmail(id));
+    return unwrapAny(res);
+  },
+
   async confirmEmail(token: string): Promise<ConfirmEmailRes> {
     const res = await http.post(routes.auth.confirm(), { token });
     return unwrapAny<ConfirmEmailRes>(res);

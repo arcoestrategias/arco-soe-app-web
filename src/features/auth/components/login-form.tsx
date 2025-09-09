@@ -1,4 +1,3 @@
-// src/features/auth/components/login-form.tsx
 "use client";
 
 import * as React from "react";
@@ -56,10 +55,6 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
   const [applying, setApplying] = React.useState(false); // admin: aplicar company/BU
   const [pendingBU, setPendingBU] = React.useState(false); // no-admin: aplicar BU
 
-  // *** BLOQUEO DURO DE UI ***
-  // Evita clics repetidos incluso antes de que React marque disabled por estado.
-  // Se activa al iniciar un flujo async real y NO se desactiva en éxito (redirecciona).
-  // Solo se desactiva en errores o validaciones fallidas.
   const [uiLocked, setUiLocked] = React.useState(false);
 
   const router = useRouter();

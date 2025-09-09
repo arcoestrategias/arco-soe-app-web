@@ -3,6 +3,7 @@ import { routes } from "@/shared/api/routes";
 import { unwrapAny } from "@/shared/api/response";
 
 export type PatchUserBusinessUnitPayload = {
+  fromBusinessUnitId?: string;
   roleId?: string;
   positionId?: string | null;
   isResponsible?: boolean;

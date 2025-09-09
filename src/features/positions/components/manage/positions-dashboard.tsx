@@ -1,25 +1,41 @@
-// src/features/positions/components/positions-dashboard.tsx
 "use client";
 
-import * as React from "react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Eye, Pencil, Trash } from "lucide-react";
+
 import { QKEY } from "@/shared/api/query-keys";
-import { getPositions } from "../../services/positionsService";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+import { getCompanyId } from "@/shared/auth/storage";
+import { getPositionsByCompanyGrouped } from "@/features/positions/services/positionsService";
+import { usePositions } from "@/features/positions/hooks/use-positions";
 import { ModalPosition } from "./modal-position";
-import { usePositions } from "../../hooks/use-positions";
-import type { Position } from "../../types/positions";
-import { Eye, Pencil, Trash } from "lucide-react";
+import type { Position } from "@/features/positions/types/positions";
+import { type PositionsByCompanyGroupBU } from "../../types/positions";
+import { patchUserBusinessUnit } from "@/features/users/services/userBusinessUnitsService";
 
 export function PositionsDashboard() {
+  // Estado modal / confirma (igual que antes)
   const [openModal, setOpenModal] = useState(false);
   const [modo, setModo] = useState<"crear" | "editar" | "ver">("crear");
   const [current, setCurrent] = useState<Position | null>(null);
   const [openConfirm, setOpenConfirm] = useState(false);
+
+  const { fullCreatePosition, updatePosition, inactivatePosition } =
+    usePositions();
+
+  // ⚠️ Nuevo: leemos companyId del storage y usamos el endpoint agrupado
+  const companyId = getCompanyId() ?? "";
 
   const {
     data = [],
@@ -27,42 +43,43 @@ export function PositionsDashboard() {
     error,
     refetch,
   } = useQuery({
-    queryKey: QKEY.positions,
-    queryFn: getPositions,
+    queryKey: QKEY.companyPositionsGrouped(companyId || "none"),
+    queryFn: () =>
+      companyId ? getPositionsByCompanyGrouped(companyId) : Promise.resolve([]),
+    enabled: !!companyId,
     staleTime: 60_000,
   });
 
-  const { fullCreatePosition, updatePosition, inactivatePosition } =
-    usePositions();
-
-  const positions = useMemo<Position[]>(
+  const groups = useMemo<PositionsByCompanyGroupBU[]>(
     () => (Array.isArray(data) ? data : []),
     [data]
   );
 
+  const total = useMemo(
+    () => groups.reduce((acc, g) => acc + (g.positions?.length ?? 0), 0),
+    [groups]
+  );
+
+  // Handlers
   const openCreate = () => {
     setModo("crear");
     setCurrent(null);
     setOpenModal(true);
   };
-
   const openEdit = (pos: Position) => {
     setModo("editar");
     setCurrent(pos);
     setOpenModal(true);
   };
-
   const openView = (pos: Position) => {
     setModo("ver");
     setCurrent(pos);
     setOpenModal(true);
   };
-
   const askInactivate = (pos: Position) => {
     setCurrent(pos);
     setOpenConfirm(true);
   };
-
   const handleInactivate = () => {
     if (!current?.id) return;
     inactivatePosition.mutate(current.id, {
@@ -72,26 +89,62 @@ export function PositionsDashboard() {
       },
     });
   };
-
   const handleSave = (res: {
     mode: "crear" | "editar";
     id?: string;
     payload: any;
   }) => {
     if (res.mode === "crear") {
+      // 1) crea la posición
       fullCreatePosition.mutate(res.payload, {
-        onSuccess: () => {
-          setOpenModal(false);
-          refetch();
+        onSuccess: async (created: Position) => {
+          try {
+            // 2) asigna usuario a la posición si vino userId (no vacío)
+            if (res.payload.userId && res.payload.userId !== "") {
+              await patchUserBusinessUnit(
+                res.payload.userId,
+                res.payload.businessUnitId,
+                { positionId: created.id } // asignación
+              );
+            }
+          } finally {
+            setOpenModal(false);
+            refetch();
+          }
         },
       });
     } else if (res.mode === "editar" && res.id) {
+      // 1) actualiza datos propios de la posición (name, isCeo,...)
+      const { userId, ...positionData } = res.payload;
       updatePosition.mutate(
-        { id: res.id, data: res.payload },
+        { id: res.id, data: positionData },
         {
-          onSuccess: () => {
-            setOpenModal(false);
-            refetch();
+          onSuccess: async () => {
+            try {
+              // 2) asigna o desasigna según userId
+              if (userId === "") {
+                // desasignar
+                await patchUserBusinessUnit(
+                  // necesitas un userId para desasignar si está ocupada por alguien:
+                  // si no lo tienes en el DTO, puedes omitir desasignar aquí
+                  // y exponer desasignación solo cuando eliges "Sin usuario" junto con un usuario seleccionado.
+                  // Si EN TU API el backend permite desasignar sin userId (por positionId), ignora este comentario.
+                  // Asumiendo tu endpoint requiere userId, entonces:
+                  current?.userId!, // usuario actual en esa posición
+                  positionData.businessUnitId,
+                  { positionId: null } // desasignar
+                );
+              } else if (userId) {
+                await patchUserBusinessUnit(
+                  userId,
+                  positionData.businessUnitId,
+                  { positionId: res.id } // asignar
+                );
+              }
+            } finally {
+              setOpenModal(false);
+              refetch();
+            }
           },
         }
       );
@@ -107,104 +160,124 @@ export function PositionsDashboard() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Posiciones</h2>
-        <Button onClick={openCreate}>Nueva Posición</Button>
+    <div className="space-y-6">
+      <div className="border rounded-md">
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">Gestión de Posiciones</h1>
+            <span className="text-xs rounded-full px-2 py-1 bg-muted">
+              {total}
+            </span>
+          </div>
+          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+            Nueva Posición
+          </Button>
+        </div>
+
+        {isPending ? (
+          <div className="p-4 text-sm text-muted-foreground">
+            Cargando posiciones…
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="p-4 text-sm text-muted-foreground">
+            No hay posiciones para la compañía seleccionada.
+          </div>
+        ) : (
+          <Accordion type="multiple" className="w-full">
+            {groups.map((g) => (
+              <AccordionItem key={g.businessUnitId} value={g.businessUnitId}>
+                <AccordionTrigger className="px-4 py-3 bg-muted/40 hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{g.businessUnitName}</span>
+                    <Badge variant="secondary">{g.positions.length}</Badge>
+                  </div>
+                </AccordionTrigger>
+
+                <AccordionContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Posición</th>
+                          <th className="px-4 py-2 text-left">
+                            Usuario asignado
+                          </th>
+                          <th className="px-4 py-2 text-center">CEO</th>
+                          <th className="px-4 py-2 text-center">Estado</th>
+                          <th className="px-4 py-2 text-center">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.positions.map((p) => (
+                          <tr key={p.id} className="border-t">
+                            <td className="px-4 py-2">{p.name}</td>
+                            <td className="px-4 py-2">
+                              {p.userFullName ?? "—"}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <Badge
+                                className={
+                                  p.isCeo
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-300 text-gray-800"
+                                }
+                              >
+                                {p.isCeo ? "Sí" : "No"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <Badge
+                                className={
+                                  p.isActive
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-300 text-gray-800"
+                                }
+                              >
+                                {p.isActive ? "Activa" : "Inactiva"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2 flex flex-wrap gap-2 justify-center">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => openView(p)}
+                                title="Ver"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => openEdit(p)}
+                                title="Editar"
+                                className="btn-gradient"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {p.isActive && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => askInactivate(p)}
+                                  title="Inactivar"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
       </div>
 
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Nombre</th>
-              <th className="px-3 py-2 text-left font-medium">
-                Unidad de Negocio
-              </th>
-              <th className="px-3 py-2 text-left font-medium">Usuario</th>
-              <th className="px-3 py-2 text-left font-medium">CEO</th>
-              <th className="px-3 py-2 text-left font-medium">Estado</th>
-              <th className="px-3 py-2 text-right font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isPending ? (
-              <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={6}>
-                  Cargando...
-                </td>
-              </tr>
-            ) : positions.length === 0 ? (
-              <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={6}>
-                  No hay posiciones
-                </td>
-              </tr>
-            ) : (
-              positions.map((pos) => (
-                <tr key={pos.id} className="border-t">
-                  <td className="px-3 py-2">{pos.name}</td>
-                  <td className="px-3 py-2">{pos.businessUnitName}</td>
-                  <td className="px-3 py-2">{pos.userFullName ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <Badge
-                      className={
-                        pos.isCeo
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-300 text-gray-800"
-                      }
-                    >
-                      {pos.isCeo ? "Si" : "No"}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge
-                      className={
-                        pos.isActive
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-300 text-gray-800"
-                      }
-                    >
-                      {pos.isActive ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-2 flex flex-wrap gap-2 justify-center">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => openView(pos)}
-                      title="Ver"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={() => openEdit(pos)}
-                      title="Editar"
-                      className="btn-gradient"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    {pos.isActive && (
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => askInactivate(pos)}
-                        title="Inactivar"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal crear/editar/ver */}
+      {/* Modal crear/editar/ver (igual que tu versión actual) */}
       <ModalPosition
         isOpen={openModal}
         modo={modo}

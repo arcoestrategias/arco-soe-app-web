@@ -39,6 +39,8 @@ import ObjectiveSelect from "@/shared/components/objective-select";
 import { SingleDatePicker } from "@/shared/components/date-single-picker";
 import { QueryKey, useQueryClient } from "@tanstack/react-query";
 
+import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
+
 /* ------------------------------------------------------------
    Tipos y utilidades base
 ------------------------------------------------------------ */
@@ -64,7 +66,7 @@ const EMPTY_DRAFT: Draft = {
   finishedAt: undefined,
 };
 
-// YYYY-MM-DD (o ISO) -> Date local (evita shift por zona horaria)
+// YYYY-MM-DD (o ISO) -> Date local
 function parseYmdOrIsoToLocalDate(s?: string) {
   if (!s) return undefined;
   const ymd = s.includes("T") ? s.slice(0, 10) : s;
@@ -144,36 +146,15 @@ const MONTHLY_CLASS_LABEL: Record<string, string> = {
 
 function resolveMonthlyLabel(mc?: string): string | undefined {
   if (!mc) return;
-
-  // 1) si hay match exacto, listo
   if (MONTHLY_CLASS_LABEL[mc]) return MONTHLY_CLASS_LABEL[mc];
-
-  // 2) fallback robusto por patrones
   const M = mc.toUpperCase();
-
-  // Cumplidas atrasadas (cualquier variante)
-  if (M.includes("CUMPLIDAS") && M.includes("ATRASADAS")) {
-    return M.includes("MESES") ? "Cumplida tarde" : "Cumplida tarde";
-  }
-
-  // No cumplidas (cualquier variante)
+  if (M.includes("CUMPLIDAS") && M.includes("ATRASADAS")) return "Cumplida tarde";
   if (M.startsWith("NO_CUMPLIDAS")) {
-    // si menciona meses anteriores/atrás → Muy atrasada
-    if (
-      M.includes("MESES") ||
-      M.includes("ANTERIORES") ||
-      M.includes("ATRAS")
-    ) {
+    if (M.includes("MESES") || M.includes("ANTERIORES") || M.includes("ATRAS"))
       return "Muy atrasada";
-    }
-    // del mes actual → Atrasada
-    if (M.includes("DEL_MES") || M.includes("MES")) {
-      return "Atrasada";
-    }
-    // genérico
+    if (M.includes("DEL_MES") || M.includes("MES")) return "Atrasada";
     return "Atrasada";
   }
-
   return undefined;
 }
 
@@ -200,10 +181,8 @@ function renderClosureBadge(p: Priority) {
   const finished = p.finishedAt ?? undefined;
   const canceled = p.canceledAt ?? undefined;
 
-  // Nada que mostrar
   if (!finished && !canceled) return null;
 
-  // Si por alguna razón llegan ambas, decide por status:
   let showFinished = Boolean(finished);
   let showCanceled = Boolean(canceled);
   if (finished && canceled) {
@@ -214,7 +193,6 @@ function renderClosureBadge(p: Priority) {
       showFinished = false;
       showCanceled = true;
     } else {
-      // fallback: prioriza finishedAt
       showFinished = true;
       showCanceled = false;
     }
@@ -233,7 +211,7 @@ function renderClosureBadge(p: Priority) {
 }
 
 /* ------------------------------------------------------------
-   Celda de fechas con DateRangePicker (edición)
+   Celdas de fechas (edición)
 ------------------------------------------------------------ */
 function DatesCell({
   fromAt,
@@ -281,7 +259,7 @@ function DatesCell({
                 onChange?.(f, u);
               }}
               showToastOnApply={false}
-              onClose={() => setOpen(false)} // cierra en Aplicar/Cancelar
+              onClose={() => setOpen(false)}
             />
           </PopoverContent>
         </Popover>
@@ -385,7 +363,6 @@ export default function PrioritiesTable({
   const createRowRef = useRef<HTMLTableRowElement | null>(null);
   useEffect(() => {
     if (showCreateRow) {
-      // desplaza hasta la fila de creación
       createRowRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "start",
@@ -393,14 +370,12 @@ export default function PrioritiesTable({
     }
   }, [showCreateRow]);
 
-  // Bloqueo global
   const uiBusy =
     editingId !== null ||
     showCreateRow ||
     createMut.isPending ||
     updateMut.isPending;
 
-  /* --------------------------- acciones --------------------------- */
   const startEdit = (p: Priority) => {
     if (uiBusy && editingId !== p.id) return;
     setEditingId(p.id);
@@ -487,7 +462,6 @@ export default function PrioritiesTable({
     );
   };
 
-  /* --------------------------- UI table --------------------------- */
   if (loading) return <Skeleton className="h-40 w-full" />;
   if (error)
     return (
@@ -497,56 +471,33 @@ export default function PrioritiesTable({
     );
 
   return (
+    // Permitimos scroll horizontal si hace falta: ideal para laptops pequeñas
     <div className="w-full overflow-x-auto">
-      <Table>
-        {/* Forzamos ancho de columnas: las pequeñas a w-px (solo lo necesario) */}
-        <colgroup>
-          {[
-            <col key="c-idx" className="w-px" />, // #
-            <col key="c-pri" className="w-[20%]" />, // Prioridad
-            <col key="c-ent" className="w-[20%]" />, // Entregable
-            <col key="c-obj" className="w-[28%]" />, // Objetivo
-            <col key="c-est" className="w-px" />, // Estado
-            <col key="c-fyf" className="w-px" />, // Fecha Inicio/Fin
-            <col key="c-cie" className="w-px" />, // Terminado/Anulado
-            <col key="c-acc" className="w-px" />, // Acciones
-          ]}
-        </colgroup>
-
+      {/* min-w evita que las columnas se monten entre sí */}
+      <Table className="w-full min-w-[1100px]">
         <TableHeader>
           <TableRow>
-            {[
-              <TableHead key="col-#" className="w-px whitespace-nowrap">
-                #
-              </TableHead>,
-              <TableHead key="col-prioridad">Prioridad</TableHead>,
-              <TableHead key="col-entregable">Entregable</TableHead>,
-              <TableHead key="col-objetivo">Objetivo</TableHead>,
-              <TableHead
-                key="col-estado"
-                className="text-center w-px whitespace-nowrap"
-              >
-                Estado
-              </TableHead>,
-              <TableHead
-                key="col-fechas"
-                className="text-center w-px whitespace-nowrap"
-              >
-                Fecha Inicio - Fin
-              </TableHead>,
-              <TableHead
-                key="col-cierre"
-                className="text-center w-px whitespace-nowrap"
-              >
-                Fecha Terminado
-              </TableHead>,
-              <TableHead
-                key="col-acciones"
-                className="text-center w-px whitespace-nowrap"
-              >
-                Acciones
-              </TableHead>,
-            ]}
+            <TableHead className="w-12 whitespace-nowrap">#</TableHead>
+
+            {/* Prioridad: más espacio relativo */}
+            <TableHead className="whitespace-nowrap">Prioridad</TableHead>
+
+            {/* Entregable / Objetivo: ancho fijo (se controla en el cuerpo con wrappers) */}
+            <TableHead className="whitespace-nowrap">Entregable</TableHead>
+            <TableHead className="whitespace-nowrap">Objetivo</TableHead>
+
+            <TableHead className="text-center w-24 whitespace-nowrap">
+              Estado
+            </TableHead>
+            <TableHead className="text-center w-40 whitespace-nowrap">
+              Inicio / Fin
+            </TableHead>
+            <TableHead className="text-center w-40 whitespace-nowrap">
+              Fecha Terminado
+            </TableHead>
+            <TableHead className="text-center w-28 whitespace-nowrap">
+              Acciones
+            </TableHead>
           </TableRow>
         </TableHeader>
 
@@ -562,12 +513,13 @@ export default function PrioritiesTable({
 
             return (
               <TableRow key={p.id}>
-                <TableCell className="w-px whitespace-nowrap">
+                {/* # */}
+                <TableCell className="w-12 whitespace-nowrap align-top">
                   {idx + 1}
                 </TableCell>
 
-                {/* PRIORIDAD */}
-                <TableCell className="max-w-[360px]">
+                {/* PRIORIDAD (más ancho en laptops pequeñas). En lectura: tooltip */}
+                <TableCell className="align-top">
                   {isEditing ? (
                     <Input
                       value={d?.name ?? ""}
@@ -583,12 +535,15 @@ export default function PrioritiesTable({
                       placeholder="Nombre de la prioridad"
                     />
                   ) : (
-                    <div className="line-clamp-2">{p.name}</div>
+                    // Le damos margen amplio: ocupa el espacio flexible
+                    <div className="min-w-[280px] md:min-w-[320px] max-w-[560px]">
+                      <CellWithTooltip text={p.name} lines={2} />
+                    </div>
                   )}
                 </TableCell>
 
-                {/* ENTREGABLE */}
-                <TableCell className="max-w-[420px]">
+                {/* ENTREGABLE (ancho fijo + tooltip) */}
+                <TableCell className="align-top">
                   {isEditing ? (
                     <Input
                       value={d?.description ?? ""}
@@ -604,12 +559,14 @@ export default function PrioritiesTable({
                       placeholder="Entregable"
                     />
                   ) : (
-                    <div className="line-clamp-2">{p.description ?? "-"}</div>
+                    <div className="min-w-0 w-[220px] md:w-[260px]">
+                      <CellWithTooltip text={p.description ?? "-"} lines={2} />
+                    </div>
                   )}
                 </TableCell>
 
-                {/* OBJETIVO */}
-                <TableCell className="max-w-[420px]">
+                {/* OBJETIVO (ancho fijo + tooltip) */}
+                <TableCell className="align-top">
                   {isEditing ? (
                     <ObjectiveSelect
                       stacked
@@ -628,12 +585,14 @@ export default function PrioritiesTable({
                       otherPositions={otherPositions}
                     />
                   ) : (
-                    <div className="line-clamp-2">{p.objectiveName ?? "-"}</div>
+                    <div className="min-w-0 w-[220px] md:w-[260px]">
+                      <CellWithTooltip text={p.objectiveName ?? "-"} lines={2} />
+                    </div>
                   )}
                 </TableCell>
 
                 {/* ESTADO */}
-                <TableCell className="text-center w-px whitespace-nowrap">
+                <TableCell className="text-center w-24 whitespace-nowrap align-top">
                   {isEditing ? (
                     <StatusBadge
                       value={(d?.status as Status) ?? "OPE"}
@@ -665,7 +624,7 @@ export default function PrioritiesTable({
                 </TableCell>
 
                 {/* FECHAS (solo from/until) */}
-                <TableCell className="text-center w-px whitespace-nowrap">
+                <TableCell className="text-center w-40 whitespace-nowrap align-top">
                   {isEditing ? (
                     <DatesCell
                       fromAt={d?.fromAt}
@@ -695,7 +654,7 @@ export default function PrioritiesTable({
                 </TableCell>
 
                 {/* CIERRE (finishedAt / canceledAt) */}
-                <TableCell className="text-center w-px whitespace-nowrap">
+                <TableCell className="text-center w-40 whitespace-nowrap align-top">
                   {isEditing ? (
                     effectiveStatus === "CLO" ? (
                       <FinishedDateCell
@@ -712,7 +671,6 @@ export default function PrioritiesTable({
                         }
                       />
                     ) : (
-                      // No está terminado: SIN editor, solo vista (si hubiera cancelado/terminado previo)
                       renderClosureBadge(p)
                     )
                   ) : (
@@ -721,7 +679,7 @@ export default function PrioritiesTable({
                 </TableCell>
 
                 {/* ACCIONES */}
-                <TableCell className="w-px whitespace-nowrap text-right space-x-1">
+                <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top">
                   {isEditing ? (
                     <>
                       <Button
@@ -773,44 +731,50 @@ export default function PrioritiesTable({
           {/* Fila de creación */}
           {showCreateRow && (
             <TableRow ref={createRowRef}>
-              <TableCell className="w-px whitespace-nowrap">
+              <TableCell className="w-12 whitespace-nowrap align-top">
                 #{items.length + 1}
               </TableCell>
 
-              <TableCell>
-                <Input
-                  value={newDraft.name ?? ""}
-                  onChange={(e) =>
-                    setNewDraft((d) => ({ ...d, name: e.target.value }))
-                  }
-                  placeholder="Nombre de la prioridad"
-                />
+              <TableCell className="align-top">
+                <div className="min-w-[280px] md:min-w-[320px] max-w-[560px]">
+                  <Input
+                    value={newDraft.name ?? ""}
+                    onChange={(e) =>
+                      setNewDraft((d) => ({ ...d, name: e.target.value }))
+                    }
+                    placeholder="Nombre de la prioridad"
+                  />
+                </div>
               </TableCell>
 
-              <TableCell>
-                <Input
-                  value={newDraft.description ?? ""}
-                  onChange={(e) =>
-                    setNewDraft((d) => ({ ...d, description: e.target.value }))
-                  }
-                  placeholder="Entregable"
-                />
+              <TableCell className="align-top">
+                <div className="min-w-0 w-[220px] md:w-[260px]">
+                  <Input
+                    value={newDraft.description ?? ""}
+                    onChange={(e) =>
+                      setNewDraft((d) => ({ ...d, description: e.target.value }))
+                    }
+                    placeholder="Entregable"
+                  />
+                </div>
               </TableCell>
 
-              <TableCell>
-                <ObjectiveSelect
-                  stacked
-                  planId={planId}
-                  positionId={positionId}
-                  value={newDraft.objectiveId}
-                  onChange={(val) =>
-                    setNewDraft((d) => ({ ...d, objectiveId: val }))
-                  }
-                  otherPositions={otherPositions}
-                />
+              <TableCell className="align-top">
+                <div className="min-w-0 w-[220px] md:w-[260px]">
+                  <ObjectiveSelect
+                    stacked
+                    planId={planId}
+                    positionId={positionId}
+                    value={newDraft.objectiveId}
+                    onChange={(val) =>
+                      setNewDraft((d) => ({ ...d, objectiveId: val }))
+                    }
+                    otherPositions={otherPositions}
+                  />
+                </div>
               </TableCell>
 
-              <TableCell className="w-px whitespace-nowrap">
+              <TableCell className="w-24 whitespace-nowrap text-center align-top">
                 <StatusBadge
                   value={(newDraft.status as Status) ?? "OPE"}
                   editable
@@ -818,7 +782,7 @@ export default function PrioritiesTable({
                 />
               </TableCell>
 
-              <TableCell className="w-px whitespace-nowrap">
+              <TableCell className="w-40 whitespace-nowrap text-center align-top">
                 <DatesCell
                   fromAt={newDraft.fromAt}
                   untilAt={newDraft.untilAt}
@@ -829,9 +793,9 @@ export default function PrioritiesTable({
                 />
               </TableCell>
 
-              <TableCell className="w-px whitespace-nowrap" />
+              <TableCell className="w-40 whitespace-nowrap align-top" />
 
-              <TableCell className="w-px whitespace-nowrap text-right space-x-1">
+              <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top">
                 <Button
                   onClick={saveNew}
                   disabled={

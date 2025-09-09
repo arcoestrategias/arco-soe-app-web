@@ -8,7 +8,10 @@ export const QKEY = {
   buDocuments: (id: string) => ["bu-documents", id] as const,
 
   businessUnitUsers: (businessUnitId: string) =>
-    ["business-unit", "users", businessUnitId] as const,
+    ["users", "by-business-unit", businessUnitId] as const,
+
+  companyUsersGrouped: (companyId: string) =>
+    ["users", "by-company", "grouped-by-business-unit", companyId] as const,
 
   users: ["users"] as const,
   userAvatar: (id: string) => ["user-avatar", id] as const,
@@ -22,6 +25,9 @@ export const QKEY = {
   positionsByBU: (businessUnitId: string) =>
     ["positions", "bu", businessUnitId] as const,
   position: (positionId: string) => ["position", positionId] as const,
+
+  companyPositionsGrouped: (companyId: string) =>
+    ["positions", "by-company", "grouped-by-business-unit", companyId] as const,
 
   strategicPlans: ["strategic-plans"] as const,
   strategicPlan: (id: string) => ["strategic-plans", id] as const,

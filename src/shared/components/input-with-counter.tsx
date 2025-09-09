@@ -8,6 +8,7 @@ interface InputWithCounterProps {
   placeholder?: string;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
 }
 
 export const InputWithCounter = forwardRef<
@@ -15,7 +16,15 @@ export const InputWithCounter = forwardRef<
   InputWithCounterProps
 >(
   (
-    { value, onChange, maxLength, placeholder, className = "", onKeyDown },
+    {
+      value,
+      onChange,
+      maxLength,
+      placeholder,
+      className = "",
+      onKeyDown,
+      disabled = false,
+    },
     ref
   ) => {
     return (
@@ -28,6 +37,7 @@ export const InputWithCounter = forwardRef<
           onChange={(e) => onChange(e.target.value)}
           className={`${className} pr-12`}
           onKeyDown={onKeyDown}
+          disabled={disabled}
         />
         <span className="absolute bottom-1 right-2 text-xs text-gray-400">
           {value.length}/{maxLength}

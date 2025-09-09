@@ -1,12 +1,11 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import http from "@/shared/api/http";
-import { unwrapAny, getHumanErrorMessage } from "@/shared/api/response";
+import { getHumanErrorMessage } from "@/shared/api/response";
 
-// shadcn/ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +17,6 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { routes } from "@/shared/api/routes";
 import { authService } from "@/features/auth/services/authService";
 
 export default function ConfirmEmailPage() {
@@ -39,8 +37,8 @@ export default function ConfirmEmailPage() {
     }
     try {
       setLoading(true);
-      const data = authService.confirmEmail(token);
-      toast.success((await data).message);
+      const data = await authService.confirmEmail(token);
+      toast.success(data.message);
       router.replace("/login");
     } catch (err) {
       toast.error(getHumanErrorMessage(err));
@@ -50,48 +48,62 @@ export default function ConfirmEmailPage() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Confirmar correo</CardTitle>
-        <CardDescription>
-          {hasUrlToken
-            ? "Usaremos el token del enlace."
-            : "Pega el token de confirmación que recibiste por correo."}
-        </CardDescription>
-      </CardHeader>
-
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-5 px-6 sm:px-8">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium" htmlFor="token">
-              Token
-            </Label>
-            <Input
-              id="token"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="h-11 text-base"
-              placeholder="eac3c463-...."
-              readOnly={hasUrlToken}
+    <div className="min-h-[100dvh] flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Logo arriba */}
+        <Card className="shadow-lg">
+          <div className="mb-6 flex justify-center">
+            <Image
+              src="/logo-soe.svg"
+              alt="SOE Logo"
+              width={200}
+              height={50}
+              className="h-12 w-auto"
+              priority
             />
-            {!hasUrlToken && (
-              <p className="text-xs text-muted-foreground">
-                Pega aquí el token si tu enlace no funcionó.
-              </p>
-            )}
           </div>
-        </CardContent>
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Confirmar correo</CardTitle>
+            <CardDescription>
+              {hasUrlToken
+                ? "Usaremos el token del enlace"
+                : "Pega el token de confirmación que recibiste por correo."}
+            </CardDescription>
+          </CardHeader>
 
-        <CardFooter>
-          <Button
-            type="submit"
-            className="btn-gradient h-11 text-base w-full"
-            disabled={loading}
-          >
-            {loading ? "Confirmando…" : "Confirmar correo"}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+          <form onSubmit={onSubmit}>
+            <CardContent className="space-y-5 px-6 sm:px-8">
+              {!hasUrlToken && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium" htmlFor="token">
+                    Token
+                  </Label>
+                  <Input
+                    id="token"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    className="h-11 text-base"
+                    placeholder="eac3c463-...."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pega aquí el token si tu enlace no funcionó.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter>
+              <Button
+                type="submit"
+                className="btn-gradient h-11 text-base w-full"
+                disabled={loading}
+              >
+                {loading ? "Confirmando…" : "Confirmar correo"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    </div>
   );
 }
