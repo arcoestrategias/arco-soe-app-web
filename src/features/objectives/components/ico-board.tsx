@@ -296,19 +296,19 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="bg-green-50 text-green-700 border-green-200 border text-xs px-2 py-1 rounded-md font-medium">
-                  ≥95%
+                  ≥99%
                 </div>
                 <span className="text-xs text-gray-600">Aceptable</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="bg-amber-50 text-amber-700 border-amber-200 border text-xs px-2 py-1 rounded-md font-medium">
-                  85–94%
+                  75–98.99%
                 </div>
                 <span className="text-xs text-gray-600">Esperado</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="bg-red-50 text-red-700 border-red-200 border text-xs px-2 py-1 rounded-md font-medium">
-                  &lt;85%
+                  &lt;75%
                 </div>
                 <span className="text-xs text-gray-600">Inaceptable</span>
               </div>
