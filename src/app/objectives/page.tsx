@@ -15,7 +15,7 @@ import { YearSelect } from "@/shared/filters/components/YearSelect";
 import { FilterField } from "@/shared/components/FilterField";
 import ObjectivesView from "@/features/objectives/components/objectives-view";
 
-export default function PrioritiesPage() {
+export default function ObjectivesPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);

@@ -81,4 +81,19 @@ export const QKEY = {
   prioritiesIcpSeries(positionId: string, from: string, to: string) {
     return ["priorities", "icp-series", positionId, from, to] as const;
   },
+
+  objectivesIcoBoard: (
+    planId: string,
+    positionId: string,
+    fromYear: number | string,
+    toYear: number | string
+  ) =>
+    [
+      "objectives",
+      "ico-board",
+      String(planId),
+      String(positionId),
+      String(fromYear),
+      String(toYear),
+    ] as const,
 };

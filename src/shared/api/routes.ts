@@ -145,6 +145,7 @@ export const routes = {
     create: () => prefixed(Modules.OBJECTIVES),
     update: (objectiveId: string) => prefixed(Modules.OBJECTIVES, objectiveId),
     reorder: () => prefixed(Modules.OBJECTIVES, "reorder"),
+    icoBoard: () => prefixed("/ico/objectives/ico-board"),
   },
 
   strategicProjects: {
