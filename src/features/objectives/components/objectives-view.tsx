@@ -48,8 +48,8 @@ export default function ObjectivesView({
       <Tabs defaultValue="ico" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="ico">Tablero ICO</TabsTrigger>
-          <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
-          <TabsTrigger value="deployment">Matriz de despliegue</TabsTrigger>
+          {/* <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
+          <TabsTrigger value="deployment">Matriz de despliegue</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="ico" className="mt-4">
@@ -57,7 +57,7 @@ export default function ObjectivesView({
           <AnnualIcoTrendCard data={data} year={Number(year)} />
         </TabsContent>
 
-        <TabsContent value="compliance" className="mt-4">
+        {/* <TabsContent value="compliance" className="mt-4">
           <ObjectivesCompliance
             planId={planId}
             positionId={positionId}
@@ -71,7 +71,7 @@ export default function ObjectivesView({
             positionId={positionId}
             year={year}
           />
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   );
