@@ -8,7 +8,7 @@ import { Header } from "./header";
 export function SidebarLayout({
   children,
   currentPath,
-  pageTitle = "Dashboard",
+  pageTitle,
   onNavigate,
 }: SidebarLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);

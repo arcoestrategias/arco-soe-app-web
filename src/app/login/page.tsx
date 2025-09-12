@@ -27,7 +27,7 @@ export default function LoginPage() {
       {/* Formulario */}
       <div className="flex-1 lg:w-1/2 bg-gray-50 flex flex-col">
         <div className="flex-1 flex items-center justify-center p-8">
-          <LoginForm defaultRedirectTo="/resumen" />
+          <LoginForm defaultRedirectTo="/resume" />
         </div>
 
         <footer className="border-t border-gray-200 p-4 text-center">

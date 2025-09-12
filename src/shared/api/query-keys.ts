@@ -26,6 +26,41 @@ export const QKEY = {
     ["positions", "bu", businessUnitId] as const,
   position: (positionId: string) => ["position", positionId] as const,
 
+  positionsOverview: (
+    businessUnitId: string,
+    strategicPlanId: string,
+    year: number | string,
+    month: number | string,
+    positionId?: string | null
+  ) => [
+    "positions",
+    "overview",
+    String(businessUnitId),
+    String(strategicPlanId),
+    String(year),
+    String(month),
+    String(positionId ?? "all"),
+  ],
+
+  positionsOrgChartOverview: (
+    companyId: string,
+    businessUnitId: string,
+    strategicPlanId: string,
+    year: number | string,
+    month: number | string,
+    positionId?: string | null
+  ) =>
+    [
+      "positions",
+      "org-chart-overview",
+      String(companyId),
+      String(businessUnitId),
+      String(strategicPlanId),
+      String(year),
+      String(month),
+      String(positionId ?? "all"),
+    ] as const,
+
   companyPositionsGrouped: (companyId: string) =>
     ["positions", "by-company", "grouped-by-business-unit", companyId] as const,
 

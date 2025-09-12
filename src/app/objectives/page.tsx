@@ -30,10 +30,10 @@ export default function ObjectivesPage() {
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
               Objetivos
             </h1>
-            <p className="text-sm text-gray-600 text-optimized mt-1">
+            {/* <p className="text-sm text-gray-600 text-optimized mt-1">
               Gestiona y monitorea los objetivos mensuales por posición.
               Selecciona el plan, la posición y el año para visualizar el ICO.
-            </p>
+            </p> */}
           </div>
 
           <div className="flex gap-3">

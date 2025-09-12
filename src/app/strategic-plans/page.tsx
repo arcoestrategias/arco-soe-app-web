@@ -22,12 +22,12 @@ export default function StrategicPlanPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
-              Strategic Plan
+              Plan Estratégico
             </h1>
-            <p className="text-sm text-gray-600 text-optimized mt-1">
+            {/* <p className="text-sm text-gray-600 text-optimized mt-1">
               Define your organizational strategy and visualize the strategic
               map.
-            </p>
+            </p> */}
           </div>
 
           {/* Filtro reutilizable: planes por BU (auto más reciente) */}

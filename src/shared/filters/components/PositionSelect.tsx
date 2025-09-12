@@ -1,3 +1,4 @@
+// shared/filters/components/PositionSelect.tsx
 "use client";
 
 import * as React from "react";
@@ -22,7 +23,7 @@ import { getPositionId as getAuthPositionId } from "@/shared/auth/storage";
 type Props = {
   businessUnitId?: string;
   value?: string | null;
-  onChange?: (id: string) => void;
+  onChange?: (id: string | null) => void;
 
   /** usar la position del usuario logueado como default */
   defaultFromAuth?: boolean; // default: true
@@ -31,9 +32,14 @@ type Props = {
   /** limpiar del filtro al desmontar */
   clearOnUnmount?: boolean; // default: false
 
+  /** Mostrar la opción "Todos" al inicio de la lista */
+  showOptionAll?: boolean; // default: false
+
   className?: string;
   placeholder?: string;
 };
+
+const ALL_VALUE = "__ALL__";
 
 export function PositionSelect({
   businessUnitId,
@@ -42,6 +48,7 @@ export function PositionSelect({
   defaultFromAuth = true,
   persist = true,
   clearOnUnmount = false,
+  showOptionAll = false,
   className,
   placeholder = "Selecciona una posición",
 }: Props) {
@@ -54,10 +61,16 @@ export function PositionSelect({
     staleTime: 60_000,
   });
 
-  // Autoselect: posición del usuario (si existe en la lista) o primera
+  // Autoselect: posición del usuario (si existe) o primera
+  // IMPORTANTE: si showOptionAll está activo y value === null, NO autoseleccionamos nada.
   useEffect(() => {
     if (!positions.length) return;
-    if (value) return;
+
+    // Si ya hay un valor explícito (incluyendo null con showOptionAll), no autoseleccionar.
+    if (value !== undefined) {
+      if (showOptionAll && value === null) return; // respetar "Todos"
+      if (value) return; // ya hay valor
+    }
 
     let chosen: string | null = null;
 
@@ -68,6 +81,7 @@ export function PositionSelect({
     }
 
     if (!chosen) chosen = positions[0]?.id ?? null;
+
     if (chosen) {
       onChange?.(chosen);
       if (persist) setSelectedPositionId(chosen);
@@ -75,7 +89,7 @@ export function PositionSelect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions]);
 
-  // Cleanup opcional
+  // Limpieza opcional al desmontar
   useEffect(() => {
     return () => {
       if (clearOnUnmount) clearSelectedPositionId();
@@ -87,11 +101,19 @@ export function PositionSelect({
     [positions, value]
   );
 
+  // Valor que ve el <Select>: si showOptionAll y value === null → "__ALL__"
+  const selectValue = showOptionAll && value === null ? ALL_VALUE : value ?? "";
+
   return (
     <div className={className}>
       <Select
-        value={value ?? ""}
+        value={selectValue}
         onValueChange={(id) => {
+          if (showOptionAll && id === ALL_VALUE) {
+            onChange?.(null);
+            if (persist) clearSelectedPositionId();
+            return;
+          }
           onChange?.(id);
           if (persist) setSelectedPositionId(id);
         }}
@@ -103,6 +125,11 @@ export function PositionSelect({
           />
         </SelectTrigger>
         <SelectContent>
+          {showOptionAll && (
+            <SelectItem key={ALL_VALUE} value={ALL_VALUE}>
+              Todos
+            </SelectItem>
+          )}
           {positions.map((pos) => (
             <SelectItem key={pos.id} value={pos.id}>
               {pos.name}

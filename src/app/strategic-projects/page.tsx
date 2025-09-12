@@ -82,10 +82,10 @@ export default function StrategicProjectsPage() {
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
               Proyectos Estratégicos
             </h1>
-            <p className="text-sm text-gray-600 text-optimized mt-1">
+            {/* <p className="text-sm text-gray-600 text-optimized mt-1">
               Gestiona y monitorea el progreso de todos los proyectos
               estratégicos
-            </p>
+            </p> */}
           </div>
 
           <div className="flex gap-3">

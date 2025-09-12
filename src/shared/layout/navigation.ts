@@ -18,7 +18,12 @@ export const navigationSections = [
   {
     title: "MANAGEMENT SYSTEM",
     items: [
-      { title: "Resumen", url: "/resumen", icon: LayoutGrid, module: "resume" },
+      {
+        title: "Resumen",
+        url: "/resume",
+        icon: LayoutGrid,
+        module: "resume",
+      },
       {
         title: "Plan Estratégico",
         url: "/strategic-plans",
@@ -50,12 +55,12 @@ export const navigationSections = [
         icon: Star,
         module: "priority",
       },
-      {
-        title: "Performance",
-        url: "/performance",
-        icon: TrendingUp,
-        module: "performance",
-      },
+      // {
+      //   title: "Performance",
+      //   url: "/performance",
+      //   icon: TrendingUp,
+      //   module: "performance",
+      // },
     ],
   },
   {

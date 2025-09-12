@@ -90,7 +90,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     const go =
       redirectTo && redirectTo !== "/login" && redirectTo !== "/"
         ? redirectTo
-        : "/resumen";
+        : "/resume";
     router.prefetch(go);
   }, [redirectTo, router]);
 
@@ -147,7 +147,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     const go =
       redirectTo && redirectTo !== "/login" && redirectTo !== "/"
         ? redirectTo
-        : "/resumen";
+        : "";
 
     if (!isAdmin && !needsSelection) {
       if (!didRedirectRef.current) {
@@ -187,7 +187,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         const go =
           redirectTo && redirectTo !== "/login" && redirectTo !== "/"
             ? redirectTo
-            : "/resumen";
+            : "/resume";
         router.replace(go);
       } catch (err) {
         toast.error(getHumanErrorMessage(err));
@@ -264,7 +264,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     const go =
       redirectTo && redirectTo !== "/login" && redirectTo !== "/"
         ? redirectTo
-        : "/resumen";
+        : "";
     router.replace(go);
   }, [redirectTo, router]);
 

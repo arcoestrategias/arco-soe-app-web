@@ -138,10 +138,7 @@ export function StrategicProjectsDashboard({
 
   // Resumen (usa backend si enabled; si no hay datos, muestra 0)
   const totalProjects = data?.summary?.totalProjects ?? 0;
-  const avgProgress =
-    typeof data?.summary?.avgCompliance === "number"
-      ? Math.round(data!.summary!.avgCompliance)
-      : 0;
+  const avgProgress = data?.summary?.avgCompliance ?? 0;
   const totalBudget = data?.summary?.totalBudget ?? 0;
   const totalExecuted = data?.summary?.totalExecuted ?? 0;
 
