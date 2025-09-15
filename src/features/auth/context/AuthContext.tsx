@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const isAuthError = status === 401 || status === 403;
       if (isAuthError) {
-        clearSession();
+        clearTokens();
       } else {
         setState((s) => ({ ...s, loading: false }));
       }
