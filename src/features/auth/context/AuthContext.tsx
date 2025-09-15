@@ -112,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e: unknown) {
       // Solo invalidar sesión si es 401/403. Mantener contexto (BU/Company) en otros errores.
       const status = extractStatus(e);
+
       const isAuthError = status === 401 || status === 403;
       if (isAuthError) {
         clearSession();

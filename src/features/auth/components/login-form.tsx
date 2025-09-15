@@ -345,8 +345,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         setRecovering(true);
         const data = await authService.forgotPassword(form.email.trim());
         toast.success("Si el correo existe, te enviaremos instrucciones.");
-        if (data?.resetToken) console.log("resetToken:", data.resetToken);
-        setMode("login");
+        if (data?.resetToken) setMode("login");
         // éxito: no des-bloqueamos; no hay endpoint repetible aquí y el usuario puede seguir
         setUiLocked(false); // en recover sí desbloqueamos para permitir login
         setRecovering(false);

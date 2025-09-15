@@ -61,7 +61,6 @@ export function Header({
   }, [currentBU]);
 
   const handleChangeBU = async (nextId: string) => {
-    console.log(nextId, currentBU);
     if (!nextId || nextId === currentBU) return;
     setPending(true);
     const prev = buValue;

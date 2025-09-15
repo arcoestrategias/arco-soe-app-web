@@ -87,22 +87,22 @@ export const authService = {
     const res = await http.get(routes.users.me());
     const data = unwrapAny<MeData>(res);
 
+    const storedBU = getBusinessUnitId();
+    const apiBU = data.currentBusinessUnit?.id ?? null;
+    const isPlatformAdmin = !!data?.isPlatformAdmin;
+
     // === Admin de plataforma ===
-    if (data.isPlatformAdmin) {
+    if (isPlatformAdmin) {
       // El back hace bypass de BU; evita headers residuales y deja "sin posición"
-      clearBusinessUnit();
-      setPositionId(null); // ➜ guarda "" en soe.positionId (helper lo normaliza)
+
+      if (!storedBU && apiBU) {
+        setBusinessUnitId(apiBU);
+      }
       return data;
     }
 
-    // === NO admin ===
-    const storedBU = getBusinessUnitId();
-    const apiBU = data.currentBusinessUnit?.id ?? null;
-
     // Si el back dice que el header era inválido / no asignado:
-    if (storedBU && data.currentBusinessUnit === null) {
-      clearBusinessUnit();
-      setPositionId(null); // ➜ sin posición
+    if (storedBU && apiBU === null) {
       return data;
     }
 

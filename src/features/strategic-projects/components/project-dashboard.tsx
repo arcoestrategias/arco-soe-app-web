@@ -72,7 +72,6 @@ export function StrategicProjectsDashboard({
   function onEditProject(projectId: string) {
     const raw = (data?.projects ?? []).find((p: any) => p.id === projectId);
     if (!raw) return;
-    console.log(raw);
     setEditing(raw);
     setEditOpen(true);
   }

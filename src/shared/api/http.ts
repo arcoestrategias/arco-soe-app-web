@@ -186,26 +186,4 @@ http.interceptors.response.use(
   }
 );
 
-/** Logging en desarrollo (no modifica res.data) */
-// if (process.env.NODE_ENV === "development") {
-//   http.interceptors.request.use((c) => {
-//     console.log(
-//       `[http:req] ${(c.method || "get").toUpperCase()} ${c.baseURL || ""}${
-//         c.url || ""
-//       }`
-//     );
-//     return c;
-//   });
-//   http.interceptors.response.use(
-//     (r) => {
-//       console.log(`[http:res] ${r.status} ${r.config.url}`);
-//       return r;
-//     },
-//     (e) => {
-//       console.log(`[http:err] ${e?.response?.status} ${e?.config?.url}`);
-//       return Promise.reject(e);
-//     }
-//   );
-// }
-
 export default http;
