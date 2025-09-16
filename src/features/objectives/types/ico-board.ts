@@ -2,13 +2,44 @@
 
 // Punto mensual por objetivo (tal como lo devuelve el back)
 export type IcoMonthlyPoint = {
+  // existentes
   month: number; // 1..12
-  year: number; // ej. 2025
+  year: number; // p.ej. 2025
   ico: number; // índice (sin redondeo)
   isMeasured: boolean; // existe ObjectiveGoal ese mes
   hasCompliance: boolean; // ObjectiveGoal tiene indexCompliance
   lightNumeric: number | null; // 1=verde, 2=amarillo, 3=rojo (si aplica)
   lightColorHex: string | null; // color de la celda (si aplica)
+
+  // NUEVOS (opcionales para no romper usos previos)
+  id?: string;
+  goalPercentage?: number | null;
+  goalValue?: number | null;
+  realPercentage?: number | null;
+  realValue?: number | null;
+  indexCompliance?: number | null;
+  score?: number | null;
+
+  // rangos/semáforo del rendimiento
+  rangeExceptional?: number | null;
+  rangeInacceptable?: number | null;
+  indexPerformance?: number | null;
+
+  // base de cálculo y luz "numérica" del backend
+  baseValue?: number | null;
+  light?: number | null; // OJO: el backend envía `light`; mantenemos también `lightNumeric` arriba
+
+  // trazabilidad / anotaciones
+  observation?: string | null;
+  action?: string | null;
+
+  // metadatos
+  objectiveId?: string;
+  isActive?: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdAt?: string | null; // ISO datetime
+  updatedAt?: string | null; // ISO datetime
 };
 
 // Promedio mensual (pie de la tabla)
@@ -77,12 +108,17 @@ export type IcoBoardListItem = {
       updatedAt?: string | null;
     };
     icoMonthly: IcoMonthlyPoint[];
+    goalStatus?: {
+      pendingCount: number;
+      statusLabel: string;
+      lightColorHex: string;
+    };
   };
 };
 
 // Envelope de datos del tablero ICO
 export type IcoBoardData = {
-  resume: IcoBoardResume; 
+  resume: IcoBoardResume;
   listObjectives: IcoBoardListItem[];
   monthlyAverages: IcoBoardMonthlyAverage[];
 };

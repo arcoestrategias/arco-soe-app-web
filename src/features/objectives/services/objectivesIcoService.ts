@@ -2,7 +2,7 @@
 import { http } from "@/shared/api/http";
 import { routes } from "@/shared/api/routes";
 import { unwrapAny } from "@/shared/api/response";
-import { IcoBoardResponse } from "../types/ico-board";
+import { IcoBoardData } from "../types/ico-board";
 
 // Mantén el nombre del DTO simple y consistente con priorities
 export type GetIcoBoardParams = {
@@ -14,7 +14,7 @@ export type GetIcoBoardParams = {
 
 export async function getObjectivesIcoBoard(
   params: GetIcoBoardParams
-): Promise<IcoBoardResponse> {
+): Promise<IcoBoardData> {
   // usa qs desde routes helper (patrón priorities)
   const url = routes.objectives.icoBoard();
   const query = `?strategicPlanId=${encodeURIComponent(
@@ -26,5 +26,5 @@ export async function getObjectivesIcoBoard(
   )}&toYear=${encodeURIComponent(String(params.toYear))}`;
 
   const res = await http.get(url + query);
-  return unwrapAny<IcoBoardResponse>(res.data);
+  return unwrapAny<IcoBoardData>(res.data);
 }

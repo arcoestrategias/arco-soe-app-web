@@ -44,6 +44,7 @@ export const Modules = {
   STRATEGIC_PROJECTS: "strategic-projects",
   STRATEGIC_VALUES: "strategic-values",
   LEVERS: "levers",
+  OBJECTIVE_GOALS: "objective-goals",
 
   PRIORITIES: "priorities",
   FILES: "files",
@@ -201,6 +202,10 @@ export const routes = {
     update: (id: string) => `/api/v1/priorities/${id}`,
     toggleActive: (id: string) => `/api/v1/priorities/${id}/active`,
     icpSeries: "/api/v1/priorities/icp/series",
+  },
+
+  objectiveGoals: {
+    update: (goalId: string) => prefixed(Modules.OBJECTIVE_GOALS, goalId),
   },
 
   files: {
