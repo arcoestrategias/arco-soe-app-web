@@ -74,10 +74,8 @@ export function TaskRowEditor({
   const handleSave = () => {
     const newErrors: Partial<Record<keyof Task, string>> = {};
     if (!editedTask.name?.trim()) newErrors.name = "Campo obligatorio";
-    if (
-      !((editedTask.description ?? editedTask.result) || "").toString().trim()
-    )
-      newErrors.description = "Campo obligatorio";
+    if (!(editedTask.result || "").toString().trim())
+      newErrors.result = "Campo obligatorio";
     if (!editedTask.fromAt || !editedTask.untilAt)
       newErrors.fromAt = "Selecciona un rango de fechas";
 
@@ -121,12 +119,12 @@ export function TaskRowEditor({
           </label>
           <TextareaWithCounter
             ref={resultRef}
-            value={editedTask.description ?? editedTask.result ?? ""}
-            onValueChange={(val) => handleChange("description", val)}
+            value={editedTask.result ?? ""}
+            onValueChange={(val) => handleChange("result", val)}
             maxLength={300}
           />
-          {errors.description && (
-            <p className="text-xs text-red-500 mt-1">{errors.description}</p>
+          {errors.result && (
+            <p className="text-xs text-red-500 mt-1">{errors.result}</p>
           )}
         </div>
       </div>

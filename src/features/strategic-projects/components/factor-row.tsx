@@ -210,11 +210,11 @@ export function FactorRow({
 
             <div className="col-span-4">
               <label className="text-xs text-gray-500 mb-1 block">
-                Descripción
+                Resultado
               </label>
               <TextareaWithCounter
-                value={editedFactor.description ?? ""}
-                onValueChange={(val) => handleChange("description", val)}
+                value={editedFactor.result ?? ""}
+                onValueChange={(val) => handleChange("result", val)}
                 maxLength={300}
               />
             </div>

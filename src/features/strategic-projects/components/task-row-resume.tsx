@@ -128,7 +128,7 @@ export function TaskRowResume({
 
       <div className="col-span-4">
         <span className="text-sm text-gray-600 truncate">
-          {task.description ?? task.result ?? ""}
+          {task.result ?? ""}
         </span>
       </div>
 

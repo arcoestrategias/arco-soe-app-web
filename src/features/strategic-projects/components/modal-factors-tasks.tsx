@@ -260,13 +260,13 @@ export function ModalFactorsTasks({
             await createProjectFactor({
               projectId,
               name, // <- ya viene trimmed
-              description: (factor.description ?? "").trim(),
+              result: (factor.result ?? "").trim(),
             });
             toast.success("Factor creado");
           } else {
             await updateProjectFactor(factor.id, {
               name, // <- trimmed
-              description: (factor.description ?? "").trim(),
+              result: (factor.result ?? "").trim(),
             });
             toast.success("Factor actualizado");
           }
@@ -371,7 +371,7 @@ export function ModalFactorsTasks({
         if (!task.id.startsWith("__new__")) {
           await updateProjectTask(task.id, {
             name: task.name,
-            description: task.description ?? task.result ?? "",
+            result: task.result ?? "",
             fromAt: task.fromAt,
             untilAt: task.untilAt,
             status: task.status,
@@ -394,7 +394,7 @@ export function ModalFactorsTasks({
         await createProjectTask({
           projectFactorId: factorId,
           name: task.name,
-          description: task.description ?? task.result ?? "",
+          result: task.result ?? "",
           fromAt: task.fromAt ?? undefined,
           untilAt: task.untilAt ?? undefined,
           status: task.status ?? "OPE",

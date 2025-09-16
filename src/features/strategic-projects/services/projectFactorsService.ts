@@ -5,12 +5,12 @@ import { routes } from "@/shared/api/routes";
 export type CreateProjectFactorPayload = {
   projectId: string;
   name: string;
-  description?: string | null;
+  result?: string | null;
 };
 
 export type UpdateProjectFactorPayload = Partial<{
   name: string;
-  description: string | null;
+  result: string | null;
 }>;
 
 export async function createProjectFactor(payload: CreateProjectFactorPayload) {
