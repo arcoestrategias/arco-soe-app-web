@@ -17,12 +17,14 @@ import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
 
 // Rango del PROYECTO via provider
-import { usePlanRange } from "@/features/strategic-projects/context/plan-range.context";
-import {
-  parseYmdOrIsoToLocalDate,
-  projectRangeToDates,
-  toYmd,
-} from "@/shared/utils/dateFormatters";
+// import { usePlanRange } from "@/features/strategic-projects/context/plan-range.context";
+// import {
+//   parseYmdOrIsoToLocalDate,
+//   projectRangeToDates,
+//   toYmd,
+// } from "@/shared/utils/dateFormatters";
+
+import { parseYmdOrIsoToLocalDate, toYmd } from "@/shared/utils/dateFormatters";
 
 export function TaskRowEditor({
   task,
@@ -41,11 +43,11 @@ export function TaskRowEditor({
   const datesRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement>(null);
 
-  const { planFromAt, planUntilAt } = usePlanRange();
-  const { min: minDate, max: maxDate } = projectRangeToDates(
-    planFromAt,
-    planUntilAt
-  );
+  // const { planFromAt, planUntilAt } = usePlanRange();
+  // const { min: minDate, max: maxDate } = projectRangeToDates(
+  //   planFromAt,
+  //   planUntilAt
+  // );
 
   const [editedTask, setEditedTask] = useState<Task>({ ...task });
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
@@ -106,14 +108,8 @@ export function TaskRowEditor({
           <label className="text-xs text-gray-500 mb-1 block">Nombre</label>
           <TextareaWithCounter
             value={editedTask.name ?? ""}
-            onChange={(val) => handleChange("name", val)}
+            onValueChange={(val) => handleChange("name", val)}
             maxLength={120}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                resultRef.current?.focus();
-              }
-            }}
           />
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
@@ -121,12 +117,12 @@ export function TaskRowEditor({
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
-            Resultado / Descripción
+            Resultado / Entregable
           </label>
           <TextareaWithCounter
             ref={resultRef}
             value={editedTask.description ?? editedTask.result ?? ""}
-            onChange={(val) => handleChange("description", val)}
+            onValueChange={(val) => handleChange("description", val)}
             maxLength={300}
           />
           {errors.description && (
@@ -141,7 +137,7 @@ export function TaskRowEditor({
           <TextareaWithCounter
             ref={limitationRef}
             value={editedTask.limitation ?? ""}
-            onChange={(val) => handleChange("limitation", val)}
+            onValueChange={(val) => handleChange("limitation", val)}
             maxLength={120}
             className="h-8 text-sm"
           />
@@ -153,7 +149,7 @@ export function TaskRowEditor({
           <TextareaWithCounter
             ref={methodologyRef}
             value={editedTask.methodology ?? ""}
-            onChange={(val) => handleChange("methodology", val)}
+            onValueChange={(val) => handleChange("methodology", val)}
             maxLength={120}
             className="h-8 text-sm"
           />
@@ -200,8 +196,8 @@ export function TaskRowEditor({
                 date={range}
                 onChange={(newRange) => newRange && setRange(newRange)} // no persiste aquí
                 showToastOnApply={false}
-                minDate={minDate}
-                maxDate={maxDate}
+                // minDate={minDate}
+                // maxDate={maxDate}
                 onClose={() => setIsDatePopoverOpen(false)}
                 onApply={(r) => handleApplyDates(r)} // 1 sola persistencia
               />
@@ -218,7 +214,7 @@ export function TaskRowEditor({
         <TextareaWithCounter
           ref={commentsRef}
           value={editedTask.comments ?? ""}
-          onChange={(val) => handleChange("comments", val)}
+          onValueChange={(val) => handleChange("comments", val)}
           maxLength={300}
         />
       </div>

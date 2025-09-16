@@ -202,7 +202,7 @@ export function FactorRow({
                 </label>
                 <TextareaWithCounter
                   value={editedFactor.name ?? ""}
-                  onChange={(val) => handleChange("name", val)}
+                  onValueChange={(val) => handleChange("name", val)}
                   maxLength={150}
                 />
               </div>
@@ -214,7 +214,7 @@ export function FactorRow({
               </label>
               <TextareaWithCounter
                 value={editedFactor.description ?? ""}
-                onChange={(val) => handleChange("description", val)}
+                onValueChange={(val) => handleChange("description", val)}
                 maxLength={300}
               />
             </div>
