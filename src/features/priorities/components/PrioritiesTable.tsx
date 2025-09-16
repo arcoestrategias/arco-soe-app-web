@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -40,6 +39,7 @@ import { SingleDatePicker } from "@/shared/components/date-single-picker";
 import { QueryKey, useQueryClient } from "@tanstack/react-query";
 
 import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
+import { TextareaWithCounter } from "../../../shared/components/textarea-with-counter";
 
 /* ------------------------------------------------------------
    Tipos y utilidades base
@@ -148,7 +148,8 @@ function resolveMonthlyLabel(mc?: string): string | undefined {
   if (!mc) return;
   if (MONTHLY_CLASS_LABEL[mc]) return MONTHLY_CLASS_LABEL[mc];
   const M = mc.toUpperCase();
-  if (M.includes("CUMPLIDAS") && M.includes("ATRASADAS")) return "Cumplida tarde";
+  if (M.includes("CUMPLIDAS") && M.includes("ATRASADAS"))
+    return "Cumplida tarde";
   if (M.startsWith("NO_CUMPLIDAS")) {
     if (M.includes("MESES") || M.includes("ANTERIORES") || M.includes("ATRAS"))
       return "Muy atrasada";
@@ -327,6 +328,8 @@ export default function PrioritiesTable({
   invalidateKeys,
   showCreateRow = false,
   onCloseCreateRow,
+  onDirtyChange,
+  resetSignal,
 }: {
   loading?: boolean;
   error?: boolean;
@@ -340,6 +343,8 @@ export default function PrioritiesTable({
   invalidateKeys?: QueryKey[];
   showCreateRow?: boolean;
   onCloseCreateRow?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  resetSignal?: number;
 }) {
   const createMut = useCreatePriority(invalidateKey);
   const updateMut = useUpdatePriority(invalidateKey);
@@ -347,6 +352,25 @@ export default function PrioritiesTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
+
+  const hasNewDraftValues = !!(
+    newDraft.name ||
+    newDraft.description ||
+    newDraft.fromAt ||
+    newDraft.untilAt ||
+    newDraft.objectiveId ||
+    newDraft.finishedAt
+  );
+
+  const isDirty =
+    editingId !== null ||
+    showCreateRow ||
+    Object.keys(drafts).length > 0 ||
+    hasNewDraftValues;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const qc = useQueryClient();
 
@@ -369,6 +393,25 @@ export default function PrioritiesTable({
       });
     }
   }, [showCreateRow]);
+
+  useEffect(() => {
+    if (resetSignal === undefined) return;
+    // limpiar edición/creación y borradores
+    setEditingId(null);
+    setDrafts({});
+    setNewDraft(EMPTY_DRAFT);
+    onCloseCreateRow?.();
+  }, [resetSignal]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = ""; // requerido por browsers para mostrar prompt nativo
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const uiBusy =
     editingId !== null ||
@@ -470,21 +513,31 @@ export default function PrioritiesTable({
       </div>
     );
 
+  // En edición global (cualquier fila o creación), se ocultan columnas Objetivo
+  const hasEditing = editingId !== null || showCreateRow;
+
+  // Total de columnas visibles
+  //   - Visualización: #, Prioridad, Objetivo, Estado, Inicio/Fin, Fecha Terminado, Acciones => 8
+  //   - Edición:       #, Prioridad, Estado, Inicio/Fin, Fecha Terminado, Acciones => 6
+  const totalCols = hasEditing ? 6 : 7;
+
+  // Colspan para la celda del editor (todas menos Acciones)
+  const colsWithoutActions = totalCols - 1;
+
   return (
-    // Permitimos scroll horizontal si hace falta: ideal para laptops pequeñas
+    // Permitimos scroll horizontal si hace falta, pero la tabla se ajusta al contenido
     <div className="w-full overflow-x-auto">
-      {/* min-w evita que las columnas se monten entre sí */}
-      <Table className="w-full min-w-[1100px]">
+      <Table className="w-full table-auto">
         <TableHeader>
           <TableRow>
             <TableHead className="w-12 whitespace-nowrap">#</TableHead>
 
-            {/* Prioridad: más espacio relativo */}
             <TableHead className="whitespace-nowrap">Prioridad</TableHead>
 
-            {/* Entregable / Objetivo: ancho fijo (se controla en el cuerpo con wrappers) */}
-            <TableHead className="whitespace-nowrap">Entregable</TableHead>
-            <TableHead className="whitespace-nowrap">Objetivo</TableHead>
+            {/*Objetivo en visualización */}
+            {!hasEditing && (
+              <TableHead className="whitespace-nowrap">Objetivo</TableHead>
+            )}
 
             <TableHead className="text-center w-24 whitespace-nowrap">
               Estado
@@ -495,7 +548,9 @@ export default function PrioritiesTable({
             <TableHead className="text-center w-40 whitespace-nowrap">
               Fecha Terminado
             </TableHead>
-            <TableHead className="text-center w-28 whitespace-nowrap">
+
+            {/* Acciones sticky a la derecha */}
+            <TableHead className="text-center w-28 whitespace-nowrap sticky right-0 bg-background z-20 border-l">
               Acciones
             </TableHead>
           </TableRow>
@@ -511,6 +566,194 @@ export default function PrioritiesTable({
 
             const effectiveStatus: Status = (d?.status ?? p.status) as Status;
 
+            const objectiveName = p.objectiveName ?? "—";
+            const deliverableText = p.description ?? "—";
+
+            if (isEditing) {
+              // --- Fila en EDICIÓN (editor en una sola celda + acciones sticky) ---
+              return (
+                <TableRow key={p.id}>
+                  <TableCell
+                    colSpan={colsWithoutActions}
+                    className="align-top p-3"
+                  >
+                    <div className="space-y-4">
+                      <div className="text-xs text-muted-foreground">
+                        Editando # {idx + 1}
+                      </div>
+
+                      {/* Fila 1: Nombre, Entregable */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Nombre
+                          </label>
+                          <TextareaWithCounter
+                            value={d?.name ?? ""}
+                            onChange={(e) =>
+                              setDrafts((ds) => ({
+                                ...ds,
+                                [p.id]: {
+                                  ...(ds[p.id] ?? EMPTY_DRAFT),
+                                  name: e.target.value,
+                                },
+                              }))
+                            }
+                            maxLength={120}
+                            rows={2}
+                            placeholder="Nombre de la prioridad"
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Entregable
+                          </label>
+                          <TextareaWithCounter
+                            value={d?.description ?? ""}
+                            onChange={(e) =>
+                              setDrafts((ds) => ({
+                                ...ds,
+                                [p.id]: {
+                                  ...(ds[p.id] ?? EMPTY_DRAFT),
+                                  description: e.target.value,
+                                },
+                              }))
+                            }
+                            maxLength={500}
+                            rows={3}
+                            placeholder="Describe el entregable…"
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Fila 2: Izquierda = Objetivo (mitad). Derecha = Estado / Fechas (mitad) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Izquierda: Objetivo ocupa toda la mitad (igual ancho que “Nombre”) */}
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Objetivo
+                          </label>
+                          <ObjectiveSelect
+                            planId={planId}
+                            positionId={positionId}
+                            value={d?.objectiveId}
+                            onChange={(val) =>
+                              setDrafts((ds) => ({
+                                ...ds,
+                                [p.id]: {
+                                  ...(ds[p.id] ?? EMPTY_DRAFT),
+                                  objectiveId: val,
+                                },
+                              }))
+                            }
+                            otherPositions={otherPositions}
+                          />
+                        </div>
+
+                        {/* Derecha: Estado | Fecha inicio/fin | Fecha Terminado */}
+                        <div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-xs text-muted-foreground block mb-1">
+                                Estado
+                              </label>
+                              <div className="h-9 flex items-center">
+                                <StatusBadge
+                                  value={(d?.status as Status) ?? "OPE"}
+                                  editable
+                                  onChange={(v) =>
+                                    setDrafts((ds) => ({
+                                      ...ds,
+                                      [p.id]: {
+                                        ...(ds[p.id] ?? EMPTY_DRAFT),
+                                        status: v,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-xs text-muted-foreground block mb-1">
+                                Fecha inicio / fin
+                              </label>
+                              <DatesCell
+                                fromAt={d?.fromAt}
+                                untilAt={d?.untilAt}
+                                editable
+                                onChange={(f, u) =>
+                                  setDrafts((ds) => ({
+                                    ...ds,
+                                    [p.id]: {
+                                      ...(ds[p.id] ?? EMPTY_DRAFT),
+                                      fromAt: f,
+                                      untilAt: u,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs text-muted-foreground block mb-1">
+                                Fecha Terminado
+                              </label>
+                              {effectiveStatus === "CLO" ? (
+                                <FinishedDateCell
+                                  value={d?.finishedAt}
+                                  editable
+                                  onChange={(v) =>
+                                    setDrafts((ds) => ({
+                                      ...ds,
+                                      [p.id]: {
+                                        ...(ds[p.id] ?? EMPTY_DRAFT),
+                                        finishedAt: v,
+                                      },
+                                    }))
+                                  }
+                                />
+                              ) : (
+                                <div className="h-9 flex items-center">
+                                  {renderClosureBadge(p)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  {/* Acciones sticky */}
+                  <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
+                    <Button
+                      onClick={() => saveEdit(p.id)}
+                      disabled={
+                        updateMut.isPending && updateMut.variables?.id === p.id
+                      }
+                      size="sm"
+                      className="h-8 btn-gradient"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => cancelEdit(p.id)}
+                      disabled={updateMut.isPending}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+
+            // --- Fila en VISUALIZACIÓN (texto envuelve, acciones sticky) ---
             return (
               <TableRow key={p.id}>
                 {/* # */}
@@ -518,284 +761,206 @@ export default function PrioritiesTable({
                   {idx + 1}
                 </TableCell>
 
-                {/* PRIORIDAD (más ancho en laptops pequeñas). En lectura: tooltip */}
+                {/* PRIORIDAD */}
                 <TableCell className="align-top">
-                  {isEditing ? (
-                    <Input
-                      value={d?.name ?? ""}
-                      onChange={(e) =>
-                        setDrafts((ds) => ({
-                          ...ds,
-                          [p.id]: {
-                            ...(ds[p.id] ?? EMPTY_DRAFT),
-                            name: e.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Nombre de la prioridad"
-                    />
-                  ) : (
-                    // Le damos margen amplio: ocupa el espacio flexible
-                    <div className="min-w-[280px] md:min-w-[320px] max-w-[560px]">
-                      <CellWithTooltip text={p.name} lines={2} />
-                    </div>
-                  )}
+                  <div className="max-w-full">
+                    <CellWithTooltip
+                      lines={[{ label: "Entregable", text: deliverableText }]}
+                      side="top"
+                    >
+                      <div className="font-medium leading-6 break-words whitespace-pre-wrap">
+                        {p.name}
+                      </div>
+                    </CellWithTooltip>
+                  </div>
                 </TableCell>
 
-                {/* ENTREGABLE (ancho fijo + tooltip) */}
-                <TableCell className="align-top">
-                  {isEditing ? (
-                    <Input
-                      value={d?.description ?? ""}
-                      onChange={(e) =>
-                        setDrafts((ds) => ({
-                          ...ds,
-                          [p.id]: {
-                            ...(ds[p.id] ?? EMPTY_DRAFT),
-                            description: e.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Entregable"
-                    />
-                  ) : (
-                    <div className="min-w-0 w-[220px] md:w-[260px]">
-                      <CellWithTooltip text={p.description ?? "-"} lines={2} />
+                {/*OBJETIVO solo en visualización */}
+                {!hasEditing && (
+                  <TableCell className="align-top">
+                    <div className="text-sm break-words whitespace-pre-wrap">
+                      {p.objectiveName ?? "—"}
                     </div>
-                  )}
-                </TableCell>
-
-                {/* OBJETIVO (ancho fijo + tooltip) */}
-                <TableCell className="align-top">
-                  {isEditing ? (
-                    <ObjectiveSelect
-                      stacked
-                      planId={planId}
-                      positionId={positionId}
-                      value={d?.objectiveId}
-                      onChange={(val) =>
-                        setDrafts((ds) => ({
-                          ...ds,
-                          [p.id]: {
-                            ...(ds[p.id] ?? EMPTY_DRAFT),
-                            objectiveId: val,
-                          },
-                        }))
-                      }
-                      otherPositions={otherPositions}
-                    />
-                  ) : (
-                    <div className="min-w-0 w-[220px] md:w-[260px]">
-                      <CellWithTooltip text={p.objectiveName ?? "-"} lines={2} />
-                    </div>
-                  )}
-                </TableCell>
+                  </TableCell>
+                )}
 
                 {/* ESTADO */}
                 <TableCell className="text-center w-24 whitespace-nowrap align-top">
-                  {isEditing ? (
-                    <StatusBadge
-                      value={(d?.status as Status) ?? "OPE"}
-                      editable
-                      onChange={(v) =>
-                        setDrafts((ds) => ({
-                          ...ds,
-                          [p.id]: {
-                            ...(ds[p.id] ?? EMPTY_DRAFT),
-                            status: v,
-                          },
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2 justify-center">
-                      {monthlyLabel && monthlyStyle ? (
-                        <Badge
-                          className="whitespace-nowrap border-0"
-                          style={monthlyStyle}
-                        >
-                          {monthlyLabel}
-                        </Badge>
-                      ) : (
-                        <StatusBadge value={p.status} />
-                      )}
-                    </div>
-                  )}
-                </TableCell>
-
-                {/* FECHAS (solo from/until) */}
-                <TableCell className="text-center w-40 whitespace-nowrap align-top">
-                  {isEditing ? (
-                    <DatesCell
-                      fromAt={d?.fromAt}
-                      untilAt={d?.untilAt}
-                      editable
-                      onChange={(f, u) =>
-                        setDrafts((ds) => ({
-                          ...ds,
-                          [p.id]: {
-                            ...(ds[p.id] ?? EMPTY_DRAFT),
-                            fromAt: f,
-                            untilAt: u,
-                          },
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="space-x-2 whitespace-nowrap justify-center">
-                      <Badge variant="outline">
-                        {formatDateBadge(p.fromAt)}
+                  <div className="flex items-center gap-2 justify-center">
+                    {monthlyLabel && monthlyStyle ? (
+                      <Badge
+                        className="whitespace-nowrap border-0"
+                        style={monthlyStyle}
+                      >
+                        {monthlyLabel}
                       </Badge>
-                      <Badge variant="outline">
-                        {formatDateBadge(p.untilAt)}
-                      </Badge>
-                    </div>
-                  )}
-                </TableCell>
-
-                {/* CIERRE (finishedAt / canceledAt) */}
-                <TableCell className="text-center w-40 whitespace-nowrap align-top">
-                  {isEditing ? (
-                    effectiveStatus === "CLO" ? (
-                      <FinishedDateCell
-                        value={d?.finishedAt}
-                        editable
-                        onChange={(v) =>
-                          setDrafts((ds) => ({
-                            ...ds,
-                            [p.id]: {
-                              ...(ds[p.id] ?? EMPTY_DRAFT),
-                              finishedAt: v,
-                            },
-                          }))
-                        }
-                      />
                     ) : (
-                      renderClosureBadge(p)
-                    )
-                  ) : (
-                    renderClosureBadge(p)
-                  )}
+                      <StatusBadge value={p.status} />
+                    )}
+                  </div>
                 </TableCell>
 
-                {/* ACCIONES */}
-                <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top">
-                  {isEditing ? (
-                    <>
-                      <Button
-                        onClick={() => saveEdit(p.id)}
-                        disabled={
-                          updateMut.isPending &&
-                          updateMut.variables?.id === p.id
-                        }
-                        size="sm"
-                        className="h-8 btn-gradient"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => cancelEdit(p.id)}
-                        disabled={updateMut.isPending}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => startEdit(p)}
-                        disabled={uiBusy}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => onInactivate?.(p.id)}
-                        disabled={uiBusy || inactivatingId === p.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
+                {/* FECHAS (from/until) */}
+                <TableCell className="text-center w-40 whitespace-nowrap align-top">
+                  <div className="space-x-2 whitespace-nowrap justify-center">
+                    <Badge variant="outline">{formatDateBadge(p.fromAt)}</Badge>
+                    <Badge variant="outline">
+                      {formatDateBadge(p.untilAt)}
+                    </Badge>
+                  </div>
+                </TableCell>
+
+                {/* CIERRE */}
+                <TableCell className="text-center w-40 whitespace-nowrap align-top">
+                  {renderClosureBadge(p)}
+                </TableCell>
+
+                {/* ACCIONES sticky */}
+                <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startEdit(p)}
+                    disabled={uiBusy}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => onInactivate?.(p.id)}
+                    disabled={uiBusy || inactivatingId === p.id}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             );
           })}
 
-          {/* Fila de creación */}
+          {/* Fila de creación (misma idea: editor + acciones sticky) */}
           {showCreateRow && (
             <TableRow ref={createRowRef}>
-              <TableCell className="w-12 whitespace-nowrap align-top">
-                #{items.length + 1}
-              </TableCell>
+              <TableCell colSpan={colsWithoutActions} className="align-top p-3">
+                <div className="space-y-4">
+                  <div className="text-xs text-muted-foreground">
+                    Nueva prioridad #{items.length + 1}
+                  </div>
 
-              <TableCell className="align-top">
-                <div className="min-w-[280px] md:min-w-[320px] max-w-[560px]">
-                  <Input
-                    value={newDraft.name ?? ""}
-                    onChange={(e) =>
-                      setNewDraft((d) => ({ ...d, name: e.target.value }))
-                    }
-                    placeholder="Nombre de la prioridad"
-                  />
+                  {/* Fila 1: Nombre, Entregable */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Nombre
+                      </label>
+                      <TextareaWithCounter
+                        value={newDraft.name ?? ""}
+                        onChange={(e) =>
+                          setNewDraft((d) => ({ ...d, name: e.target.value }))
+                        }
+                        maxLength={120}
+                        rows={2}
+                        placeholder="Nombre de la prioridad"
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Entregable
+                      </label>
+                      <TextareaWithCounter
+                        value={newDraft.description ?? ""}
+                        onChange={(e) =>
+                          setNewDraft((d) => ({
+                            ...d,
+                            description: e.target.value,
+                          }))
+                        }
+                        maxLength={500}
+                        rows={3}
+                        placeholder="Describe el entregable…"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fila 2: Objetivo, Estado, Fecha inicio, Fecha Terminado */}
+                  {/* Fila 2: Izquierda = Objetivo (mitad). Derecha = Estado / Fechas (mitad) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Izquierda: Objetivo ocupa toda la mitad (igual ancho que “Nombre”) */}
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">
+                        Objetivo
+                      </label>
+                      <ObjectiveSelect
+                        planId={planId}
+                        positionId={positionId}
+                        value={newDraft.objectiveId}
+                        onChange={(val) =>
+                          setNewDraft((d) => ({ ...d, objectiveId: val }))
+                        }
+                        otherPositions={otherPositions}
+                        // stacked={false} (por defecto): el switch queda al lado del select
+                      />
+                    </div>
+
+                    {/* Derecha: Estado | Fecha inicio/fin | Fecha Terminado (distribuidos en 3 columnas dentro de esta mitad) */}
+                    <div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Estado
+                          </label>
+                          <div className="h-9 flex items-center">
+                            <StatusBadge
+                              value={(newDraft.status as Status) ?? "OPE"}
+                              editable
+                              onChange={(v) =>
+                                setNewDraft((d) => ({ ...d, status: v }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Fecha inicio / fin
+                          </label>
+                          <DatesCell
+                            fromAt={newDraft.fromAt}
+                            untilAt={newDraft.untilAt}
+                            editable
+                            onChange={(f, u) =>
+                              setNewDraft((d) => ({
+                                ...d,
+                                fromAt: f,
+                                untilAt: u,
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">
+                            Fecha Terminado
+                          </label>
+                          <FinishedDateCell
+                            value={newDraft.finishedAt}
+                            editable
+                            onChange={(v) =>
+                              setNewDraft((d) => ({ ...d, finishedAt: v }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TableCell>
 
-              <TableCell className="align-top">
-                <div className="min-w-0 w-[220px] md:w-[260px]">
-                  <Input
-                    value={newDraft.description ?? ""}
-                    onChange={(e) =>
-                      setNewDraft((d) => ({ ...d, description: e.target.value }))
-                    }
-                    placeholder="Entregable"
-                  />
-                </div>
-              </TableCell>
-
-              <TableCell className="align-top">
-                <div className="min-w-0 w-[220px] md:w-[260px]">
-                  <ObjectiveSelect
-                    stacked
-                    planId={planId}
-                    positionId={positionId}
-                    value={newDraft.objectiveId}
-                    onChange={(val) =>
-                      setNewDraft((d) => ({ ...d, objectiveId: val }))
-                    }
-                    otherPositions={otherPositions}
-                  />
-                </div>
-              </TableCell>
-
-              <TableCell className="w-24 whitespace-nowrap text-center align-top">
-                <StatusBadge
-                  value={(newDraft.status as Status) ?? "OPE"}
-                  editable
-                  onChange={(v) => setNewDraft((d) => ({ ...d, status: v }))}
-                />
-              </TableCell>
-
-              <TableCell className="w-40 whitespace-nowrap text-center align-top">
-                <DatesCell
-                  fromAt={newDraft.fromAt}
-                  untilAt={newDraft.untilAt}
-                  editable
-                  onChange={(f, u) =>
-                    setNewDraft((d) => ({ ...d, fromAt: f, untilAt: u }))
-                  }
-                />
-              </TableCell>
-
-              <TableCell className="w-40 whitespace-nowrap align-top" />
-
-              <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top">
+              {/* Acciones sticky */}
+              <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
                 <Button
                   onClick={saveNew}
                   disabled={
@@ -826,7 +991,7 @@ export default function PrioritiesTable({
           {items.length === 0 && !showCreateRow && (
             <TableRow>
               <TableCell
-                colSpan={8}
+                colSpan={totalCols}
                 className="text-center text-sm text-muted-foreground"
               >
                 No hay prioridades para los filtros seleccionados.

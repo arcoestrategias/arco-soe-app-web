@@ -1,4 +1,3 @@
-// shared/components/objective-select.tsx
 "use client";
 
 import { useEffect, useMemo, useState, useId } from "react";
@@ -15,9 +14,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-// Hook real para "mis objetivos"
 import { useObjectives } from "@/features/strategic-plans/hooks/use-objectives";
-// Service real para terceros (named export)
 import { getObjectives } from "@/features/strategic-plans/services/objectivesService";
 import { QKEY } from "@/shared/api/query-keys";
 
@@ -30,14 +27,11 @@ export default function ObjectiveSelect({
   value,
   onChange,
   disabled,
-  otherPositions, // posiciones “de terceros” (todas menos la actual)
+  otherPositions,
   defaultAllowThirdParty = false,
-  // NUEVOS props no-rompedores:
-  stacked = false, // ← cuando true, pone el switch arriba del select
+  stacked = false,
   switchLabel = "Permitir objetivos de terceros",
-  triggerClassName, // para personalizar ancho si lo necesitas
-
-  // NUEVO: ocultar forzosamente el switch (y con ello, no permitir terceros)
+  triggerClassName,
   hideSwitch = false,
 }: {
   planId?: string;
@@ -50,15 +44,13 @@ export default function ObjectiveSelect({
   stacked?: boolean;
   switchLabel?: string;
   triggerClassName?: string;
-  hideSwitch?: boolean; // ← NUEVO
+  hideSwitch?: boolean;
 }) {
   const [allowThirdParty, setAllowThirdParty] = useState(
     defaultAllowThirdParty
   );
   const switchId = useId();
 
-  // Mis objetivos (de la posición actual)
-  const ownEnabled = !!planId && !!positionId && !disabled;
   const { objectives: ownObjectives, isLoading: loadingOwn } = useObjectives(
     planId!,
     positionId!
@@ -73,30 +65,23 @@ export default function ObjectiveSelect({
     [ownObjectives]
   );
 
-  // ¿El valor actual está en "Mis objetivos"?
   const selectedInOwn = useMemo(
     () => !!value && ownOpts.some((o) => o.id === value),
     [value, ownOpts]
   );
 
-  // Si hay valor preseleccionado y NO está en propios, habilitar terceros automáticamente
   useEffect(() => {
     if (!value) return;
     if (selectedInOwn) return;
-    // Solo activar terceros automáticamente si NO estamos ocultando el switch
     if (!hideSwitch && !allowThirdParty && otherPositions?.length) {
       setAllowThirdParty(true);
     }
   }, [value, selectedInOwn, allowThirdParty, otherPositions, hideSwitch]);
 
-  // Si ocultamos el switch, nunca permitimos terceros (fuerza OFF)
   useEffect(() => {
-    if (hideSwitch && allowThirdParty) {
-      setAllowThirdParty(false);
-    }
+    if (hideSwitch && allowThirdParty) setAllowThirdParty(false);
   }, [hideSwitch, allowThirdParty]);
 
-  // Candidatos “terceros” solo si está permitido (y no oculto)
   const canShowSwitch = !hideSwitch && !!otherPositions?.length;
   const canUseThirdParty =
     !hideSwitch && allowThirdParty && !!planId && !!otherPositions?.length;
@@ -128,12 +113,82 @@ export default function ObjectiveSelect({
 
   const isLoadingThird = thirdQueries.some((q) => q.isPending);
 
-  // Layout
   return (
     <div
-      className={stacked ? "flex flex-col gap-2" : "flex items-center gap-3"}
+      className={
+        stacked ? "flex flex-col gap-2" : "flex items-center gap-3 min-w-0"
+      }
     >
-      {/* Switch + Label (arriba si stacked) */}
+      {/* Select (ocupa todo el ancho disponible) */}
+      <div className={stacked ? "" : "flex-1 min-w-0"}>
+        <Select
+          value={value ?? ""}
+          onValueChange={(v) => onChange?.(v || undefined)}
+          disabled={disabled || loadingOwn || isLoadingThird}
+        >
+          <SelectTrigger className={triggerClassName ?? "w-full"}>
+            <SelectValue
+              placeholder={
+                loadingOwn || isLoadingThird
+                  ? "Cargando objetivos..."
+                  : "Seleccionar objetivo"
+              }
+            />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Mis objetivos</SelectLabel>
+              {ownOpts.length === 0 ? (
+                <SelectItem value="__empty_own" disabled>
+                  (Sin objetivos)
+                </SelectItem>
+              ) : (
+                ownOpts.map((o) => (
+                  <SelectItem key={`own-${o.id}`} value={o.id}>
+                    {o.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectGroup>
+
+            {canUseThirdParty &&
+              Object.entries(thirdGroups).map(([cargo, list]) => (
+                <SelectGroup key={cargo}>
+                  <SelectLabel>{cargo}</SelectLabel>
+                  {list.length === 0 ? (
+                    <SelectItem value={`__empty_${cargo}`} disabled>
+                      (Sin objetivos)
+                    </SelectItem>
+                  ) : (
+                    list.map((o) => (
+                      <SelectItem key={`${cargo}-${o.id}`} value={o.id}>
+                        {o.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectGroup>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Switch al lado (no-stacked) */}
+      {!stacked && canShowSwitch && (
+        <div className="shrink-0 flex items-center gap-2">
+          <Switch
+            id={switchId}
+            checked={allowThirdParty}
+            onCheckedChange={setAllowThirdParty}
+            disabled={disabled || !otherPositions?.length}
+          />
+          <Label htmlFor={switchId} className="text-xs whitespace-nowrap">
+            {switchLabel}
+          </Label>
+        </div>
+      )}
+
+      {/* Switch arriba (stacked) */}
       {stacked && canShowSwitch && (
         <label
           htmlFor={switchId}
@@ -147,72 +202,6 @@ export default function ObjectiveSelect({
           />
           {switchLabel}
         </label>
-      )}
-
-      <Select
-        value={value ?? ""} // El componente controla value; no hay <SelectItem value=""> en la lista
-        onValueChange={(v) => onChange?.(v || undefined)}
-        disabled={disabled || loadingOwn || isLoadingThird}
-      >
-        <SelectTrigger className={triggerClassName ?? "w-full max-w-[420px]"}>
-          <SelectValue
-            placeholder={
-              loadingOwn || isLoadingThird
-                ? "Cargando objetivos..."
-                : "Seleccionar objetivo"
-            }
-          />
-        </SelectTrigger>
-
-        <SelectContent>
-          <SelectGroup>
-            <SelectLabel>Mis objetivos</SelectLabel>
-            {ownOpts.length === 0 ? (
-              <SelectItem value="__empty_own" disabled>
-                (Sin objetivos)
-              </SelectItem>
-            ) : (
-              ownOpts.map((o) => (
-                <SelectItem key={`own-${o.id}`} value={o.id}>
-                  {o.name}
-                </SelectItem>
-              ))
-            )}
-          </SelectGroup>
-
-          {canUseThirdParty &&
-            Object.entries(thirdGroups).map(([cargo, list]) => (
-              <SelectGroup key={cargo}>
-                <SelectLabel>{cargo}</SelectLabel>
-                {list.length === 0 ? (
-                  <SelectItem value={`__empty_${cargo}`} disabled>
-                    (Sin objetivos)
-                  </SelectItem>
-                ) : (
-                  list.map((o) => (
-                    <SelectItem key={`${cargo}-${o.id}`} value={o.id}>
-                      {o.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectGroup>
-            ))}
-        </SelectContent>
-      </Select>
-
-      {/* Switch a la derecha (solo si NO stacked) */}
-      {!stacked && canShowSwitch && (
-        <div className="flex items-center gap-2">
-          <Switch
-            id={switchId}
-            checked={allowThirdParty}
-            onCheckedChange={setAllowThirdParty}
-            disabled={disabled || !otherPositions?.length}
-          />
-          <Label htmlFor={switchId} className="text-xs">
-            {switchLabel}
-          </Label>
-        </div>
       )}
     </div>
   );

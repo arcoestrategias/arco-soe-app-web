@@ -1,7 +1,11 @@
 "use client";
 
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ActionButton } from "@/components/ui/action-button";
 
 interface ConfirmModalProps {
@@ -13,6 +17,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   children?: React.ReactNode;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ConfirmModal({
@@ -24,12 +29,21 @@ export function ConfirmModal({
   confirmText = "Aceptar",
   cancelText = "Cancelar",
   children,
+  onOpenChange,
 }: ConfirmModalProps) {
   return (
-    <Dialog open={open} onOpenChange={onCancel}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+        onOpenChange?.(next);
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
-        <p className="text-sm text-gray-600">{message}</p>
+        <DialogDescription className="text-sm text-gray-600">
+          {message}
+        </DialogDescription>
 
         {children && <div className="mt-3">{children}</div>}
 

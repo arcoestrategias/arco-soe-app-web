@@ -1,9 +1,10 @@
+import * as React from "react";
 import { forwardRef } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
 interface TextareaWithCounterProps {
   value: string;
-  onChange: (val: string) => void;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   maxLength: number;
   rows?: number;
   placeholder?: string;
@@ -34,7 +35,7 @@ export const TextareaWithCounter = forwardRef<
           value={value}
           placeholder={placeholder}
           maxLength={maxLength}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={onChange}
           className={`${className} pr-12 resize-none`}
           onKeyDown={onKeyDown}
         />

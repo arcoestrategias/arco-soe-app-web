@@ -25,11 +25,15 @@ export default function PrioritiesDashboard({
   positionId,
   month,
   year,
+  onDirtyChange,
+  resetSignal,
 }: {
   planId?: string;
   positionId?: string;
   month: number;
   year: number;
+  onDirtyChange?: (dirty: boolean) => void;
+  resetSignal?: number;
 }) {
   const enabled = !!positionId && !!month && !!year;
 
@@ -142,6 +146,8 @@ export default function PrioritiesDashboard({
             invalidateKeys={invalidateKeys}
             showCreateRow={showCreateRow}
             onCloseCreateRow={() => setShowCreateRow(false)}
+            onDirtyChange={onDirtyChange}
+            resetSignal={resetSignal}
           />
         </CardContent>
       </Card>
