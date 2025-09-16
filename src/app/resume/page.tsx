@@ -2,10 +2,10 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 import { SidebarLayout } from "@/shared/layout";
-import { getBusinessUnitId } from "@/shared/auth/storage";
+import { getBusinessUnitId, getPositionId } from "@/shared/auth/storage"; // ✅ añade getPositionId
 
 // Selects
 import { StrategicPlanSelect } from "@/shared/filters/components/StrategicPlanSelect";
@@ -28,16 +28,36 @@ import PositionsAssignmentsChart from "@/features/resume/components/positions-as
 import Velocimeter from "@/features/resume/components/velocimeter";
 import PositionAnnualTrendCard from "@/features/resume/components/position-annual-trend-card";
 
+// ✅ permisos
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
+
 export default function ResumenPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
+  const { me } = useAuth();
+
+  // ✅ ¿Puede asignar posiciones? (Position Management -> assign)
+  const canAssignPosition = useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"),
+    [me]
+  );
 
   // Filtros
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
-  const [positionId, setPositionId] = useState<string | null>(null);
+  const [positionId, setPositionId] = useState<string | null>(
+    getPositionId() ?? null
+  ); // ✅ arranca con storage
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
-  // Fetch principal: /positions/overview (ahora acepta positionId)
+  // ✅ si NO puede asignar, forzamos siempre la posición del storage
+  useEffect(() => {
+    if (!canAssignPosition) {
+      setPositionId(getPositionId() ?? null);
+    }
+  }, [canAssignPosition]);
+
+  // Fetch principal: /positions/overview (acepta positionId)
   const { data, isLoading, error } = usePositionsOverview(
     businessUnitId,
     strategicPlanId ?? undefined,
@@ -93,13 +113,8 @@ export default function ResumenPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
-              Resumen
+              Performance
             </h1>
-            {/* <p className="text-sm text-gray-600 text-optimized mt-1">
-              Vista general de desempeño por posición (ICO, ICP y Performance
-              del mes) y carga de trabajo. Selecciona plan, posición y periodo
-              para analizar el mapa, los KPIs y la tabla.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
@@ -115,19 +130,22 @@ export default function ResumenPage() {
               </FilterField>
             </div>
 
-            <div className="w-full">
-              <FilterField label="Posición">
-                <PositionSelect
-                  businessUnitId={businessUnitId}
-                  value={positionId} // string | null
-                  onChange={setPositionId} // recibe string | null
-                  defaultFromAuth={false} // opcional: si quieres arrancar en "Todos"
-                  showOptionAll // 👈 habilita la opción "Todos"
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {/* ✅ Mostrar el select solo si tiene permiso assign */}
+            {canAssignPosition ? (
+              <div className="w-full">
+                <FilterField label="Posición">
+                  <PositionSelect
+                    businessUnitId={businessUnitId}
+                    value={positionId} // string | null
+                    onChange={setPositionId} // string | null
+                    defaultFromAuth // auto-selecciona storage en el propio select
+                    showOptionAll
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            ) : null}
 
             <div className="w-full">
               <FilterField label="Mes">

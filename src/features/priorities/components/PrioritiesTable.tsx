@@ -41,6 +41,10 @@ import { QueryKey, useQueryClient } from "@tanstack/react-query";
 import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
 import { TextareaWithCounter } from "../../../shared/components/textarea-with-counter";
 
+import { getPositionId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
+
 /* ------------------------------------------------------------
    Tipos y utilidades base
 ------------------------------------------------------------ */
@@ -346,6 +350,12 @@ export default function PrioritiesTable({
   onDirtyChange?: (dirty: boolean) => void;
   resetSignal?: number;
 }) {
+  const { me } = useAuth();
+  const canAssignPosition = useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    [me]
+  );
+
   const createMut = useCreatePriority(invalidateKey);
   const updateMut = useUpdatePriority(invalidateKey);
 
@@ -697,31 +707,32 @@ export default function PrioritiesTable({
                                 }
                               />
                             </div>
-
-                            <div>
-                              <label className="text-xs text-muted-foreground block mb-1">
-                                Fecha Terminado
-                              </label>
-                              {effectiveStatus === "CLO" ? (
-                                <FinishedDateCell
-                                  value={d?.finishedAt}
-                                  editable
-                                  onChange={(v) =>
-                                    setDrafts((ds) => ({
-                                      ...ds,
-                                      [p.id]: {
-                                        ...(ds[p.id] ?? EMPTY_DRAFT),
-                                        finishedAt: v,
-                                      },
-                                    }))
-                                  }
-                                />
-                              ) : (
-                                <div className="h-9 flex items-center">
-                                  {renderClosureBadge(p)}
-                                </div>
-                              )}
-                            </div>
+                            {canAssignPosition ? (
+                              <div>
+                                <label className="text-xs text-muted-foreground block mb-1">
+                                  Fecha Terminado
+                                </label>
+                                {effectiveStatus === "CLO" ? (
+                                  <FinishedDateCell
+                                    value={d?.finishedAt}
+                                    editable
+                                    onChange={(v) =>
+                                      setDrafts((ds) => ({
+                                        ...ds,
+                                        [p.id]: {
+                                          ...(ds[p.id] ?? EMPTY_DRAFT),
+                                          finishedAt: v,
+                                        },
+                                      }))
+                                    }
+                                  />
+                                ) : (
+                                  <div className="h-9 flex items-center">
+                                    {renderClosureBadge(p)}
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </div>

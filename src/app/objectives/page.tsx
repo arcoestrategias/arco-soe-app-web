@@ -15,12 +15,30 @@ import { YearSelect } from "@/shared/filters/components/YearSelect";
 import { FilterField } from "@/shared/components/FilterField";
 import ObjectivesView from "@/features/objectives/components/objectives-view";
 
+import { getPositionId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
+
 export default function ObjectivesPage() {
+  const { me } = useAuth();
+  const canAssignPosition = React.useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    [me]
+  );
+
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
-  const [positionId, setPositionId] = useState<string | null>(null);
+  const [positionId, setPositionId] = useState<string | null>(
+    getPositionId() ?? null
+  );
   const [year, setYear] = useState<number>(new Date().getFullYear());
+
+  React.useEffect(() => {
+    if (!canAssignPosition) {
+      setPositionId(getPositionId() ?? null);
+    }
+  }, [canAssignPosition]);
 
   return (
     <SidebarLayout currentPath="/objectives" onNavigate={() => {}}>
@@ -49,18 +67,20 @@ export default function ObjectivesPage() {
               </FilterField>
             </div>
 
-            <div className="w-full">
-              <FilterField label="Posición">
-                <PositionSelect
-                  businessUnitId={businessUnitId}
-                  value={positionId}
-                  onChange={setPositionId}
-                  defaultFromAuth
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {canAssignPosition ? (
+              <div className="w-full">
+                <FilterField label="Posición">
+                  <PositionSelect
+                    businessUnitId={businessUnitId}
+                    value={positionId}
+                    onChange={setPositionId}
+                    defaultFromAuth
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            ) : null}
 
             <div className="w-full">
               <FilterField label="Año">

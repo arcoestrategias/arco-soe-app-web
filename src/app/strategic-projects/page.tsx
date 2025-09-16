@@ -27,15 +27,24 @@ import { toast } from "sonner";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { createStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
 
-// (opcional) si ya tienes el servicio de creación, impórtalo y úsalo en onConfirm
-// import { createStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
+import { getPositionId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
 
 export default function StrategicProjectsPage() {
+  const { me } = useAuth();
+  const canAssignPosition = React.useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    [me]
+  );
+
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
   // Estados controlados por la página
   const [planId, setPlanId] = useState<string | null>(null);
-  const [positionId, setPositionId] = useState<string | null>(null);
+  const [positionId, setPositionId] = useState<string | null>(
+    getPositionId() ?? null
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingCreate, setPendingCreate] = useState<null | {
@@ -73,6 +82,12 @@ export default function StrategicProjectsPage() {
     });
   }
 
+  React.useEffect(() => {
+    if (!canAssignPosition) {
+      setPositionId(getPositionId() ?? null);
+    }
+  }, [canAssignPosition]);
+
   return (
     <SidebarLayout currentPath="/strategic-projects" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
@@ -103,18 +118,20 @@ export default function StrategicProjectsPage() {
             </div>
 
             {/* Posición */}
-            <div className="w-64">
-              <FilterField label="Posición">
-                <PositionSelect
-                  businessUnitId={businessUnitId}
-                  value={positionId}
-                  onChange={setPositionId}
-                  defaultFromAuth
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {canAssignPosition ? (
+              <div className="w-64">
+                <FilterField label="Posición">
+                  <PositionSelect
+                    businessUnitId={businessUnitId}
+                    value={positionId}
+                    onChange={setPositionId}
+                    defaultFromAuth
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            ) : null}
 
             {/* Botón: Nuevo Proyecto */}
             <div>

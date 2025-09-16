@@ -12,15 +12,33 @@ import { MonthSelect } from "@/shared/filters/components/MonthSelect";
 import { YearSelect } from "@/shared/filters/components/YearSelect";
 import { DefinitionTab } from "@/features/positions/components/definition-tab";
 import { OrganizationChartOverview } from "@/features/resume/components/organization-chart-overview";
+import { getPositionId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
 
 export default function PositionsPage() {
+  const { me } = useAuth();
+  const canAssignPosition = React.useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    [me]
+  );
+
   const businessUnitId = getBusinessUnitId() ?? undefined;
   const companyId = getCompanyId() ?? undefined;
 
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
-  const [positionId, setPositionId] = useState<string | null>(null); // (no se usa en el org chart, pero lo mantengo)
+  const [positionId, setPositionId] = useState<string | null>(
+    getPositionId() ?? null
+  );
+
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
+
+  React.useEffect(() => {
+    if (!canAssignPosition) {
+      setPositionId(getPositionId() ?? null);
+    }
+  }, [canAssignPosition]);
 
   return (
     <SidebarLayout currentPath="/positions" onNavigate={() => {}}>
@@ -45,19 +63,19 @@ export default function PositionsPage() {
                 clearOnUnmount
               />
             </FilterField>
-
-            <FilterField label="Posición">
-              <PositionSelect
-                businessUnitId={businessUnitId}
-                value={positionId}
-                onChange={setPositionId}
-                defaultFromAuth
-                persist
-                clearOnUnmount
-                showOptionAll
-              />
-            </FilterField>
-
+            {canAssignPosition ? (
+              <FilterField label="Posición">
+                <PositionSelect
+                  businessUnitId={businessUnitId}
+                  value={positionId}
+                  onChange={setPositionId}
+                  defaultFromAuth
+                  persist
+                  clearOnUnmount
+                  showOptionAll
+                />
+              </FilterField>
+            ) : null}
             <FilterField label="Mes">
               <MonthSelect value={month} onChange={setMonth} />
             </FilterField>

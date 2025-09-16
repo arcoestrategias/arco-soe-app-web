@@ -19,7 +19,7 @@ export const navigationSections = [
     title: "MANAGEMENT SYSTEM",
     items: [
       {
-        title: "Resumen",
+        title: "Performance",
         url: "/resume",
         icon: LayoutGrid,
         module: "resume",
@@ -83,13 +83,13 @@ export const navigationSections = [
         title: "Posiciones",
         url: "/positions/manage",
         icon: IdCardLanyard,
-        module: "position",
+        module: "positionManagement",
       },
       {
         title: "Planes Estratégicos",
         url: "/strategic-plans/manage",
         icon: BookOpenCheck,
-        module: "strategicPlan",
+        module: "strategicPlanManagement",
       },
     ],
   },

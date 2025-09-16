@@ -20,6 +20,10 @@ import { FilterField } from "@/shared/components/FilterField";
 import PrioritiesDashboard from "@/features/priorities/components/priorities-dashboard";
 import { ConfirmModal } from "../../shared/components/confirm-modal";
 
+import { getPositionId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
+
 type PendingChangeKind = "plan" | "position" | "month" | "year";
 type PendingChange = {
   kind: PendingChangeKind;
@@ -27,11 +31,19 @@ type PendingChange = {
 };
 
 export default function PrioritiesPage() {
+  const { me } = useAuth();
+  const canAssignPosition = React.useMemo(
+    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    [me]
+  );
+
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
   // Filtros
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
-  const [positionId, setPositionId] = useState<string | null>(null);
+  const [positionId, setPositionId] = useState<string | null>(
+    getPositionId() ?? null
+  );
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -89,6 +101,12 @@ export default function PrioritiesPage() {
     setPending(null);
   };
 
+  React.useEffect(() => {
+    if (!canAssignPosition) {
+      setPositionId(getPositionId() ?? null);
+    }
+  }, [canAssignPosition]);
+
   return (
     <SidebarLayout currentPath="/priorities">
       <div className="space-y-6 font-system">
@@ -120,20 +138,26 @@ export default function PrioritiesPage() {
               </FilterField>
             </div>
 
-            <div className="w-full">
-              <FilterField label="Posición">
-                <PositionSelect
-                  businessUnitId={businessUnitId}
-                  value={positionId}
-                  onChange={(val) =>
-                    guardedChange<string | null>(val, setPositionId, "position")
-                  }
-                  defaultFromAuth
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {canAssignPosition ? (
+              <div className="w-full">
+                <FilterField label="Posición">
+                  <PositionSelect
+                    businessUnitId={businessUnitId}
+                    value={positionId}
+                    onChange={(val) =>
+                      guardedChange<string | null>(
+                        val,
+                        setPositionId,
+                        "position"
+                      )
+                    }
+                    defaultFromAuth
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            ) : null}
 
             <div className="w-full">
               <FilterField label="Mes">
