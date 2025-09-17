@@ -1,0 +1,24 @@
+services:
+  frontend-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL}
+    container_name: frontend-demo
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: ${FRONT_PORT}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL}
+    ports:
+      - "${HOST_DOCKER_FRONT_PORT:-3000}:${FRONT_PORT:-3000}"
+    networks:
+      - soe-demo-network
+
+networks:
+  soe-demo-network:
+    external: true
+    name: soe-demo-network
