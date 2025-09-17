@@ -4,6 +4,15 @@ import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { QueryProvider } from "@/shared/react-query/query-provider";
 import AppShell from "./AppShell";
 import ClientToaster from "@/shared/utils/client-toaster";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "SOE",
+  description: "SOE",
+  icons: {
+    icon: "/logo-soe-icon.svg",
+  },
+};
 
 export default function RootLayout({
   children,

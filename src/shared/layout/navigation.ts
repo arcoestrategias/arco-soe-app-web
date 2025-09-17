@@ -12,6 +12,7 @@ import {
   Users2,
   BookOpenCheck,
   IdCardLanyard,
+  UserCog2,
 } from "lucide-react";
 
 export const navigationSections = [
@@ -27,7 +28,7 @@ export const navigationSections = [
       {
         title: "Plan Estratégico",
         url: "/strategic-plans",
-        icon: Target,
+        icon: BookOpenCheck,
         module: "strategicPlan",
       },
       {
@@ -78,11 +79,11 @@ export const navigationSections = [
         icon: Layers3,
         module: "businessUnit",
       },
-      { title: "Usuarios", url: "/users", icon: Users2, module: "user" },
+      { title: "Usuarios", url: "/users", icon: UserCog2, module: "user" },
       {
         title: "Posiciones",
         url: "/positions/manage",
-        icon: IdCardLanyard,
+        icon: Users2,
         module: "positionManagement",
       },
       {

@@ -107,7 +107,7 @@ export default function ResumenPage() {
   }, [data, selected]);
 
   return (
-    <SidebarLayout currentPath="/resumen" onNavigate={() => {}}>
+    <SidebarLayout currentPath="/resume" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         {/* Encabezado + Filtros */}
         <div className="flex items-start justify-between">

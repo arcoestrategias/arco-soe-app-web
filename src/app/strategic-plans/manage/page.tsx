@@ -5,7 +5,7 @@ import { StrategicPlansDashboard } from "@/features/strategic-plans/components/m
 
 const BusinessUnitsPage = () => {
   return (
-    <SidebarLayout currentPath="/manage-strategic-plans">
+    <SidebarLayout currentPath="/strategic-plans/manage">
       <StrategicPlansDashboard />
     </SidebarLayout>
   );

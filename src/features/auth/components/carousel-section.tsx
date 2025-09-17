@@ -43,7 +43,7 @@ export function CarouselSection() {
         alt="SOE Logo"
         width={280}
         height={65}
-        className="h-12 w-auto"
+        className="h-20 w-auto z-10 drop-shadow-[0_12px_12px_rgba(0,0,0,0.95)]"
         priority
       />
 

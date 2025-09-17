@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,9 @@ import type { SidebarProps } from "@/shared/layout/types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "../auth/access-control";
 import Link from "next/link";
+
+const norm = (p?: string) =>
+  p ? (p.endsWith("/") && p !== "/" ? p.slice(0, -1) : p) : "";
 
 export function Sidebar({
   currentPath,
@@ -51,16 +55,31 @@ export function Sidebar({
     .map((sec) => ({
       ...sec,
       items: sec.items.filter((it: any) => {
-        // 1) adminOnly → sólo admin
         if (it.adminOnly) return isAdmin;
-        // 2) sin module → visible para todos
         if (!it.module) return true;
-        // 3) con module → requiere access=true
         return hasAccess(me, it.module, "access");
       }),
     }))
-    // opcional: oculta secciones vacías
     .filter((sec) => sec.items.length > 0);
+
+  const flatItems = useMemo(
+    () =>
+      sections.flatMap((s) =>
+        s.items.map((it: any) => ({ ...it, url: norm(it.url) }))
+      ),
+    [sections]
+  );
+
+  const now = norm(currentPath || "");
+  const activeUrl = useMemo(() => {
+    const exact = flatItems.find((it) => now === it.url)?.url;
+    if (exact) return exact;
+    const pref = flatItems
+      .map((it) => it.url)
+      .filter((u) => now.startsWith(u + "/"))
+      .sort((a, b) => b.length - a.length);
+    return pref[0] ?? "";
+  }, [flatItems, now]);
 
   return (
     <TooltipProvider>
@@ -74,42 +93,61 @@ export function Sidebar({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="h-16 flex items-center justify-between px-4 border-b">
+        {/* ===== Header con LOGO (fix colapsado) ===== */}
+        <div
+          className={cn(
+            "h-16 flex items-center justify-between border-b",
+            shouldShowExpanded ? "px-4" : "px-2"
+          )}
+        >
           <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded bg-gradient-to-r from-[#FF6B35] to-[#E55A2B] flex items-center justify-center text-white font-bold">
-              S
-            </div>
-            <span
-              className={cn(
-                "transition-all duration-300 ease-in-out overflow-hidden",
-                shouldShowExpanded
-                  ? "opacity-100 w-auto ml-2"
-                  : "opacity-0 w-0 ml-0"
-              )}
-            >
-              SOE
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleCollapsed}
-            className={cn(
-              "h-8 w-8 text-gray-400 hover:text-gray-600 transition-all duration-300 ease-in-out",
-              shouldShowExpanded
-                ? "opacity-100 translate-x-0"
-                : "opacity-0 translate-x-4 pointer-events-none"
+            {shouldShowExpanded ? (
+              // Logo grande en expandido
+              <div className="relative w-36 h-10 shrink-0">
+                <Image
+                  src="/logo-soe-black.svg"
+                  alt="SOE"
+                  fill
+                  className="object-contain"
+                  priority
+                  sizes="144px"
+                />
+              </div>
+            ) : (
+              // Ícono en colapsado (hay espacio real ahora)
+              <div className="relative w-10 h-10 mx-auto shrink-0">
+                <Image
+                  src="/logo-soe-icon.svg"
+                  alt="SOE Icon"
+                  fill
+                  className="object-contain"
+                  priority
+                  sizes="40px"
+                />
+              </div>
             )}
-          >
-            <ChevronRight
-              className={cn(
-                "h-4 w-4 transition-transform duration-300 ease-in-out",
-                isCollapsed ? "-rotate-180" : "rotate-0"
-              )}
-            />
-          </Button>
+          </div>
+
+          {/* Oculta COMPLETAMENTE el botón en colapsado para que no ocupe ancho */}
+          {shouldShowExpanded ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapsed}
+              className="h-8 w-8 text-gray-400 hover:text-gray-600 transition-all duration-300 ease-in-out"
+              aria-label={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+            >
+              <ChevronRight
+                className={cn(
+                  "h-4 w-4 transition-transform duration-300 ease-in-out",
+                  isCollapsed ? "-rotate-180" : "rotate-0"
+                )}
+              />
+            </Button>
+          ) : null}
         </div>
 
+        {/* ===== Navegación ===== */}
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 pr-1">
           {sections.map((section, i) => (
             <div
@@ -131,7 +169,7 @@ export function Sidebar({
 
               <div className="space-y-1 px-3">
                 {section.items.map((item: any) => {
-                  const isActive = currentPath?.startsWith(item.url);
+                  const isActive = norm(item.url) === activeUrl;
 
                   return (
                     <ul key={item.title}>

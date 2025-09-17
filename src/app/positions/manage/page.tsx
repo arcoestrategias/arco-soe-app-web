@@ -6,7 +6,7 @@ import { PositionsDashboard } from "@/features/positions/components/manage/posit
 
 export default function ManagePositionsPage() {
   return (
-    <SidebarLayout currentPath="/manage-positions" onNavigate={() => {}}>
+    <SidebarLayout currentPath="/positions/manage" onNavigate={() => {}}>
       <PositionsDashboard />
     </SidebarLayout>
   );

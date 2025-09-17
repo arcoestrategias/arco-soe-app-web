@@ -17,7 +17,7 @@ export default function StrategicPlanPage() {
   const [planId, setPlanId] = useState<string | null>(null);
 
   return (
-    <SidebarLayout currentPath="/strategic-plan" onNavigate={() => {}}>
+    <SidebarLayout currentPath="/strategic-plans" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
         <div className="flex items-center justify-between">
           <div>
