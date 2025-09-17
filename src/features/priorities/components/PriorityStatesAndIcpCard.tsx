@@ -310,7 +310,7 @@ export default function PriorityStatesAndIcpCard({
             />
             <Legend
               color={COLORS.cumplidas}
-              label="Cumplidas"
+              label="Cumplidas a tiempo"
               count={counts.cumplidas}
             />
             <Legend

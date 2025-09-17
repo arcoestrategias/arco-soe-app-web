@@ -141,7 +141,7 @@ const MONTHLY_CLASS_LABEL: Record<string, string> = {
   CUMPLIDAS_A_TIEMPO: "Cumplida a tiempo",
   CUMPLIDAS_ATRASADAS_DEL_MES: "Cumplida tarde",
   CUMPLIDAS_ATRASADAS_MESES_ANTERIORES: "Cumplida tarde",
-  CUMPLIDAS_DE_OTRO_MES: "Cumplida",
+  CUMPLIDAS_DE_OTRO_MES: "Cumplida otro mes",
   NO_CUMPLIDAS_ATRASADAS_DEL_MES: "Atrasada",
   NO_CUMPLIDAS_ATRASADAS_MESES_ANTERIORES: "Muy atrasada",
   NO_CUMPLIDAS_ATRASADAS: "Atrasada",
@@ -170,6 +170,7 @@ const MONTHLY_LABEL_STYLE: Record<string, { bg: string; color: string }> = {
   "Cumplida a tiempo": { bg: "#86efac", color: "#16a34a" },
   "Cumplida tarde": { bg: "#16a34a", color: "#ffffff" },
   Anulada: { bg: "#d1d5db", color: "#000000" },
+  "Cumplida otro mes": { bg: "#116b31", color: "#ffffff" },
 };
 
 function resolveMonthlyStyle(
@@ -798,10 +799,10 @@ export default function PrioritiesTable({
                 {/* ESTADO */}
                 <TableCell className="text-center w-24 whitespace-nowrap align-top">
                   <div className="flex items-center gap-2 justify-center">
-                    {monthlyLabel && monthlyStyle ? (
+                    {monthlyLabel ? (
                       <Badge
                         className="whitespace-nowrap border-0"
-                        style={monthlyStyle}
+                        style={monthlyStyle ?? {}}
                       >
                         {monthlyLabel}
                       </Badge>
@@ -810,7 +811,6 @@ export default function PrioritiesTable({
                     )}
                   </div>
                 </TableCell>
-
                 {/* FECHAS (from/until) */}
                 <TableCell className="text-center w-40 whitespace-nowrap align-top">
                   <div className="space-x-2 whitespace-nowrap justify-center">
