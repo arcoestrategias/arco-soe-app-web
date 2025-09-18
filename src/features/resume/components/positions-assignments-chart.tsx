@@ -108,13 +108,6 @@ export default function PositionsAssignmentsChart({
                 align="center"
                 height={28}
                 wrapperStyle={{ fontSize: 12, color: "#374151" }}
-                formatter={(v) =>
-                  v === "objetivos"
-                    ? "Objetivos"
-                    : v === "prioridades"
-                    ? "Prioridades"
-                    : "Proyectos"
-                }
               />
               <Bar
                 dataKey="objetivos"
