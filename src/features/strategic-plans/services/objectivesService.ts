@@ -6,6 +6,7 @@ import type {
   CreateObjectivePayload,
   UpdateObjectivePayload,
   ReorderObjectivesPayload,
+  UnconfiguredObjective,
 } from "../types/objectives";
 
 export async function getObjectives(
@@ -17,6 +18,16 @@ export async function getObjectives(
   });
 
   return unwrapAny<Objective[]>(res.data);
+}
+
+export async function getUnconfiguredObjectives(
+  strategicPlanId: string,
+  positionId: string
+): Promise<UnconfiguredObjective[]> {
+  const res = await http.get(routes.objectives.unconfigured(), {
+    params: { strategicPlanId, positionId },
+  });
+  return unwrapAny<UnconfiguredObjective[]>(res.data);
 }
 
 export async function createObjective(

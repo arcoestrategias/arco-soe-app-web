@@ -15,6 +15,9 @@ import { useUpdateObjectiveGoal } from "@/features/objectives/hooks/use-objectiv
 import { toast } from "sonner";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import type { ObjectiveComplianceChange } from "./objective-compliance-modal";
+import { useObjectives } from "@/features/strategic-plans/hooks/use-objectives";
+import { NewObjectivePayload } from "./new-objective-modal";
+import { useUnconfiguredObjectives } from "@/features/strategic-plans/hooks/use-unconfigured-objectives";
 
 type ObjectivesViewProps = {
   planId?: string;
@@ -32,6 +35,9 @@ export default function ObjectivesView({
     positionId,
     year
   );
+
+  const { items: unconfigured, isLoading: loadingUnconf } =
+    useUnconfiguredObjectives(planId, positionId);
 
   // --- construir invalidateKeys con el mismo año (from = to = year) ---
   const canQuery = !!planId && !!positionId && !!year;
@@ -69,6 +75,26 @@ export default function ObjectivesView({
     }
   };
 
+  const { createObjective: createObjectiveMut, isCreating } = useObjectives(
+    planId,
+    positionId
+  );
+
+  // Handler que usará el modal del botón "+ Nuevo Objetivo"
+  const handleCreateObjective = async (input: NewObjectivePayload) => {
+    if (!planId || !positionId) return; // guard por filtros requeridos
+
+    // 1) El "name" que espera tu backend lo tomamos de la oración compuesta
+    const name = (input.objectiveText ?? "").trim();
+    if (!name) return;
+
+    // 2) Llamada al service (usa la mutation del hook para invalidar QKEY.objectives(planId, positionId))
+    await createObjectiveMut({
+      name,
+      strategicPlanId: planId,
+      positionId,
+    });
+  };
   return (
     <div className="flex flex-col gap-4">
       {isLoading && (
@@ -102,7 +128,11 @@ export default function ObjectivesView({
           <ObjectivesCompliance
             data={data}
             loading={isLoading}
-            onComplianceUpdate={handleComplianceUpdate} // <- pasar handler
+            onComplianceUpdate={handleComplianceUpdate}
+            onCreateObjective={handleCreateObjective}
+            canCreateObjective={!!planId && !!positionId && !isCreating}
+            unconfigured={unconfigured}
+            loadingUnconfigured={loadingUnconf}
           />
         </TabsContent>
       </Tabs>

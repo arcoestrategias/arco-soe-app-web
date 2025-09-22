@@ -48,9 +48,6 @@ function composeSentence(p: NewObjectivePayload) {
   // Horizonte
   if (p.horizonte?.trim()) partes.push(`${p.horizonte.trim()}`);
 
-  // Nivel (label)
-  if (p.nivel) partes.push(`nivel ${LEVEL_LABEL[p.nivel]}`);
-
   // Une todo en una sola oración.
   const sentence = partes.join(" ");
   return sentence ? `${sentence}` : "";

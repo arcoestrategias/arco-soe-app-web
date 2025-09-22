@@ -21,11 +21,12 @@ export function useObjectives(strategicPlanId?: string, positionId?: string) {
   const qc = useQueryClient();
 
   const listQuery = useQuery({
-    queryKey: strategicPlanId
-      ? QKEY.objectives(strategicPlanId, positionId!)
-      : ["objectives", "disabled"],
+    queryKey:
+      strategicPlanId && positionId
+        ? QKEY.objectives(strategicPlanId, positionId)
+        : ["objectives", "disabled"],
     queryFn: () => getObjectives(strategicPlanId!, positionId!),
-    enabled: !!strategicPlanId,
+    enabled: !!strategicPlanId && !!positionId,
     staleTime: 60_000,
   });
 
@@ -35,6 +36,10 @@ export function useObjectives(strategicPlanId?: string, positionId?: string) {
       if (strategicPlanId) {
         qc.invalidateQueries({
           queryKey: QKEY.objectives(strategicPlanId, positionId!),
+        });
+
+        qc.invalidateQueries({
+          queryKey: QKEY.objectivesUnconfigured(strategicPlanId, positionId!),
         });
       }
       toast.success("Objetivo creado");

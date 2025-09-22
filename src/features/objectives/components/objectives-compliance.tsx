@@ -13,18 +13,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CheckCircle, Target, Map, Rocket, Settings } from "lucide-react";
+
 import type {
   IcoBoardData,
   IcoBoardListItem,
 } from "@/features/objectives/types/ico-board";
 import { NewObjectiveModal, NewObjectivePayload } from "./new-objective-modal";
-import { CheckCircle, Map, Rocket, Settings, Target } from "lucide-react";
 import {
   ObjectiveComplianceChange,
   ObjectiveComplianceModal,
 } from "./objective-compliance-modal";
-import { useUpdateObjectiveGoal } from "../hooks/use-objective-goals";
-import { QKEY } from "@/shared/api/query-keys";
+import type { UnconfiguredObjective } from "@/features/strategic-plans/types/objectives";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -34,10 +41,10 @@ const LEVEL_LABEL: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = { RES: "Resultado", GES: "Gestión" };
 
 function normalizeLevel(v?: string | null) {
-  return v ? LEVEL_LABEL[v.toUpperCase()] ?? v : "—";
+  return v ? LEVEL_LABEL[(v as string).toUpperCase()] ?? v : "—";
 }
 function normalizeType(v?: string | null) {
-  return v ? TYPE_LABEL[v.toUpperCase()] ?? v : "—";
+  return v ? TYPE_LABEL[(v as string).toUpperCase()] ?? v : "—";
 }
 
 function textColorForBg(hex?: string | null): string | undefined {
@@ -63,25 +70,51 @@ type RowItem = {
   statusFg?: string;
 };
 
+/* --------------------- props --------------------- */
+type ObjectivesComplianceProps = {
+  data?: IcoBoardData;
+  loading?: boolean;
+  error?: boolean;
+  onCreateObjective?: (payload: NewObjectivePayload) => void | Promise<void>;
+  onComplianceUpdate?: (changes: ObjectiveComplianceChange[]) => void;
+  canCreateObjective?: boolean;
+
+  // NO configurados
+  unconfigured?: UnconfiguredObjective[];
+  loadingUnconfigured?: boolean;
+};
+
+/* Colgroup compartido para ALINEAR AMBAS TABLAS */
+function SharedColGroup() {
+  return (
+    <colgroup>
+      <col style={{ width: "56px" }} />
+      <col />
+      <col style={{ width: "140px" }} />
+      <col style={{ width: "140px" }} />
+      <col style={{ width: "160px" }} />
+      <col style={{ width: "240px" }} />
+    </colgroup>
+  );
+}
+
 /* --------------------- componente --------------------- */
 export default function ObjectivesCompliance({
   data,
   loading,
   error,
-  onCreateObjective, // opcional
+  onCreateObjective,
   onComplianceUpdate,
-}: {
-  data?: IcoBoardData;
-  loading?: boolean;
-  error?: boolean;
-  onCreateObjective?: (payload: NewObjectivePayload) => void;
-  onComplianceUpdate?: (changes: ObjectiveComplianceChange[]) => void;
-}) {
-  const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
-  const empty = !loading && !error && rows.length === 0;
+  canCreateObjective,
 
+  unconfigured = [],
+  loadingUnconfigured = false,
+}: ObjectivesComplianceProps) {
+  /* --------- configurados / registrables --------- */
+  const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
   const [openCompliance, setOpenCompliance] = useState(false);
   const [selected, setSelected] = useState<IcoBoardListItem | null>(null);
+  const [openCreate, setOpenCreate] = useState(false);
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -89,7 +122,7 @@ export default function ObjectivesCompliance({
     setOpenCompliance(true);
   };
 
-  const computed: RowItem[] = useMemo(
+  const configuredRows: RowItem[] = useMemo(
     () =>
       rows.map((it, idx): RowItem => {
         const o = it.objective;
@@ -117,127 +150,303 @@ export default function ObjectivesCompliance({
     [rows]
   );
 
-  const [openCreate, setOpenCreate] = useState(false);
+  /* --------- no configurados (misma forma de tabla) --------- */
+  const unconfRows: RowItem[] = useMemo(
+    () =>
+      unconfigured.map((o, idx) => {
+        const indicatorName = o.indicator?.name ?? "—";
+        return {
+          index: idx + 1,
+          id: o.id,
+          name: o.name ?? "—",
+          indicatorName,
+          level: "—", // si luego viene en el API: normalizeLevel(o.level)
+          type: normalizeType(o.indicator?.type ?? undefined),
+          statusLabel: "No configurado",
+          statusBg: "#E5E7EB",
+          statusFg: "#111827",
+        };
+      }),
+    [unconfigured]
+  );
 
+  const totalConfigured = configuredRows.length;
+  const totalUnconfigured = unconfRows.length;
+
+  /* --------------------- render --------------------- */
   return (
-    <div className="w-full">
-      {/* header fuera de la tabla */}
-      {/* <div className="mb-3 flex items-center justify-end">
+    <Card className="w-full">
+      {/* Header global */}
+      <CardHeader className="flex flex-row items-center justify-between py-3 px-4 border-b">
+        <h2 className="text-base font-semibold">Objetivos</h2>
         <Button
           size="sm"
-          className="h-8 btn-gradient"
+          className="h-9 btn-gradient"
           onClick={() => setOpenCreate(true)}
+          disabled={canCreateObjective === false}
         >
           + Nuevo Objetivo
         </Button>
-      </div> */}
+      </CardHeader>
 
-      {loading && <Skeleton className="h-48 w-full" />}
-      {error && (
-        <div className="text-sm text-destructive">
-          No se pudo cargar la lista de objetivos.
-        </div>
-      )}
-      {empty && !loading && !error && (
-        <div className="text-sm text-muted-foreground">
-          No hay objetivos para los filtros seleccionados.
-        </div>
-      )}
+      <CardContent className="p-0">
+        <Accordion
+          type="multiple"
+          defaultValue={["configured", "unconfigured"]}
+          className="w-full"
+        >
+          {/* ---------- Acordeón 1: Registrar cumplimiento ---------- */}
+          <AccordionItem value="configured" className="border-b">
+            <AccordionTrigger className="px-4 py-3 bg-muted/40 hover:no-underline">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Cumplimiento de objetivos</span>
+                <Badge variant="secondary">{totalConfigured}</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              {loading ? (
+                <Skeleton className="h-48 w-full" />
+              ) : error ? (
+                <div className="p-4 text-sm text-destructive">
+                  No se pudo cargar la lista de objetivos.
+                </div>
+              ) : totalConfigured === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  No hay objetivos para los filtros seleccionados.
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <Table className="w-full min-w-[1000px]">
+                    <SharedColGroup />
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-center whitespace-nowrap px-2">
+                          #
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap px-2">
+                          Objetivo
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center px-2">
+                          Nivel
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center px-2">
+                          Tipo
+                        </TableHead>
+                        <TableHead className="text-center whitespace-nowrap px-2">
+                          Estado
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center sticky right-0 bg-background z-20 border-l px-2">
+                          Acciones
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
 
-      {!loading && !error && !empty && (
-        <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-[980px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 whitespace-nowrap">#</TableHead>
-                <TableHead className="whitespace-nowrap">Objetivo</TableHead>
-                <TableHead className="whitespace-nowrap text-center">
-                  Nivel
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-center">
-                  Tipo
-                </TableHead>
-                <TableHead className="text-center whitespace-nowrap">
-                  Estado
-                </TableHead>
-                <TableHead className="text-center whitespace-nowrap sticky right-0 bg-background z-20 border-l px-3">
-                  Configuración
-                </TableHead>
-              </TableRow>
-            </TableHeader>
+                    <TableBody>
+                      {configuredRows.map((r) => (
+                        <TableRow key={r.id} className="align-top">
+                          <TableCell className="text-center whitespace-nowrap align-top px-2 py-2">
+                            {r.index}
+                          </TableCell>
 
-            <TableBody>
-              {computed.map((r) => (
-                <TableRow key={r.id} className="align-top">
-                  <TableCell className="w-12 whitespace-nowrap align-top">
-                    {r.index}
-                  </TableCell>
+                          {/* objetivo + indicador */}
+                          <TableCell className="align-top px-2 py-2">
+                            <div className="font-medium leading-5 break-words whitespace-pre-wrap">
+                              {r.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap mt-0.5">
+                              {r.indicatorName}
+                            </div>
+                          </TableCell>
 
-                  {/* objetivo + indicador con saltos de línea */}
-                  <TableCell className="align-top">
-                    <div className="font-medium leading-5 break-words whitespace-pre-wrap">
-                      {r.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap mt-0.5">
-                      {r.indicatorName}
-                    </div>
-                  </TableCell>
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <div className="text-sm">{r.level}</div>
+                          </TableCell>
 
-                  <TableCell className=" text-center align-center">
-                    <div className="text-sm">{r.level}</div>
-                  </TableCell>
-                  <TableCell className="text-center align-center">
-                    <div className="text-sm">{r.type}</div>
-                  </TableCell>
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <div className="text-sm">{r.type}</div>
+                          </TableCell>
 
-                  <TableCell className="text-center align-center">
-                    <Badge
-                      className="whitespace-nowrap border-0"
-                      style={{
-                        backgroundColor: r.statusBg ?? undefined,
-                        color: r.statusFg ?? undefined,
-                      }}
-                      title={r.statusLabel}
-                    >
-                      {r.statusLabel}
-                    </Badge>
-                  </TableCell>
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <Badge
+                              className="whitespace-nowrap border-0"
+                              style={{
+                                backgroundColor: r.statusBg ?? undefined,
+                                color: r.statusFg ?? undefined,
+                              }}
+                              title={r.statusLabel}
+                            >
+                              {r.statusLabel}
+                            </Badge>
+                          </TableCell>
 
-                  {/* columna fija de acciones */}
-                  <TableCell className="text-center space-x-2 align-top sticky right-0 bg-background z-10 border-l">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      title="Cumplimiento"
-                      onClick={() => openComplianceFor(r.id)}
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </Button>
-                    {/* <Button size="sm" variant="outline" title="Metas">
-                      <Target className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" title="Mapa">
-                      <Map className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" title="Despliegue">
-                      <Rocket className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" title="Configuración">
-                      <Settings className="w-4 h-4" />
-                    </Button> */}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                          {/* acciones */}
+                          <TableCell className="text-center sticky right-0 bg-background z-10 border-l px-2 py-1">
+                            <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Cumplimiento"
+                                aria-label="Cumplimiento"
+                                onClick={() => openComplianceFor(r.id)}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Metas"
+                                aria-label="Metas"
+                              >
+                                <Target className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Mapa"
+                                aria-label="Mapa"
+                              >
+                                <Map className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Despliegue"
+                                aria-label="Despliegue"
+                              >
+                                <Rocket className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Configuración"
+                                aria-label="Configuración"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
 
-      {/* modal separada */}
+          {/* ---------- Acordeón 2: Objetivos sin configurar ---------- */}
+          <AccordionItem value="unconfigured" className="border-b">
+            <AccordionTrigger className="px-4 py-3 bg-muted/40 hover:no-underline">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Objetivos sin configurar</span>
+                <Badge variant="secondary">{totalUnconfigured}</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              {loadingUnconfigured ? (
+                <Skeleton className="h-40 w-full" />
+              ) : totalUnconfigured === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  No hay objetivos por configurar.
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <Table className="w-full min-w-[1000px]">
+                    <SharedColGroup />
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-center whitespace-nowrap px-2">
+                          #
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap px-2">
+                          Objetivo
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center px-2">
+                          Nivel
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center px-2">
+                          Tipo
+                        </TableHead>
+                        <TableHead className="text-center whitespace-nowrap px-2">
+                          Estado
+                        </TableHead>
+                        <TableHead className="whitespace-nowrap text-center sticky right-0 bg-background z-20 border-l px-2">
+                          Acciones
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {unconfRows.map((r) => (
+                        <TableRow key={r.id} className="align-top">
+                          <TableCell className="text-center whitespace-nowrap align-top px-2 py-2">
+                            {r.index}
+                          </TableCell>
+
+                          {/* objetivo + indicador */}
+                          <TableCell className="align-top px-2 py-2">
+                            <div className="font-medium leading-5 break-words whitespace-pre-wrap">
+                              {r.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap mt-0.5">
+                              {r.indicatorName}
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <div className="text-sm">{r.level}</div>
+                          </TableCell>
+
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <div className="text-sm">{r.type}</div>
+                          </TableCell>
+
+                          <TableCell className="text-center align-center px-2 py-2">
+                            <Badge
+                              className="whitespace-nowrap border-0"
+                              style={{
+                                backgroundColor: r.statusBg ?? undefined,
+                                color: r.statusFg ?? undefined,
+                              }}
+                              title={r.statusLabel}
+                            >
+                              {r.statusLabel}
+                            </Badge>
+                          </TableCell>
+
+                          {/* acciones (solo configuración) */}
+                          <TableCell className="text-center sticky right-0 bg-background z-10 border-l px-2 py-1">
+                            <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Configuración"
+                                aria-label="Configuración"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+
+      {/* Modales */}
       <NewObjectiveModal
         open={openCreate}
         onOpenChange={setOpenCreate}
-        onCreate={onCreateObjective}
+        onCreate={async (payload) => {
+          if (!onCreateObjective) return;
+          await onCreateObjective(payload);
+          setOpenCreate(false);
+        }}
       />
 
       <ObjectiveComplianceModal
@@ -247,6 +456,6 @@ export default function ObjectivesCompliance({
         objective={selected?.objective}
         onUpdate={onComplianceUpdate}
       />
-    </div>
+    </Card>
   );
 }

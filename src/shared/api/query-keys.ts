@@ -131,4 +131,10 @@ export const QKEY = {
       String(fromYear),
       String(toYear),
     ] as const,
+
+  objectivesUnconfigured: (planId: string, positionId: string) => [
+    "objectives-unconfigured",
+    planId,
+    positionId,
+  ],
 };
