@@ -7,6 +7,8 @@ import type {
   UpdateObjectivePayload,
   ReorderObjectivesPayload,
   UnconfiguredObjective,
+  ConfigureObjectiveDto,
+  ConfigureObjectiveResponse,
 } from "../types/objectives";
 
 export async function getObjectives(
@@ -53,4 +55,15 @@ export async function reorderObjectives(
 ): Promise<void> {
   const { data } = await http.patch(routes.objectives.reorder(), payload);
   unwrapAny(data);
+}
+
+export async function configureObjective(
+  objectiveId: string,
+  payload: Omit<ConfigureObjectiveDto, "objectiveId">
+) {
+  const { data } = await http.patch(routes.objectives.configure(objectiveId), {
+    objectiveId,
+    ...payload,
+  });
+  return unwrapAny<ConfigureObjectiveResponse>(data);
 }

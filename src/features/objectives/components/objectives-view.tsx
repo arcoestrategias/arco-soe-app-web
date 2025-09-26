@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnnualIcoTrendCard from "./annual-ico-trend-card";
-import { DeploymentMatrix } from "./deployment-matrix";
 import { useObjectivesIcoBoard } from "../hooks/use-ico-board";
 import { Card, CardContent } from "@/components/ui/card";
 import IcoBoard from "./ico-board";
@@ -133,6 +132,9 @@ export default function ObjectivesView({
             canCreateObjective={!!planId && !!positionId && !isCreating}
             unconfigured={unconfigured}
             loadingUnconfigured={loadingUnconf}
+            strategicPlanId={planId!}
+            positionId={positionId!}
+            year={Number(year)}
           />
         </TabsContent>
       </Tabs>

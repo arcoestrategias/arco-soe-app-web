@@ -32,6 +32,9 @@ import {
   ObjectiveComplianceModal,
 } from "./objective-compliance-modal";
 import type { UnconfiguredObjective } from "@/features/strategic-plans/types/objectives";
+import ObjectiveConfigureModal, {
+  ObjectiveConfigureData,
+} from "./objective-configure-modal";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -82,6 +85,10 @@ type ObjectivesComplianceProps = {
   // NO configurados
   unconfigured?: UnconfiguredObjective[];
   loadingUnconfigured?: boolean;
+
+  strategicPlanId: string;
+  positionId: string;
+  year?: number;
 };
 
 /* Colgroup compartido para ALINEAR AMBAS TABLAS */
@@ -98,6 +105,32 @@ function SharedColGroup() {
   );
 }
 
+// Toma los meses medidos de icoMonthly
+function monthsFromIcoMonthly(icoMonthly: any[] = []) {
+  return icoMonthly
+    .filter((p) => p && p.isMeasured)
+    .map((p) => ({
+      month: Number(p.month),
+      year: Number(p.year),
+    }))
+    .filter(
+      (m) =>
+        Number.isInteger(m.month) &&
+        m.month >= 1 &&
+        m.month <= 12 &&
+        Number.isInteger(m.year)
+    );
+}
+
+// Devuelve el primer registro que tenga al menos uno de los ranges
+function firstWithRanges(icoMonthly: any[] = []) {
+  return icoMonthly.find(
+    (p) =>
+      p &&
+      (p.rangeExceptional !== undefined || p.rangeInacceptable !== undefined)
+  );
+}
+
 /* --------------------- componente --------------------- */
 export default function ObjectivesCompliance({
   data,
@@ -109,12 +142,18 @@ export default function ObjectivesCompliance({
 
   unconfigured = [],
   loadingUnconfigured = false,
+  strategicPlanId,
+  positionId,
+  year,
 }: ObjectivesComplianceProps) {
   /* --------- configurados / registrables --------- */
   const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
   const [openCompliance, setOpenCompliance] = useState(false);
   const [selected, setSelected] = useState<IcoBoardListItem | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
+  const [openConfigure, setOpenConfigure] = useState(false);
+  const [configureData, setConfigureData] =
+    useState<ObjectiveConfigureData | null>(null);
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -172,6 +211,99 @@ export default function ObjectivesCompliance({
 
   const totalConfigured = configuredRows.length;
   const totalUnconfigured = unconfRows.length;
+
+  // Configurar desde la tabla de "configurados"
+  const openConfigureFromConfigured = (objectiveId: string) => {
+    const item = rows.find((it) => it.objective?.id === objectiveId);
+    if (!item?.objective) return;
+
+    const o = item.objective as any;
+    const ind = (o.indicator ?? {}) as any;
+
+    const icoMonthly: any[] = Array.isArray(o.icoMonthly) ? o.icoMonthly : [];
+    const ranges = firstWithRanges(icoMonthly);
+
+    const data: ObjectiveConfigureData = {
+      objective: {
+        id: o.id,
+        name: o.name ?? null,
+        description: o.description ?? null,
+        perspective: o.perspective ?? null,
+        level: o.level ?? null,
+        valueOrientation: o.valueOrientation ?? null,
+        objectiveParentId: o.objectiveParentId ?? null,
+        positionId: o.positionId ?? null,
+        strategicPlanId: o.strategicPlanId ?? null,
+        goalValue: o.goalValue ?? null,
+        status: o.status ?? null,
+      },
+      indicator: {
+        id: ind.id ?? null,
+        name: ind.name ?? null,
+        description: ind.description ?? null,
+        formula: ind.formula ?? null,
+        origin: ind.origin ?? null,
+        tendence: ind.tendence ?? null,
+        frequency: ind.frequency ?? null,
+        measurement: ind.measurement ?? null,
+        type: ind.type ?? null,
+        reference: ind.reference ?? null,
+        periodStart: ind.periodStart ?? null,
+        periodEnd: ind.periodEnd ?? null,
+      },
+
+      months: monthsFromIcoMonthly(icoMonthly),
+      rangeExceptional: ranges?.rangeExceptional ?? undefined,
+      rangeInacceptable: ranges?.rangeInacceptable ?? undefined,
+    };
+
+    setConfigureData(data);
+    setOpenConfigure(true);
+  };
+
+  // Configurar desde la tabla de "no configurados"
+  const openConfigureFromUnconfigured = (objectiveId: string) => {
+    const u = unconfigured.find((x) => x.id === objectiveId) as any;
+    if (!u) return;
+
+    const ind = (u.indicator ?? {}) as any;
+
+    const data: ObjectiveConfigureData = {
+      objective: {
+        id: u.id,
+        name: u.name ?? null,
+        description: u.description ?? null,
+        perspective: u.perspective ?? null,
+        level: u.level ?? null,
+        valueOrientation: u.valueOrientation ?? null,
+        objectiveParentId: u.objectiveParentId ?? null,
+        positionId: u.positionId ?? null,
+        strategicPlanId: u.strategicPlanId ?? null,
+        goalValue: u.goalValue ?? null,
+        status: u.status ?? null,
+      },
+      indicator: {
+        id: ind.id ?? null,
+        name: ind.name ?? null,
+        description: ind.description ?? null,
+        formula: ind.formula ?? null,
+        origin: ind.origin ?? null,
+        tendence: ind.tendence ?? null,
+        frequency: ind.frequency ?? null,
+        measurement: ind.measurement ?? null,
+        type: ind.type ?? null,
+        reference: ind.reference ?? null,
+        periodStart: ind.periodStart ?? null,
+        periodEnd: ind.periodEnd ?? null,
+      },
+      months: u.months ?? undefined,
+      rangeExceptional: u.rangeExceptional ?? undefined,
+      rangeInacceptable: u.rangeInacceptable ?? undefined,
+    };
+
+    setConfigureData(data);
+    setOpenConfigure(true);
+  };
 
   /* --------------------- render --------------------- */
   return (
@@ -302,24 +434,11 @@ export default function ObjectivesCompliance({
                               <Button
                                 size="icon"
                                 variant="outline"
-                                title="Mapa"
-                                aria-label="Mapa"
-                              >
-                                <Map className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Despliegue"
-                                aria-label="Despliegue"
-                              >
-                                <Rocket className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
                                 title="Configuración"
                                 aria-label="Configuración"
+                                onClick={() =>
+                                  openConfigureFromConfigured(r.id)
+                                }
                               >
                                 <Settings className="w-4 h-4" />
                               </Button>
@@ -422,6 +541,9 @@ export default function ObjectivesCompliance({
                                 variant="outline"
                                 title="Configuración"
                                 aria-label="Configuración"
+                                onClick={() =>
+                                  openConfigureFromUnconfigured(r.id)
+                                }
                               >
                                 <Settings className="w-4 h-4" />
                               </Button>
@@ -456,6 +578,16 @@ export default function ObjectivesCompliance({
         objective={selected?.objective}
         onUpdate={onComplianceUpdate}
       />
+      {openConfigure && configureData && (
+        <ObjectiveConfigureModal
+          open={openConfigure}
+          onClose={() => setOpenConfigure(false)}
+          data={configureData}
+          strategicPlanId={strategicPlanId}
+          positionId={positionId}
+          year={year}
+        />
+      )}
     </Card>
   );
 }

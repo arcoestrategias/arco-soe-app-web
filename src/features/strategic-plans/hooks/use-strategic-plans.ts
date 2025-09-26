@@ -5,6 +5,7 @@ import {
   createStrategicPlan,
   updateStrategicPlan,
   inactivateStrategicPlan,
+  getStrategicPlan,
 } from "../services/strategicPlansService";
 
 export function useStrategicPlans() {
@@ -38,4 +39,12 @@ export function useStrategicPlans() {
     update,
     remove,
   };
+}
+
+export function useStrategicPlan(strategicPlanId?: string) {
+  return useQuery({
+    queryKey: QKEY.strategicPlan(String(strategicPlanId ?? "")),
+    queryFn: () => getStrategicPlan(String(strategicPlanId)),
+    enabled: !!strategicPlanId,
+  });
 }

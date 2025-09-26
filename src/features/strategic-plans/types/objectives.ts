@@ -77,3 +77,59 @@ export type UnconfiguredIndicator = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ConfigureObjectiveMonths = { month: number; year: number };
+
+export type ConfigureObjectiveDto = {
+  objectiveId: string;
+  objective?: {
+    goalValue?: number;
+    name?: string;
+    description?: string;
+    perspective?: "FIN" | "CLI" | "PRO" | "PER";
+    level?: "EST" | "OPE";
+    valueOrientation?: "CRE" | "REN";
+    objectiveParentId?: string | null;
+    positionId?: string;
+    strategicPlanId?: string;
+    status?: string; // valores exactos NO ENCONTRADO; de ejemplo has usado "OPE"
+  };
+  indicator?: {
+    name?: string;
+    description?: string;
+    formula?: string;
+    origin?: "MAN" | "AUT";
+    tendence?: "POS" | "NEG" | "MAN" | "HIT";
+    frequency?: "TRI" | "QTR" | "MES" | "STR" | "ANU" | "PER";
+    measurement?: "POR" | "RAT" | "UNI" | "MON" | "UNC";
+    type?: "RES" | "GES";
+    reference?: string;
+    periodStart?: string; // ISO (YYYY-MM-DD)
+    periodEnd?: string; // ISO (YYYY-MM-DD)
+  };
+  rangeExceptional?: number;
+  rangeInacceptable?: number;
+  months?: ConfigureObjectiveMonths[]; // solo si frequency = "PER"
+};
+
+// ❷ Respuesta (según tu ejemplo)
+export type ConfigureObjectiveResponse = {
+  objective: {
+    id: string;
+    name: string;
+    description: string | null;
+    perspective: "FIN" | "CLI" | "PRO" | "PER";
+    order: number;
+    strategicPlanId: string;
+    objectiveParentId: string | null;
+    indicatorId: string;
+    isActive: boolean;
+    createdBy: string | null;
+    updatedBy: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  indicatorUpdated: boolean;
+  goalsRegenerated: boolean;
+  monthsCount: number;
+};

@@ -137,4 +137,7 @@ export const QKEY = {
     planId,
     positionId,
   ],
+
+  objectiveConfigure: (objectiveId: string) =>
+    ["objective", "configure", objectiveId] as const,
 };
