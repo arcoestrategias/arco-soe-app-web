@@ -81,6 +81,7 @@ export type ObjectiveConfigureData = {
   months?: ConfigureObjectiveMonths[];
   rangeExceptional?: number | null;
   rangeInacceptable?: number | null;
+  isNew?: boolean;
 };
 
 type Props = {
@@ -300,17 +301,75 @@ export default function ObjectiveConfigureModal({
     },
   });
 
-  const handleApply = () => {
-    const changed = getCriticalChanges();
-    const hasCriticalChange = changed.length > 0;
+  const isNew = !!data?.isNew;
 
-    // months obligatorio si hay cambio crítico
-    if (hasCriticalChange && monthsSelected.length === 0) {
-      toast.error("Debes seleccionar los meses a medir para continuar.");
+  function requiredErrorsForNew(): string[] {
+    if (!isNew) return [];
+    const errs: string[] = [];
+
+    // Fecha inicio
+    if (!indicator?.periodStart) errs.push("Fecha inicio");
+
+    // Fecha fin
+    if (!indicator?.periodEnd) {
+      errs.push("Fecha fin");
+    } else if (
+      indicator?.periodStart &&
+      indicator.periodEnd < indicator.periodStart
+    ) {
+      errs.push("Fecha fin (debe ser ≥ inicio)");
+    }
+
+    // Meta
+    if (
+      objective?.goalValue === null ||
+      objective?.goalValue === undefined ||
+      Number.isNaN(Number(objective?.goalValue))
+    ) {
+      errs.push("Meta");
+    }
+
+    // Rangos
+    if (typeof rangeInacceptable !== "number") errs.push("Rango inaceptable");
+    if (typeof rangeExceptional !== "number") errs.push("Rango excepcional");
+
+    // Si es personalizado, debe seleccionar al menos un mes
+    if (
+      indicator?.frequency === "PER" &&
+      (!monthsSelected || monthsSelected.length === 0)
+    ) {
+      errs.push("Meses a medir (para personalizado)");
+    }
+
+    return errs;
+  }
+
+  const handleApply = () => {
+    const isPer = indicator?.frequency === "PER";
+    const isNew = !!data?.isNew;
+
+    // 1) Siempre: PER requiere al menos un mes seleccionado
+    if (isPer && (!monthsSelected || monthsSelected.length === 0)) {
+      toast.error(
+        "Selecciona al menos un mes para la frecuencia personalizada."
+      );
       return;
     }
 
-    if (hasCriticalChange) {
+    // 2) Objetivo 'no configurado': valida obligatorios y aplica directo
+    if (isNew) {
+      const missing = requiredErrorsForNew(); // ya incluye check de meses PER
+      if (missing.length > 0) {
+        toast.error(`Completa los campos obligatorios: ${missing.join(", ")}`);
+        return;
+      }
+      doConfigure();
+      return;
+    }
+
+    // 3) Objetivo ya configurado: sólo confirmación si hay cambios críticos
+    const changed = getCriticalChanges();
+    if (changed.length > 0) {
       const list =
         changed.length === 1
           ? `la ${changed[0]}`
@@ -324,6 +383,7 @@ export default function ObjectiveConfigureModal({
       return;
     }
 
+    // 4) Sin cambios críticos → aplica
     doConfigure();
   };
 

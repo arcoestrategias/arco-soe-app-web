@@ -255,6 +255,7 @@ export default function ObjectivesCompliance({
       months: monthsFromIcoMonthly(icoMonthly),
       rangeExceptional: ranges?.rangeExceptional ?? undefined,
       rangeInacceptable: ranges?.rangeInacceptable ?? undefined,
+      isNew: false,
     };
 
     setConfigureData(data);
@@ -299,6 +300,7 @@ export default function ObjectivesCompliance({
       months: u.months ?? undefined,
       rangeExceptional: u.rangeExceptional ?? undefined,
       rangeInacceptable: u.rangeInacceptable ?? undefined,
+      isNew: true,
     };
 
     setConfigureData(data);
