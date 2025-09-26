@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import type { IcoMonthlyPoint } from "@/features/objectives/types/ico-board";
 
 /* -------- mapeos etiqueta (unidad, tendencia, frecuencia) -------- */
@@ -64,12 +65,15 @@ const MONTH_NAMES_ES = [
 const monthName = (m?: number | null) =>
   typeof m === "number" && m >= 1 && m <= 12 ? MONTH_NAMES_ES[m - 1] : "—";
 
-/* ---------------- props ---------------- */
+/* ---------------- tipos ---------------- */
 export type ObjectiveComplianceChange = {
   id?: string;
   month: number;
   year: number;
   realValue: number | null;
+  newGoalValue?: number | null;
+  observation?: string | null;
+  variationPct?: number | null; // %
 };
 
 type ObjectiveHeader = {
@@ -86,7 +90,7 @@ export function ObjectiveComplianceModal({
   open,
   onOpenChange,
   icoMonthly,
-  objective, // info para la tarjeta resumen
+  objective,
   onUpdate,
   title = "Cumplimiento del Objetivo",
   description = "",
@@ -105,41 +109,127 @@ export function ObjectiveComplianceModal({
     [icoMonthly]
   );
 
-  // Estado local de ediciones
-  const [draft, setDraft] = useState<Record<string, number | null>>({});
+  // ===== Estado local
+  const [draftReal, setDraftReal] = useState<Record<string, number | null>>({});
+  const [draftGoal, setDraftGoal] = useState<Record<string, number | null>>({});
+  const [draftObs, setDraftObs] = useState<Record<string, string>>({});
+
   const keyOf = (p: IcoMonthlyPoint) => p.id ?? `${p.year}-${p.month}`;
-  const getDraftValue = (p: IcoMonthlyPoint): number | null | undefined =>
-    draft[keyOf(p)];
-  const handleChange = (p: IcoMonthlyPoint, val: string) => {
+
+  const getDraftReal = (p: IcoMonthlyPoint) => draftReal[keyOf(p)];
+  const getDraftGoal = (p: IcoMonthlyPoint) => draftGoal[keyOf(p)];
+  const getDraftObs = (p: IcoMonthlyPoint) => {
+    const k = keyOf(p);
+    if (draftObs[k] !== undefined) return draftObs[k];
+    return (p as any)?.observation ?? "";
+  };
+
+  const handleChangeReal = (p: IcoMonthlyPoint, val: string) => {
     const num = val === "" ? null : Number(val);
     if (val !== "" && Number.isNaN(num)) return;
-    setDraft((d) => ({ ...d, [keyOf(p)]: num }));
+    setDraftReal((d) => ({ ...d, [keyOf(p)]: num }));
   };
 
+  const handleChangeGoal = (p: IcoMonthlyPoint, val: string) => {
+    const num = val === "" ? null : Number(val);
+    if (val !== "" && Number.isNaN(num)) return;
+    setDraftGoal((d) => ({ ...d, [keyOf(p)]: num }));
+  };
+
+  const handleChangeObs = (p: IcoMonthlyPoint, val: string) => {
+    setDraftObs((d) => ({ ...d, [keyOf(p)]: val }));
+  };
+
+  /** Meta visible/ajustada:
+   *  - edición del usuario si existe
+   *  - newGoalValue del backend si existe
+   *  - si no, goalValue base
+   */
+  const adjustedGoalOf = (p: IcoMonthlyPoint): number | null => {
+    const k = keyOf(p);
+    if (Object.prototype.hasOwnProperty.call(draftGoal, k)) {
+      return draftGoal[k] ?? null;
+    }
+    const srv = (p as any)?.newGoalValue;
+    if (typeof srv === "number") return srv;
+    return typeof p.goalValue === "number" ? p.goalValue : null;
+  };
+
+  /** ¿la meta cambió respecto a la base del backend? */
+  const goalChanged = (p: IcoMonthlyPoint) => {
+    const base = typeof p.goalValue === "number" ? p.goalValue : null;
+    const adj = adjustedGoalOf(p);
+    return (adj ?? null) !== (base ?? null);
+  };
+
+  // Filas que requieren observación (meta cambiada sin texto)
+  const rowsMissingObs = rows.filter(
+    (p) => goalChanged(p) && !getDraftObs(p).trim()
+  );
+
+  // ¿hay algún cambio en resultado o meta?
+  const hasAnyRealChange = rows.some((p) =>
+    Object.prototype.hasOwnProperty.call(draftReal, keyOf(p))
+  );
+  const hasAnyGoalChange = rows.some(goalChanged);
+  const hasChanges = hasAnyRealChange || hasAnyGoalChange;
+
+  // Payload de cambios
   const changes: ObjectiveComplianceChange[] = useMemo(() => {
-    const arr: ObjectiveComplianceChange[] = [];
+    const out: ObjectiveComplianceChange[] = [];
     for (const p of rows) {
       const k = keyOf(p);
-      if (Object.prototype.hasOwnProperty.call(draft, k)) {
-        arr.push({
-          id: p.id,
-          month: p.month,
-          year: p.year,
-          realValue: draft[k] ?? null,
-        });
-      }
+      const realTouched = Object.prototype.hasOwnProperty.call(draftReal, k);
+      const metaTouched = goalChanged(p);
+      if (!realTouched && !metaTouched) continue;
+
+      const finalReal = realTouched
+        ? draftReal[k] ?? null
+        : p.realValue ?? null;
+      const shownGoal = adjustedGoalOf(p);
+
+      // Variación % = (Resultado - Meta visible) / Resultado * 100
+      const varPct =
+        finalReal != null && finalReal !== 0 && shownGoal != null
+          ? ((finalReal - shownGoal) / finalReal) * 100
+          : null;
+
+      out.push({
+        id: p.id,
+        month: p.month,
+        year: p.year,
+        realValue: finalReal,
+        newGoalValue: metaTouched ? (shownGoal as number | null) : undefined,
+        observation: metaTouched ? getDraftObs(p) : undefined,
+        // normalmente solo interesa si cambió la meta; ajusta si quieres enviarlo siempre
+        variationPct: metaTouched ? varPct ?? null : undefined,
+      });
     }
-    return arr;
-  }, [rows, draft]);
-  const hasChanges = changes.length > 0;
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, draftReal, draftGoal, draftObs]);
 
   const handleCancel = () => {
-    setDraft({});
+    setDraftReal({});
+    setDraftGoal({});
+    setDraftObs({});
     onOpenChange(false);
   };
+
   const handleUpdate = () => {
+    if (rowsMissingObs.length > 0) {
+      const faltantes = rowsMissingObs
+        .map((p) => `${monthName(p.month)}-${p.year}`)
+        .join(", ");
+      toast.error(
+        `Debes ingresar una observación para el cambio de meta en: ${faltantes}`
+      );
+      return;
+    }
     if (hasChanges) onUpdate?.(changes);
-    setDraft({});
+    setDraftReal({});
+    setDraftGoal({});
+    setDraftObs({});
     onOpenChange(false);
   };
 
@@ -155,22 +245,38 @@ export function ObjectiveComplianceModal({
   const tendenceLabel = (tendence && TENDENCE_LABEL[tendence]) || "—";
   const frequencyLabel = (frequency && FREQUENCY_LABEL[frequency]) || "—";
 
+  // Precargar metas ajustadas/observaciones que vengan del backend al abrir
+  React.useEffect(() => {
+    if (!open) return;
+    const initialGoals: Record<string, number | null> = {};
+    const initialObs: Record<string, string> = {};
+
+    (icoMonthly ?? []).forEach((p) => {
+      const k = keyOf(p);
+      const ng = (p as any)?.newGoalValue;
+      if (typeof ng === "number") initialGoals[k] = ng;
+      const ob = (p as any)?.observation;
+      if (typeof ob === "string" && ob.trim() !== "") initialObs[k] = ob;
+    });
+
+    setDraftGoal(initialGoals);
+    setDraftObs(initialObs);
+  }, [open, icoMonthly]);
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => (next ? onOpenChange(true) : handleCancel())}
     >
-      {/* usa tu variant size="xl" configurado en ui/dialog.tsx */}
       <DialogContent className="w-[95vw] sm:max-w-[1000px] md:max-w-[1300px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {/* ---------- Tarjeta resumen objetivo/indicador (3/4 - 1/4, pills compactas) ---------- */}
+        {/* -------- Tarjeta resumen -------- */}
         <div className="rounded-xl border bg-card text-card-foreground p-5 mb-4">
           <div className="grid gap-6 md:grid-cols-4">
-            {/* 3/4: Objetivo + Indicador */}
             <div className="md:col-span-3 space-y-4">
               <div>
                 <div className="text-xs font-medium text-muted-foreground">
@@ -180,7 +286,6 @@ export function ObjectiveComplianceModal({
                   {objName}
                 </div>
               </div>
-
               <div>
                 <div className="text-xs font-medium text-muted-foreground">
                   Indicador
@@ -191,7 +296,6 @@ export function ObjectiveComplianceModal({
               </div>
             </div>
 
-            {/* 1/4: Unidad / Tendencia / Frecuencia (labels + valor pegados) */}
             <div className="md:col-span-1">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -223,9 +327,9 @@ export function ObjectiveComplianceModal({
           </div>
         </div>
 
-        {/* -------------- Tabla de meses medidos -------------- */}
+        {/* -------- Tabla -------- */}
         <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-[860px]">
+          <Table className="w-full min-w-[1100px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-20 text-center whitespace-nowrap">
@@ -240,8 +344,14 @@ export function ObjectiveComplianceModal({
                 <TableHead className="w-40 text-center whitespace-nowrap">
                   Resultado
                 </TableHead>
-                <TableHead className="w-40 text-center whitespace-nowrap">
+                <TableHead className="w-44 text-center whitespace-nowrap">
                   Valor esperado
+                </TableHead>
+                <TableHead className="w-44 text-center whitespace-nowrap">
+                  Variación %
+                </TableHead>
+                <TableHead className="w-72 whitespace-nowrap">
+                  Observación
                 </TableHead>
                 <TableHead className="whitespace-nowrap">
                   Acciones a realizar
@@ -251,27 +361,41 @@ export function ObjectiveComplianceModal({
 
             <TableBody>
               {rows.map((p) => {
+                const k = keyOf(p);
                 const bg = p.lightColorHex ?? undefined;
-                const edited = getDraftValue(p);
-                const valueToShow =
-                  edited !== undefined
-                    ? edited
+
+                // Resultado (prioriza edición)
+                const editedReal = getDraftReal(p);
+                const realToShow =
+                  editedReal !== undefined
+                    ? editedReal
                     : typeof p.realValue === "number"
                     ? p.realValue
                     : null;
 
+                // Meta visible/ajustada
+                const goalToShow = adjustedGoalOf(p);
+
+                // Variación % = (Resultado - Meta visible) / Resultado * 100
+                const varPct =
+                  realToShow != null && realToShow !== 0 && goalToShow != null
+                    ? ((realToShow - goalToShow) / realToShow) * 100
+                    : null;
+                const varLabel = varPct == null ? "—" : `${varPct.toFixed(2)}%`;
+
+                const obs = getDraftObs(p);
+                const obsRequired = goalChanged(p) && !obs.trim(); // solo si cambias la meta
+
                 return (
-                  <TableRow key={p.id ?? `${p.year}-${p.month}`}>
+                  <TableRow key={k}>
                     <TableCell className="text-center align-middle">
                       {p.year}
                     </TableCell>
-
-                    {/* Mes con nombre */}
                     <TableCell className="text-center align-middle">
                       {monthName(p.month)}
                     </TableCell>
 
-                    {/* ✅ ICO tal cual viene del backend; color de fondo desde lightColorHex */}
+                    {/* ICO (desde backend) */}
                     <TableCell className="text-center align-middle">
                       <Badge
                         className="whitespace-nowrap border-0"
@@ -282,21 +406,58 @@ export function ObjectiveComplianceModal({
                       </Badge>
                     </TableCell>
 
+                    {/* Resultado (editable) */}
                     <TableCell className="text-center align-middle">
                       <Input
                         type="number"
                         inputMode="decimal"
                         className="h-8 text-center"
-                        value={valueToShow ?? ""}
-                        onChange={(e) => handleChange(p, e.target.value)}
+                        value={realToShow ?? ""}
+                        onChange={(e) => handleChangeReal(p, e.target.value)}
                         placeholder="—"
                       />
                     </TableCell>
 
+                    {/* Valor esperado (editable / ajustable) */}
                     <TableCell className="text-center align-middle">
-                      {typeof p.goalValue === "number" ? p.goalValue : "—"}
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        className="h-8 text-center"
+                        value={goalToShow ?? ""}
+                        onChange={(e) => handleChangeGoal(p, e.target.value)}
+                        placeholder="—"
+                      />
                     </TableCell>
 
+                    {/* Variación % */}
+                    <TableCell className="text-center align-middle">
+                      {varLabel}
+                    </TableCell>
+
+                    {/* Observación (requerida si cambió la meta) */}
+                    <TableCell className="align-middle">
+                      <div className="flex flex-col gap-1">
+                        <Input
+                          type="text"
+                          className="h-8"
+                          value={obs}
+                          onChange={(e) => handleChangeObs(p, e.target.value)}
+                          placeholder={
+                            goalChanged(p)
+                              ? "Explica por qué se ajustó la meta (obligatorio)"
+                              : "Opcional"
+                          }
+                        />
+                        {obsRequired && (
+                          <span className="text-xs text-destructive">
+                            Obligatorio: explica el cambio de meta.
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Acciones (solo lectura) */}
                     <TableCell className="align-top">
                       <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
                         {p.action ?? "—"}
@@ -308,9 +469,8 @@ export function ObjectiveComplianceModal({
 
               {rows.length === 0 && (
                 <TableRow>
-                  {/* ahora hay 6 columnas */}
                   <TableCell
-                    colSpan={6}
+                    colSpan={8}
                     className="text-center text-sm text-muted-foreground"
                   >
                     No hay meses medidos para este objetivo.
@@ -327,7 +487,7 @@ export function ObjectiveComplianceModal({
           </Button>
           <Button
             onClick={handleUpdate}
-            disabled={!hasChanges}
+            disabled={!hasChanges || rowsMissingObs.length > 0}
             className="btn-gradient"
           >
             Actualizar

@@ -65,7 +65,12 @@ export default function ObjectivesView({
     try {
       await Promise.all(
         effective.map((c) =>
-          updateGoalMut.mutateAsync({ id: c.id!, realValue: c.realValue })
+          updateGoalMut.mutateAsync({
+            id: c.id!, // id del registro mensual
+            realValue: c.realValue, // puede venir sin cambios
+            newGoalValue: c.newGoalValue, // meta ajustada
+            observation: c.observation, // requerida si cambió la meta
+          })
         )
       );
       toast.success("Cumplimiento actualizado");
