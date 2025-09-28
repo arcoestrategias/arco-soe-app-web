@@ -229,6 +229,18 @@ export const routes = {
   notifications: {
     send: () => prefixed("/notifications/send"),
   },
+
+  comments: {
+    // GET /comments?referenceId=...
+    listByReference: (referenceId: string) =>
+      prefixed("comments") + qs({ referenceId }),
+    // POST /comments
+    create: () => prefixed("comments"),
+    // PATCH /comments/:id
+    update: (id: string) => prefixed("comments", id),
+    // PATCH /comments/:id/inactivate
+    inactivate: (id: string) => prefixed("comments", id, "inactivate"),
+  },
 } as const;
 
 // Helper opcional para crear módulos dinámicos

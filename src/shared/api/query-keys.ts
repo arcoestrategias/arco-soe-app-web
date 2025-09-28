@@ -143,4 +143,8 @@ export const QKEY = {
 
   objectiveConfigure: (objectiveId: string) =>
     ["objective", "configure", objectiveId] as const,
+
+  comments: ["comments"] as const,
+  commentsByReference: (referenceId: string) =>
+    ["comments", "ref", referenceId] as const,
 };

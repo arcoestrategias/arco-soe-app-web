@@ -33,6 +33,7 @@ import {
   X,
   Trash2,
   Calendar as CalendarIcon,
+  StickyNote,
 } from "lucide-react";
 import ObjectiveSelect from "@/shared/components/objective-select";
 import { SingleDatePicker } from "@/shared/components/date-single-picker";
@@ -44,6 +45,7 @@ import { TextareaWithCounter } from "../../../shared/components/textarea-with-co
 import { getPositionId } from "@/shared/auth/storage";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "@/shared/auth/access-control";
+import NotesModal from "@/shared/components/comments/components/notes-modal";
 
 /* ------------------------------------------------------------
    Tipos y utilidades base
@@ -363,6 +365,7 @@ export default function PrioritiesTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [notesFor, setNotesFor] = useState<string | null>(null);
 
   const hasNewDraftValues = !!(
     newDraft.name ||
@@ -837,6 +840,15 @@ export default function PrioritiesTable({
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Notas"
+                    onClick={() => setNotesFor(p.id)}
+                  >
+                    <StickyNote className="h-4 w-4" />
+                  </Button>
+
+                  <Button
                     size="sm"
                     variant="ghost"
                     className="text-destructive"
@@ -1011,6 +1023,12 @@ export default function PrioritiesTable({
           )}
         </TableBody>
       </Table>
+
+      <NotesModal
+        isOpen={!!notesFor}
+        onClose={() => setNotesFor(null)}
+        referenceId={notesFor ?? ""}
+      />
     </div>
   );
 }
