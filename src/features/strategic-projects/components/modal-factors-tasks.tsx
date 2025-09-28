@@ -368,10 +368,18 @@ export function ModalFactorsTasks({
           task.untilAt ?? undefined
         );
 
+        const toNull = (v?: string | null) =>
+          (typeof v === "string" ? v.trim() : v) || null;
+
         if (!task.id.startsWith("__new__")) {
           await updateProjectTask(task.id, {
             name: task.name,
-            result: task.result ?? "",
+            description: toNull(task.description),
+            result: toNull(task.result),
+            limitation: toNull(task.limitation),
+            methodology: toNull(task.methodology),
+            comments: toNull(task.comments),
+            props: toNull(task.props),
             fromAt: task.fromAt,
             untilAt: task.untilAt,
             status: task.status,
@@ -394,7 +402,12 @@ export function ModalFactorsTasks({
         await createProjectTask({
           projectFactorId: factorId,
           name: task.name,
-          result: task.result ?? "",
+          description: toNull(task.description),
+          result: toNull(task.result),
+          limitation: toNull(task.limitation),
+          methodology: toNull(task.methodology),
+          comments: toNull(task.comments),
+          props: toNull(task.props),
           fromAt: task.fromAt ?? undefined,
           untilAt: task.untilAt ?? undefined,
           status: task.status ?? "OPE",

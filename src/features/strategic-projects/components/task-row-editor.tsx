@@ -37,8 +37,10 @@ export function TaskRowEditor({
 }) {
   const nameRef = useRef<HTMLTextAreaElement>(null);
   const resultRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const limitationRef = useRef<HTMLTextAreaElement>(null);
   const methodologyRef = useRef<HTMLTextAreaElement>(null);
+  const propsRef = useRef<HTMLTextAreaElement>(null);
   const budgetRef = useRef<HTMLInputElement>(null);
   const datesRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement>(null);
@@ -101,13 +103,15 @@ export function TaskRowEditor({
         Editando tarea
       </h3>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Nombre</label>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Acción clave
+          </label>
           <TextareaWithCounter
             value={editedTask.name ?? ""}
             onValueChange={(val) => handleChange("name", val)}
-            maxLength={120}
+            maxLength={500}
           />
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
@@ -115,28 +119,39 @@ export function TaskRowEditor({
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
-            Resultado / Entregable
+            Justificación
           </label>
+          <TextareaWithCounter
+            ref={descriptionRef}
+            value={editedTask.description ?? ""}
+            onValueChange={(val) => handleChange("description", val)}
+            maxLength={1000}
+          />
+          {errors.result && (
+            <p className="text-xs text-red-500 mt-1">{errors.result}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Entregable</label>
           <TextareaWithCounter
             ref={resultRef}
             value={editedTask.result ?? ""}
             onValueChange={(val) => handleChange("result", val)}
-            maxLength={300}
+            maxLength={1000}
           />
           {errors.result && (
             <p className="text-xs text-red-500 mt-1">{errors.result}</p>
           )}
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Limitación</label>
           <TextareaWithCounter
             ref={limitationRef}
             value={editedTask.limitation ?? ""}
             onValueChange={(val) => handleChange("limitation", val)}
-            maxLength={120}
+            maxLength={1000}
             className="h-8 text-sm"
           />
         </div>
@@ -148,13 +163,35 @@ export function TaskRowEditor({
             ref={methodologyRef}
             value={editedTask.methodology ?? ""}
             onValueChange={(val) => handleChange("methodology", val)}
-            maxLength={120}
+            maxLength={1000}
             className="h-8 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Comentarios
+          </label>
+          <TextareaWithCounter
+            ref={commentsRef}
+            value={editedTask.comments ?? ""}
+            onValueChange={(val) => handleChange("comments", val)}
+            maxLength={1000}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Apoyos Requeridos
+          </label>
+          <TextareaWithCounter
+            ref={propsRef}
+            value={editedTask.props ?? ""}
+            onValueChange={(val) => handleChange("props", val)}
+            maxLength={1000}
+          />
+        </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Inversión</label>
           <CurrencyInput
@@ -205,16 +242,6 @@ export function TaskRowEditor({
             <p className="text-xs text-red-500 mt-1">{errors.fromAt}</p>
           )}
         </div>
-      </div>
-
-      <div>
-        <label className="text-xs text-gray-500 mb-1 block">Comentarios</label>
-        <TextareaWithCounter
-          ref={commentsRef}
-          value={editedTask.comments ?? ""}
-          onValueChange={(val) => handleChange("comments", val)}
-          maxLength={300}
-        />
       </div>
 
       <div className="flex gap-2 justify-end">

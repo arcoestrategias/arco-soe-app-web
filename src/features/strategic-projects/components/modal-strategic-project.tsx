@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import {
   Dialog,
@@ -20,7 +20,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
@@ -28,9 +27,6 @@ import ObjectiveSelect from "@/shared/components/objective-select";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import * as FiltersStorage from "@/shared/filters/storage";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
-import { QKEY } from "@/shared/api/query-keys";
-import { getStrategicPlan } from "@/features/strategic-plans/services/strategicPlansService";
 
 // -------------------- Tipos --------------------
 export type ModalMode = "crear" | "editar" | "ver";
@@ -121,23 +117,6 @@ export function ModalStrategicProject({
   const resolvedPositionId =
     positionId ?? FiltersStorage.getSelectedPositionId();
 
-  type PlanMin = { fromAt?: string | null; untilAt?: string | null };
-
-  const planIdForKey = resolvedPlanId ?? "__no_plan__"; // clave siempre definida
-
-  const { data: plan } = useQuery<PlanMin>({
-    queryKey: QKEY.strategicPlan(planIdForKey),
-    queryFn: () => getStrategicPlan(resolvedPlanId!), // solo se ejecuta si enabled=true
-    enabled: !!resolvedPlanId,
-    // por si tu service devolviera envelope, lo aplanamos; si ya devuelve el objeto, se queda igual
-    select: (raw: any) =>
-      (raw && typeof raw === "object" && "data" in raw
-        ? raw.data
-        : raw) as PlanMin,
-  });
-  const minDate = parseYmdOrIso(plan?.fromAt);
-  const maxDate = parseYmdOrIso(plan?.untilAt);
-
   // RHF
   const {
     control,
@@ -225,35 +204,19 @@ export function ModalStrategicProject({
       toast.error("El nombre debe tener mínimo 3 caracteres.");
       return;
     }
-    if (nameTrim.length > 120) {
-      toast.error("El nombre no puede exceder 120 caracteres.");
+    if (nameTrim.length > 500) {
+      toast.error("El nombre no puede exceder 500 caracteres.");
       return;
     }
     const desc = (values.description ?? "")?.trim();
-    if (desc && desc.length > 300) {
-      toast.error("La descripción no puede exceder 300 caracteres.");
+    if (desc && desc.length > 1000) {
+      toast.error("La descripción no puede exceder 1000 caracteres.");
       return;
     }
 
-    // Validaciones de rango contra el Plan
+    // ✅ Sin límite de fechas: solo comprobamos coherencia del rango
     const f = parseYmdOrIso(values.fromAt);
     const u = parseYmdOrIso(values.untilAt);
-    if (minDate && f && f < minDate) {
-      toast.error("La fecha de inicio no puede ser anterior al Plan.");
-      return;
-    }
-    if (maxDate && f && f > maxDate) {
-      toast.error("La fecha de inicio no puede ser posterior al Plan.");
-      return;
-    }
-    if (minDate && u && u < minDate) {
-      toast.error("La fecha de fin no puede ser anterior al Plan.");
-      return;
-    }
-    if (maxDate && u && u > maxDate) {
-      toast.error("La fecha de fin no puede ser posterior al Plan.");
-      return;
-    }
     if (f && u && f > u) {
       toast.error("La fecha de inicio no puede ser mayor que la fecha de fin.");
       return;
@@ -311,13 +274,13 @@ export function ModalStrategicProject({
               rules={{
                 required: "El nombre es obligatorio",
                 minLength: { value: 3, message: "Mínimo 3 caracteres" },
-                maxLength: { value: 120, message: "Máximo 120 caracteres" },
+                maxLength: { value: 500, message: "Máximo 500 caracteres" },
               }}
               render={({ field }) => (
                 <TextareaWithCounter
                   value={field.value || ""}
                   onChange={field.onChange}
-                  maxLength={120}
+                  maxLength={500}
                   // disabled={readOnly}
                 />
               )}
@@ -334,13 +297,13 @@ export function ModalStrategicProject({
               name="description"
               control={control}
               rules={{
-                maxLength: { value: 300, message: "Máximo 300 caracteres" },
+                maxLength: { value: 1000, message: "Máximo 1000 caracteres" },
               }}
               render={({ field }) => (
                 <TextareaWithCounter
                   value={field.value || ""}
                   onChange={field.onChange}
-                  maxLength={300}
+                  maxLength={1000}
                   // disabled={readOnly}
                 />
               )}
@@ -385,11 +348,11 @@ export function ModalStrategicProject({
               disabled={readOnly}
             />
             <p className="text-[11px] text-muted-foreground">
-              Monto en USD. Se formatea automáticamente.
+              Monto en USD. Se formátea automáticamente.
             </p>
           </div>
 
-          {/* Fechas */}
+          {/* Fechas (sin límites) */}
           <div className="space-y-2 md:col-span-2">
             <Label>Fechas</Label>
             <div className="flex items-center gap-2">
@@ -405,8 +368,7 @@ export function ModalStrategicProject({
                   <DateRangePicker
                     date={range}
                     onChange={(r) => r && setRange(r)} // solo UI
-                    minDate={minDate}
-                    maxDate={maxDate}
+                    // 👇 sin minDate ni maxDate = sin límites
                     onClose={() => setIsDateOpen(false)}
                     onApply={(r) => {
                       if (!r?.from || !r?.to) return;
@@ -433,7 +395,7 @@ export function ModalStrategicProject({
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              El rango debe estar dentro del Plan Estratégico seleccionado.
+              Puedes elegir cualquier rango de fechas.
             </p>
           </div>
 

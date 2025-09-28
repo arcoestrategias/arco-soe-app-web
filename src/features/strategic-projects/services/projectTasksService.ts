@@ -6,7 +6,12 @@ import { routes } from "@/shared/api/routes";
 export type CreateProjectTaskPayload = {
   projectFactorId: string;
   name: string;
+  description?: string | null;
   result?: string | null;
+  limitation?: string | null;
+  methodology?: string | null;
+  comments?: string | null;
+  props?: string | null;
   fromAt?: string | null;
   untilAt?: string | null;
   status?: string; // "OPE" según tu ejemplo
@@ -16,7 +21,12 @@ export type CreateProjectTaskPayload = {
 
 export type UpdateProjectTaskPayload = Partial<{
   name: string;
+  description: string | null;
   result: string | null;
+  limitation: string | null;
+  methodology: string | null;
+  comments: string | null;
+  props: string | null;
   fromAt: string | null;
   untilAt: string | null;
   status: string;

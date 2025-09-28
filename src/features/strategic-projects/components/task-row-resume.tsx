@@ -13,14 +13,17 @@ import {
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { StrategicProjectStructureTask as Task } from "../types/strategicProjectStructure";
-import { format, isValid } from "date-fns";
+import { isValid } from "date-fns";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
+import { toast } from "sonner";
 
-// Rango del PROYECTO desde el provider
+// Tooltip reutilizado
+import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
+
+// Rango del PROYECTO
 import { usePlanRange } from "@/features/strategic-projects/context/plan-range.context";
 import { projectRangeToDates, toYmd } from "@/shared/utils/dateFormatters";
-import { toast } from "sonner";
 
 interface TaskRowResumeProps {
   task: Task;
@@ -69,7 +72,7 @@ export function TaskRowResume({
     onSave(next);
   };
 
-  // Handlers bloqueados (tipados) para drag cuando está deshabilitado
+  // Bloqueo drag
   const blockedMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -100,38 +103,56 @@ export function TaskRowResume({
     onPointerDown: blockedPointerDown,
     onTouchStart: blockedTouchStart,
   };
-
   const sortableProps = (!dragDisabled
     ? { ...(listeners ?? {}), ...(attributes ?? {}) }
     : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
 
   return (
     <div className="col-span-12 grid grid-cols-12 gap-2 items-center">
-      <div
-        className={`col-span-4 flex items-center gap-2 ${
-          dragDisabled ? "cursor-not-allowed opacity-50" : "cursor-grab"
-        }`}
-        title={
-          dragDisabled
-            ? dragDisabledReason ||
-              "No puedes reordenar mientras hay cambios sin guardar"
-            : "Arrastra para reordenar"
-        }
-        {...(dragDisabled ? blockedProps : sortableProps)}
-      >
-        <div className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
-          <GripVertical className="h-4 w-4" />
+      {/* Columna: Nombre (task.name) */}
+      <div className="col-span-4 min-w-0">
+        <div
+          className={`flex items-center gap-2 min-w-0 ${
+            dragDisabled ? "cursor-not-allowed opacity-50" : "cursor-grab"
+          }`}
+          title={
+            dragDisabled
+              ? dragDisabledReason ||
+                "No puedes reordenar mientras hay cambios sin guardar"
+              : "Arrastra para reordenar"
+          }
+          {...(dragDisabled ? blockedProps : sortableProps)}
+        >
+          <div className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+            <GripVertical className="h-4 w-4" />
+          </div>
+          <ListChecks className="text-green-500 h-4 w-4" />
+          {/* El texto debe poder encogerse → min-w-0 + flex-1 + truncate */}
+          <CellWithTooltip
+            lines={[{ label: "Acción clave", text: task.name ?? "" }]}
+            side="top"
+          >
+            <span className="flex-1 min-w-0 truncate text-sm text-gray-800">
+              {task.name ?? ""}
+            </span>
+          </CellWithTooltip>
         </div>
-        <ListChecks className="text-green-500 h-4 w-4" />
-        <span className="text-sm text-gray-800 truncate">{task.name}</span>
       </div>
 
-      <div className="col-span-4">
-        <span className="text-sm text-gray-600 truncate">
-          {task.result ?? ""}
-        </span>
+      {/* Columna: Resultado (task.result) */}
+      <div className="col-span-4 min-w-0">
+        <CellWithTooltip
+          lines={[{ label: "Entregable", text: task.result ?? "" }]}
+          side="top"
+        >
+          {/* block + min-w-0 + truncate para que no se meta debajo del badge */}
+          <span className="block min-w-0 truncate text-sm text-gray-600">
+            {task.result ?? ""}
+          </span>
+        </CellWithTooltip>
       </div>
 
+      {/* Estado */}
       <div className="col-span-2">
         <Badge
           onClick={toggleStatus}
@@ -145,6 +166,7 @@ export function TaskRowResume({
         </Badge>
       </div>
 
+      {/* Fechas + acciones */}
       <div className="col-span-2 flex justify-end items-center gap-1">
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
           <PopoverTrigger asChild>
@@ -162,28 +184,22 @@ export function TaskRowResume({
 
           <PopoverContent className="w-auto p-4" align="end">
             <DateRangePicker
-              // Estado controlado: NO llama API aquí
               date={range}
-              onChange={(newRange) => {
-                if (newRange) setRange(newRange);
-              }}
+              onChange={(newRange) => newRange && setRange(newRange)}
               showToastOnApply={false}
-              // Bloqueo por rango del PROYECTO
               minDate={minDate}
               maxDate={maxDate}
-              // Cerrar popover desde el picker
               onClose={() => setIsDateOpen(false)}
-              // Persistir SOLO al aplicar (1 PATCH)
               onApply={(r) => {
                 if (!r?.from || !r?.to || !isValid(r.from) || !isValid(r.to))
                   return;
                 const next: Task = {
                   ...task,
-                  fromAt: toYmd(r.from)!, // 'YYYY-MM-DD'
-                  untilAt: toYmd(r.to)!, // 'YYYY-MM-DD'
+                  fromAt: toYmd(r.from)!,
+                  untilAt: toYmd(r.to)!,
                 };
                 onSave(next);
-                setRange({ from: r.from, to: r.to }); // sincroniza el badge
+                setRange({ from: r.from, to: r.to });
               }}
             />
           </PopoverContent>
