@@ -256,7 +256,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         ? "Aplicando..."
         : "Ingresando..."
       : inSelectionPhase
-      ? "Aplicar"
+      ? "Ingresar"
       : "Iniciar sesión";
 
   // ---- Helpers de navegación
@@ -661,7 +661,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
 
         <CardFooter className="flex items-center gap-3 mt-4">
           <Button
-            type="button"
+            type="submit"
             onClick={handlePrimary}
             className={`flex-1 btn-gradient h-11 text-base`}
             // disabled si hay envío OR bloqueo duro de UI
