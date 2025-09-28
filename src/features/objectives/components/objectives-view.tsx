@@ -92,9 +92,17 @@ export default function ObjectivesView({
     const name = (input.objectiveText ?? "").trim();
     if (!name) return;
 
+    const level = input.nivel;
+    const indicatorName = input.indicador
+      ? input.indicador.charAt(0).toUpperCase() +
+        input.indicador.slice(1).toLowerCase()
+      : "";
+
     // 2) Llamada al service (usa la mutation del hook para invalidar QKEY.objectives(planId, positionId))
     await createObjectiveMut({
       name,
+      level,
+      indicatorName,
       strategicPlanId: planId,
       positionId,
     });

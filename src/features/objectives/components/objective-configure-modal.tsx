@@ -439,7 +439,7 @@ export default function ObjectiveConfigureModal({
                 className="w-full"
                 value={objective.name ?? ""}
                 onChange={(val) => setObjective((s) => ({ ...s, name: val }))}
-                maxLength={160}
+                maxLength={500}
                 placeholder="Nombre del objetivo"
               />
             </div>
@@ -566,7 +566,7 @@ export default function ObjectiveConfigureModal({
                 className="w-full"
                 value={indicator?.name ?? ""}
                 onChange={(val) => setIndicator((s) => ({ ...s, name: val }))}
-                maxLength={160}
+                maxLength={500}
                 placeholder="Nombre del indicador"
               />
             </div>
@@ -875,7 +875,7 @@ export default function ObjectiveConfigureModal({
                 onChange={(val) =>
                   setIndicator((s) => ({ ...s, reference: val }))
                 }
-                maxLength={120}
+                maxLength={1000}
                 placeholder="Detalle el nombre del reporte o sistema"
               />
             </div>
@@ -891,7 +891,7 @@ export default function ObjectiveConfigureModal({
                 onChange={(val) =>
                   setIndicator((s) => ({ ...s, formula: val }))
                 }
-                maxLength={200}
+                maxLength={1000}
                 placeholder="Detalle de la fórmula"
               />
             </div>

@@ -199,7 +199,7 @@ export default function ObjectivesCompliance({
           id: o.id,
           name: o.name ?? "—",
           indicatorName,
-          level: "—", // si luego viene en el API: normalizeLevel(o.level)
+          level: normalizeLevel(o.level),
           type: normalizeType(o.indicator?.type ?? undefined),
           statusLabel: "No configurado",
           statusBg: "#E5E7EB",

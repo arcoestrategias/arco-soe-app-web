@@ -32,6 +32,19 @@ const MESES = [
 ];
 const MONTH_INDEXES = Array.from({ length: 12 }, (_, i) => i + 1);
 
+const MEASUREMENT_LABEL: Record<string, string> = {
+  POR: "Porcentaje",
+  RAT: "Ratio",
+  UNI: "Unidad",
+  MON: "Moneda",
+  UNC: "Único",
+};
+
+const getMeasurementLabel = (m?: string | null) => {
+  if (!m) return "—";
+  const key = String(m).toUpperCase();
+  return MEASUREMENT_LABEL[key] ?? key; // fallback al código si no está mapeado
+};
 // ----- helpers visuales -----
 function formatPercent(n: number | null | undefined) {
   // Sin redondeo en front: mostramos exactamente lo que venga
@@ -62,16 +75,21 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
     const objetivos = data?.listObjectives ?? [];
     return objetivos.map(({ objective }) => {
       const title = objective?.indicator?.name ?? "";
-      const subtitle = `Meta: ${Math.round(
-        Number(objective?.goalValue ?? 0)
-      )}%`;
+      // Meta SIN porcentaje
+      const subtitle = `Meta: ${Math.round(Number(objective?.goalValue ?? 0))}`;
+      // Nueva línea: Unidad (desde indicator.measurement)
+      const unitLabel = `Medida: ${getMeasurementLabel(
+        objective?.indicator?.measurement
+      )}`;
+
       const cells = MONTH_INDEXES.map((m) => {
         const point = objective?.icoMonthly?.find(
           (x) => x.month === m && String(x.year) === String(year)
         );
         return { month: m, point };
       });
-      return { title, subtitle, cells };
+
+      return { title, subtitle, unitLabel, cells };
     });
   }, [data, year]);
 
@@ -129,7 +147,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
               </div>
               <div>
                 <p className="text-xs text-green-600 font-bold">
-                  Promedio General
+                  Promedio Anual
                 </p>
                 {/* El back ya envía redondeado; no usar toFixed aquí */}
                 <p className="text-xl font-bold text-green-700">
@@ -208,6 +226,9 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                           </p>
                           <p className="text-xs text-gray-500">
                             {row.subtitle}
+                          </p>
+                          <p className="text-[11px] text-gray-500/90">
+                            {row.unitLabel}
                           </p>
                         </div>
                       </td>
@@ -291,7 +312,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
         <div className="p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700">
-              Leyenda del Semáforo de Desempeño
+              Leyenda del Semáforo ICO
             </h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">

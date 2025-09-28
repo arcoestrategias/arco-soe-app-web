@@ -310,7 +310,7 @@ export function ObjectiveComplianceModal({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-muted-foreground">
-                    Unidad
+                    Medida
                   </span>
                   <span className="text-xs px-2 py-1 rounded-md border bg-muted/40">
                     {measurementLabel}

@@ -12,9 +12,11 @@ export type Objective = {
 
 export type CreateObjectivePayload = {
   name: string; // requerido (min 3, max 100) – validación en backend
+  level: string;
   description?: string | null; // opcional (min 3, max 250)
   strategicPlanId: string; // UUID requerido
   positionId?: string;
+  indicatorName: string;
 };
 
 export type UpdateObjectivePayload = Partial<CreateObjectivePayload> & {
@@ -34,18 +36,23 @@ export type ReorderObjectivesPayload = {
 // Objetivos NO configurados (response /objectives/unconfigured)
 export type UnconfiguredObjective = {
   id: string;
-  name: string;
-  description: string | null;
-  perspective: string | null;
+  name?: string;
+  description?: string;
   order: number;
-  strategicPlanId: string;
-  objectiveParentId: string | null;
+  perspective?: "FIN" | "CLI" | "PRO" | "PER";
+  level?: "EST" | "OPE";
+  valueOrientation?: "CRE" | "REN";
+  goalValue?: number;
+  status?: string;
+  positionId?: string;
+  strategicPlanId?: string;
+  objectiveParentId?: string | null;
   indicatorId: string | null;
   isActive: boolean;
   createdBy: string | null;
   updatedBy: string | null;
-  createdAt: string; // ISO
-  updatedAt: string; // ISO
+  createdAt: string;
+  updatedAt: string;
 
   // indicador “por defecto” asociado al objetivo (no configurado)
   indicator?: UnconfiguredIndicator | null;
@@ -92,7 +99,7 @@ export type ConfigureObjectiveDto = {
     objectiveParentId?: string | null;
     positionId?: string;
     strategicPlanId?: string;
-    status?: string; // valores exactos NO ENCONTRADO; de ejemplo has usado "OPE"
+    status?: string;
   };
   indicator?: {
     name?: string;

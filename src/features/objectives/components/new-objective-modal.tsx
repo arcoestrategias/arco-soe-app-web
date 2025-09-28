@@ -118,13 +118,21 @@ export function NewObjectiveModal({
     onOpenChange(false);
   };
 
+  const verboRef = React.useRef<HTMLInputElement>(null);
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => (next ? onOpenChange(true) : handleCancel())}
     >
       {/* más ANCHA: usa max-w-4xl (o 3xl si prefieres) */}
-      <DialogContent className="w-[95vw] sm:max-w-[800px] md:max-w-[900px]">
+      <DialogContent
+        className="w-[95vw] sm:max-w-[800px] md:max-w-[900px]"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          requestAnimationFrame(() => verboRef.current?.focus());
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Nuevo Objetivo</DialogTitle>
           <DialogDescription>
@@ -141,7 +149,7 @@ export function NewObjectiveModal({
           <TextareaWithCounter
             value={objectiveText}
             onChange={() => {}}
-            maxLength={600}
+            maxLength={500}
             rows={3}
             placeholder="El objetivo se compone automáticamente…"
             className="bg-muted/40"
@@ -159,9 +167,10 @@ export function NewObjectiveModal({
           <div className="space-y-1">
             <label className="text-xs font-medium text-foreground">Verbo</label>
             <InputWithCounter
+              ref={verboRef}
               value={payload.verbo}
               onChange={(val) => setPayload((p) => ({ ...p, verbo: val }))}
-              maxLength={80}
+              maxLength={100}
               placeholder="Escriba la acción a realizar. (Ej. Incrementar, Reducir...)"
             />
           </div>
@@ -170,7 +179,7 @@ export function NewObjectiveModal({
             <InputWithCounter
               value={payload.meta}
               onChange={(val) => setPayload((p) => ({ ...p, meta: val }))}
-              maxLength={160}
+              maxLength={100}
               placeholder="Escriba el valor esperado para el indicador"
               disabled={!canMeta}
             />
@@ -186,7 +195,7 @@ export function NewObjectiveModal({
             <InputWithCounter
               value={payload.indicador}
               onChange={(val) => setPayload((p) => ({ ...p, indicador: val }))}
-              maxLength={160}
+              maxLength={100}
               placeholder="Escriba la variable de medición"
               disabled={!canIndicador}
             />
@@ -198,7 +207,7 @@ export function NewObjectiveModal({
             <InputWithCounter
               value={payload.alcances}
               onChange={(val) => setPayload((p) => ({ ...p, alcances: val }))}
-              maxLength={200}
+              maxLength={100}
               placeholder="Escriba el área, división y proceso"
               disabled={!canIndicador}
             />
@@ -214,7 +223,7 @@ export function NewObjectiveModal({
             <InputWithCounter
               value={payload.horizonte}
               onChange={(val) => setPayload((p) => ({ ...p, horizonte: val }))}
-              maxLength={120}
+              maxLength={100}
               placeholder="Escriba la fecha en la que debe alcanzarse la meta"
               disabled={!canAlcances}
             />
