@@ -1,23 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, Pencil, Trash, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Eye, Pencil, Trash, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
+import { getCompanyId } from "@/shared/auth/storage";
 
 import type {
   StrategicPlan,
   CreateStrategicPlanPayload,
   UpdateStrategicPlanPayload,
 } from "../../types/types";
-import { useStrategicPlans } from "../../hooks/use-strategic-plans";
+import {
+  useStrategicPlans,
+  useStrategicPlansByBusinessUnit,
+} from "../../hooks/use-strategic-plans";
 import { ModalStrategicPlan } from "./modal-strategic-plan";
+import { useCompanyBusinessUnits } from "@/features/business-units/hooks/use-business-units";
+import type { BusinessUnit } from "@/features/business-units/types";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -30,35 +43,44 @@ type ModalState = {
   plan: StrategicPlan | null;
 };
 
-type ConfirmState =
-  | { open: false }
-  | {
-      open: true;
-      kind: "update" | "inactivate";
-      id?: string;
-      payload?: UpdateStrategicPlanPayload;
-      title: string;
-      message: string;
-      confirmText?: string;
-    };
+function BusinessUnitHeaderCount({
+  buId,
+  name,
+}: {
+  buId: string;
+  name: string;
+}) {
+  const { data, isPending } = useStrategicPlansByBusinessUnit(buId);
+  const plans = Array.isArray(data) ? data : [];
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-medium">{name}</span>
+      <Badge variant="secondary">{isPending ? "…" : plans.length}</Badge>
+    </div>
+  );
+}
 
 export function StrategicPlansDashboard() {
   const qc = useQueryClient();
-  const {
-    strategicPlans = [],
-    isLoading,
-    create,
-    update,
-    remove,
-  } = useStrategicPlans();
 
+  // ========= business units por compañía =========
+  const companyId = getCompanyId();
+  const { businessUnits, isLoading: isLoadingBUs } = useCompanyBusinessUnits(
+    companyId || undefined
+  );
+
+  // ========= modal plan =========
   const [modal, setModal] = useState<ModalState>({
     open: false,
     modo: "crear",
     plan: null,
   });
-  const [confirm, setConfirm] = useState<ConfirmState>({ open: false });
 
+  // ========= confirm inactivar (patrón igual a Positions) =========
+  const [current, setCurrent] = useState<StrategicPlan | null>(null);
+  const [openConfirm, setOpenConfirm] = useState(false);
+
+  // ========= handlers modal =========
   const openCreate = () => setModal({ open: true, modo: "crear", plan: null });
   const openView = (p: StrategicPlan) =>
     setModal({ open: true, modo: "ver", plan: p });
@@ -66,178 +88,111 @@ export function StrategicPlansDashboard() {
     setModal({ open: true, modo: "editar", plan: p });
   const closeModal = () => setModal({ open: false, modo: "crear", plan: null });
 
+  const { create, update, remove } = useStrategicPlans();
+
   const handleSaveFromModal = (res: {
     mode: "crear" | "editar";
     id?: string;
     payload: CreateStrategicPlanPayload | UpdateStrategicPlanPayload;
   }) => {
     if (res.mode === "crear") {
-      // payload de creación
-      const createPayload = res.payload as CreateStrategicPlanPayload;
-      create(createPayload, {
+      create(
+        res.payload as CreateStrategicPlanPayload,
+        {
+          onSuccess: async () => {
+            await qc.invalidateQueries({ queryKey: QKEY.strategicPlans });
+            toast.success("Plan estratégico creado");
+            closeModal();
+          },
+          onError: (e: any) => toast.error(getHumanErrorMessage(e)),
+        } as any
+      );
+      return;
+    }
+
+    if (res.mode === "editar" && res.id) {
+      // Actualiza de una (si quieres confirmar el update, podemos agregar otra ConfirmModal como antes)
+      update({ id: res.id, data: res.payload as UpdateStrategicPlanPayload }, {
         onSuccess: async () => {
           await qc.invalidateQueries({ queryKey: QKEY.strategicPlans });
-          toast.success("Plan estratégico creado");
+          toast.success("Plan estratégico actualizado");
           closeModal();
         },
         onError: (e: any) => toast.error(getHumanErrorMessage(e)),
       } as any);
-      return;
     }
-
-    // payload de actualización (con isActive y demás)
-    const updatePayload = res.payload as UpdateStrategicPlanPayload;
-    setConfirm({
-      open: true,
-      kind: "update",
-      id: res.id,
-      payload: updatePayload,
-      title: "Guardar cambios",
-      message: "¿Deseas guardar los cambios del plan estratégico?",
-      confirmText: "Guardar",
-    });
   };
 
-  const askInactivate = (p: StrategicPlan) =>
-    setConfirm({
-      open: true,
-      kind: "inactivate",
-      id: p.id,
-      title: "Inactivar plan estratégico",
-      message: `¿Seguro que deseas inactivar “${p.name}”?`,
-      confirmText: "Inactivar",
-    });
-
-  const handleConfirm = () => {
-    if (!confirm.open) return;
-
-    if (confirm.kind === "update" && confirm.id && confirm.payload) {
-      update({ id: confirm.id, data: confirm.payload }, {
-        onSuccess: async () => {
-          await qc.invalidateQueries({ queryKey: QKEY.strategicPlans });
-          toast.success("Plan estratégico actualizado");
-          setConfirm({ open: false });
-          closeModal();
-        },
-        onError: (e: any) => {
-          toast.error(getHumanErrorMessage(e));
-          setConfirm({ open: false });
-        },
-      } as any);
-      return;
-    }
-
-    if (confirm.kind === "inactivate" && confirm.id) {
-      remove(confirm.id, {
-        onSuccess: async () => {
-          await qc.invalidateQueries({ queryKey: QKEY.strategicPlans });
-          toast.success("Plan estratégico inactivado");
-          setConfirm({ open: false });
-        },
-        onError: (e: any) => {
-          toast.error(getHumanErrorMessage(e));
-          setConfirm({ open: false });
-        },
-      } as any);
-      return;
-    }
-
-    setConfirm({ open: false });
+  // ========= inactivar: abre confirm como en Positions =========
+  const askInactivate = (p: StrategicPlan) => {
+    setCurrent(p);
+    setOpenConfirm(true);
   };
+
+  const handleInactivate = () => {
+    if (!current?.id) return;
+    // Si tu backend "inactiva" con un update (isActive=false) en lugar de "remove",
+    // cambia esta llamada por update({ id, data: { isActive: false } })
+    remove(current.id, {
+      onSuccess: async () => {
+        await qc.invalidateQueries({ queryKey: QKEY.strategicPlans });
+        toast.success("Plan estratégico inactivado");
+        setOpenConfirm(false);
+      },
+      onError: (e: any) => {
+        toast.error(getHumanErrorMessage(e));
+        setOpenConfirm(false);
+      },
+    } as any);
+  };
+
+  // ========== UI ==========
 
   return (
-    <div className="space-y-6">
-      <div className="border rounded-md">
-        <div className="p-4 border-b flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">Planes Estratégicos</h1>
-            <span className="text-xs rounded-full px-2 py-1 bg-muted">
-              {strategicPlans.length}
-            </span>
-          </div>
-          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo
-          </Button>
+    <div className="rounded-lg border bg-card text-card-foreground shadow">
+      <div className="p-4 border-b flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold">
+            Planes Estratégicos por Unidad de Negocio
+          </h1>
+          <span className="text-xs rounded-full px-2 py-1 bg-muted">
+            {businessUnits.length}
+          </span>
         </div>
-
-        {isLoading ? (
-          <div className="p-4 text-sm text-muted-foreground">
-            Cargando planes…
-          </div>
-        ) : strategicPlans.length === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground">
-            No hay planes registrados.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-2 text-left">Nombre</th>
-                  <th className="px-4 py-2 text-left">Descripción</th>
-                  <th className="px-4 py-2 text-left">Fecha Desde</th>
-                  <th className="px-4 py-2 text-left">Fecha Hasta</th>
-                  <th className="px-4 py-2 text-left">Estado</th>
-                  <th className="px-4 py-2 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {strategicPlans.map((p) => (
-                  <tr key={p.id} className="border-t">
-                    <td className="px-4 py-2 font-medium">{p.name}</td>
-                    <td className="px-4 py-2">{p.description ?? ""}</td>
-                    <td className="px-4 py-2">
-                      {fmtDate.format(new Date(p.fromAt))}
-                    </td>
-                    <td className="px-4 py-2">
-                      {fmtDate.format(new Date(p.untilAt))}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Badge
-                        className={
-                          p.isActive
-                            ? "bg-green-500 text-white"
-                            : "bg-gray-300 text-gray-800"
-                        }
-                      >
-                        {p.isActive ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2 flex flex-wrap gap-2 justify-center">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => openView(p)}
-                        title="Ver"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={() => openEdit(p)}
-                        title="Editar"
-                        className="btn-gradient"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => askInactivate(p)}
-                        title="Inactivar"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+          <Plus className="h-4 w-4 mr-1" /> Nuevo Plan
+        </Button>
       </div>
+
+      {isLoadingBUs ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          Cargando unidades de negocio…
+        </div>
+      ) : businessUnits.length === 0 ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          {companyId
+            ? "No hay unidades de negocio para esta compañía."
+            : "Selecciona/define una compañía para continuar."}
+        </div>
+      ) : (
+        <Accordion type="multiple" className="w-full">
+          {businessUnits.map((bu) => (
+            <AccordionItem key={bu.id} value={bu.id}>
+              <AccordionTrigger className="px-4 py-3 bg-muted/40 hover:no-underline data-[state=open]:bg-muted/60">
+                <BusinessUnitHeaderCount buId={bu.id} name={bu.name} />
+              </AccordionTrigger>
+              <AccordionContent className="px-2">
+                <BusinessUnitPlansSection
+                  businessUnit={bu}
+                  onView={openView}
+                  onEdit={openEdit}
+                  onInactivate={askInactivate}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      )}
 
       <ModalStrategicPlan
         isOpen={modal.open}
@@ -247,14 +202,134 @@ export function StrategicPlansDashboard() {
         onSave={handleSaveFromModal}
       />
 
+      {/* Confirm inactivar (igual patrón que Positions) */}
       <ConfirmModal
-        open={confirm.open}
-        title={confirm.open ? confirm.title : ""}
-        message={confirm.open ? confirm.message : ""}
-        confirmText={confirm.open ? confirm.confirmText : undefined}
-        onConfirm={handleConfirm}
-        onCancel={() => setConfirm({ open: false })}
+        open={openConfirm}
+        title="Inactivar plan"
+        message={`¿Seguro que deseas inactivar el plan "${current?.name}"?`}
+        confirmText="Inactivar"
+        onConfirm={handleInactivate}
+        onCancel={() => setOpenConfirm(false)}
       />
+    </div>
+  );
+}
+
+// ======= Sección por BU =======
+function BusinessUnitPlansSection({
+  businessUnit,
+  onView,
+  onEdit,
+  onInactivate,
+}: {
+  businessUnit: BusinessUnit;
+  onView: (p: StrategicPlan) => void;
+  onEdit: (p: StrategicPlan) => void;
+  onInactivate: (p: StrategicPlan) => void;
+}) {
+  const { data, isPending, error } = useStrategicPlansByBusinessUnit(
+    businessUnit.id
+  );
+
+  const plans = useMemo<StrategicPlan[]>(
+    () => (Array.isArray(data) ? data : []),
+    [data]
+  );
+
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-destructive">
+        {getHumanErrorMessage(error)}
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Cargando planes de <b>{businessUnit.name}</b>…
+      </div>
+    );
+  }
+
+  if (plans.length === 0) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Sin planes para <b>{businessUnit.name}</b>.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto p-2">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/50 sticky top-0 z-10">
+          <tr>
+            <th className="px-4 py-2 text-left">Nombre</th>
+            <th className="px-4 py-2 text-left">Descripción</th>
+            <th className="px-4 py-2 text-left">Fecha Desde</th>
+            <th className="px-4 py-2 text-left">Fecha Hasta</th>
+            <th className="px-4 py-2 text-left">Estado</th>
+            <th className="px-4 py-2 text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plans.map((p) => (
+            <tr key={p.id} className="border-t">
+              <td className="px-4 py-2 font-medium">{p.name}</td>
+              <td className="px-4 py-2">{p.description ?? ""}</td>
+              <td className="px-4 py-2">
+                {fmtDate.format(new Date(p.fromAt))}
+              </td>
+              <td className="px-4 py-2">
+                {fmtDate.format(new Date(p.untilAt))}
+              </td>
+              <td className="px-4 py-2">
+                <Badge
+                  className={
+                    p.isActive
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-500 text-white"
+                  }
+                >
+                  {p.isActive ? "Activo" : "Inactivo"}
+                </Badge>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => onView(p)}
+                    title="Ver"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => onEdit(p)}
+                    title="Editar"
+                    className="btn-gradient"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {p.isActive && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => onInactivate(p)}
+                      title="Inactivar"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

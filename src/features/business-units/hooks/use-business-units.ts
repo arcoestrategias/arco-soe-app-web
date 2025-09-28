@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import {
   getBusinessUnits,
+  getBusinessUnitsByCompany,
   createBusinessUnit,
   updateBusinessUnit,
   inactivateBusinessUnit,
@@ -61,5 +62,26 @@ export function useBusinessUnits() {
     create: create.mutate,
     update: update.mutate,
     remove: remove.mutate,
+  };
+}
+
+export function useCompanyBusinessUnits(companyId?: string) {
+  const { data, isPending, error } = useQuery({
+    queryKey: QKEY.companyBusinessUnits(String(companyId ?? "none")),
+    queryFn: () =>
+      companyId
+        ? getBusinessUnitsByCompany(companyId)
+        : Promise.resolve<BusinessUnit[]>([]),
+    enabled: !!companyId,
+    staleTime: 60_000,
+  });
+
+  if (error) {
+    toast.error(getHumanErrorMessage(error));
+  }
+
+  return {
+    businessUnits: Array.isArray(data) ? data : [],
+    isLoading: isPending,
   };
 }

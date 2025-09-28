@@ -17,7 +17,6 @@ export type StrategicPlan = {
 export type CreateStrategicPlanPayload = {
   name: string;
   description?: string | null;
-  period: number;
   fromAt: string; // 'YYYY-MM-DD' desde el input date
   untilAt: string; // 'YYYY-MM-DD'
   mission?: string | null;
@@ -42,20 +41,21 @@ export type StrategicSuccessFactor = {
 };
 
 export type CreateStrategicSuccessFactorPayload = {
-  name: string;                    // requerido (min 3, max 100) – validación en backend
-  description?: string | null;     // opcional (min 3, max 250)
-  strategicPlanId: string;         // UUID requerido
+  name: string; // requerido (min 3, max 100) – validación en backend
+  description?: string | null; // opcional (min 3, max 250)
+  strategicPlanId: string; // UUID requerido
 };
 
-export type UpdateStrategicSuccessFactorPayload = Partial<CreateStrategicSuccessFactorPayload> & {
-  isActive?: boolean;
-  order?: number | null;
-};
+export type UpdateStrategicSuccessFactorPayload =
+  Partial<CreateStrategicSuccessFactorPayload> & {
+    isActive?: boolean;
+    order?: number | null;
+  };
 
 export type ReorderStrategicSuccessFactorsPayload = {
   strategicPlanId: string;
   items: Array<{
-    id: string;          // strategicSuccessFactorId
+    id: string; // strategicSuccessFactorId
     order: number;
     isActive: boolean;
   }>;

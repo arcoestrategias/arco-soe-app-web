@@ -13,6 +13,13 @@ export async function getBusinessUnits() {
   return unwrapAny<BusinessUnit[]>(res);
 }
 
+export async function getBusinessUnitsByCompany(
+  companyId: string
+): Promise<BusinessUnit[]> {
+  const res = await http.get(routes.businessUnits.listByCompany(companyId));
+  return unwrapAny<BusinessUnit[]>(res.data ?? res);
+}
+
 export async function createBusinessUnit(payload: CreateBusinessUnitPayload) {
   // No enviar isActive en create
   const res = await http.post(routes.businessUnits.create(), payload);

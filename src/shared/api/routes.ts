@@ -86,6 +86,8 @@ export const routes = {
     create: () => prefixed(Modules.BUSINESS_UNITS),
     update: (id: string) => prefixed(Modules.BUSINESS_UNITS, id),
     remove: (id: string) => prefixed(Modules.BUSINESS_UNITS, id),
+    listByCompany: (companyId: string) =>
+      prefixed(Modules.BUSINESS_UNITS, "company", companyId),
     userPermissions: (businessUnitId: string, userId: string) =>
       prefixed(
         Modules.BUSINESS_UNITS,
@@ -133,6 +135,8 @@ export const routes = {
       prefixed(Modules.STRATEGIC_PLANS, strategicPlanId),
     show: (strategicPlanId: string) =>
       prefixed(Modules.STRATEGIC_PLANS, strategicPlanId),
+    listByBusinessUnit: (businessUnitId: string) =>
+      prefixed(Modules.STRATEGIC_PLANS) + qs({ businessUnitId }),
   },
 
   strategicSuccessFactors: {

@@ -7,6 +7,9 @@ export const QKEY = {
   buLogo: (id: string) => ["bu-logo", id] as const,
   buDocuments: (id: string) => ["bu-documents", id] as const,
 
+  companyBusinessUnits: (companyId: string) =>
+    ["business-units", "company", companyId] as const,
+
   businessUnitUsers: (businessUnitId: string) =>
     ["users", "by-business-unit", businessUnitId] as const,
 

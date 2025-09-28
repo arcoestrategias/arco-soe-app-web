@@ -6,6 +6,7 @@ import {
   updateStrategicPlan,
   inactivateStrategicPlan,
   getStrategicPlan,
+  getStrategicPlansByBusinessUnit,
 } from "../services/strategicPlansService";
 
 export function useStrategicPlans() {
@@ -39,6 +40,18 @@ export function useStrategicPlans() {
     update,
     remove,
   };
+}
+
+export function useStrategicPlansByBusinessUnit(businessUnitId?: string) {
+  return useQuery({
+    queryKey: QKEY.strategicPlansByBU(String(businessUnitId ?? "none")),
+    queryFn: () =>
+      businessUnitId
+        ? getStrategicPlansByBusinessUnit(businessUnitId)
+        : Promise.resolve([]),
+    enabled: !!businessUnitId,
+    staleTime: 60_000,
+  });
 }
 
 export function useStrategicPlan(strategicPlanId?: string) {
