@@ -92,10 +92,10 @@ export function DefinitionCard({
               </span>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={onCancel}>
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button size="sm" onClick={onSave}>
-                  Save
+                  Guardar
                 </Button>
               </div>
             </div>
