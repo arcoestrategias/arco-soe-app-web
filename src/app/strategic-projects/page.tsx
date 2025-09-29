@@ -4,7 +4,7 @@ import * as React from "react";
 import { useState } from "react";
 
 import { SidebarLayout } from "@/shared/layout";
-import { getBusinessUnitId } from "@/shared/auth/storage";
+import { getBusinessUnitId, getPositionId } from "@/shared/auth/storage";
 
 // Selects reutilizables
 import { StrategicPlanSelect } from "@/shared/filters/components/StrategicPlanSelect";
@@ -18,7 +18,7 @@ import { FilterField } from "@/shared/components/FilterField";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
-// ✅ NUEVO: modal de proyecto + confirm + helpers
+// Modal de proyecto + confirm + helpers
 import { ModalStrategicProject } from "@/features/strategic-projects/components/modal-strategic-project";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,14 +27,21 @@ import { toast } from "sonner";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { createStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
 
-import { getPositionId } from "@/shared/auth/storage";
+// Auth/Permisos
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "@/shared/auth/access-control";
 
 export default function StrategicProjectsPage() {
   const { me } = useAuth();
+
+  // Permisos
   const canAssignPosition = React.useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
+    () => !!me && hasAccess(me, "positionManagement", "assign"),
+    [me]
+  );
+
+  const canCreateProject = React.useMemo(
+    () => !!me && hasAccess(me, "strategicProject", "create"),
     [me]
   );
 
@@ -97,10 +104,6 @@ export default function StrategicProjectsPage() {
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
               Proyectos Estratégicos
             </h1>
-            {/* <p className="text-sm text-gray-600 text-optimized mt-1">
-              Gestiona y monitorea el progreso de todos los proyectos
-              estratégicos
-            </p> */}
           </div>
 
           <div className="flex gap-3">
@@ -133,26 +136,28 @@ export default function StrategicProjectsPage() {
               </div>
             ) : null}
 
-            {/* Botón: Nuevo Proyecto */}
-            <div>
-              <FilterField label="Crear un nuevo proyecto">
-                <Button
-                  className="h-9 btn-gradient"
-                  onClick={() => {
-                    if (!planId || !positionId) {
-                      toast.error(
-                        "Selecciona un Plan estratégico y una Posición antes de crear."
-                      );
-                      return;
-                    }
-                    setModalOpen(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Proyecto
-                </Button>
-              </FilterField>
-            </div>
+            {/* Botón: Nuevo Proyecto (solo si tiene permiso) */}
+            {canCreateProject && (
+              <div>
+                <FilterField label="Crear un nuevo proyecto">
+                  <Button
+                    className="h-9 btn-gradient"
+                    onClick={() => {
+                      if (!planId || !positionId) {
+                        toast.error(
+                          "Selecciona un Plan estratégico y una Posición antes de crear."
+                        );
+                        return;
+                      }
+                      setModalOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Proyecto
+                  </Button>
+                </FilterField>
+              </div>
+            )}
           </div>
         </div>
 
@@ -163,45 +168,51 @@ export default function StrategicProjectsPage() {
         />
       </div>
 
-      <ModalStrategicProject
-        isOpen={modalOpen}
-        modo="crear"
-        projectId={null}
-        strategicPlanId={planId ?? undefined}
-        positionId={positionId ?? undefined}
-        onClose={() => setModalOpen(false)}
-        onSave={(res) => {
-          if (res.mode === "crear") {
-            setPendingCreate({ payload: res.payload });
-          } else {
-            if (!res.id) {
-              toast.error("No se encontró el ID del proyecto a actualizar.");
-              return;
+      {/* Modal solo si tiene permiso */}
+      {canCreateProject && (
+        <ModalStrategicProject
+          isOpen={modalOpen}
+          modo="crear"
+          projectId={null}
+          strategicPlanId={planId ?? undefined}
+          positionId={positionId ?? undefined}
+          onClose={() => setModalOpen(false)}
+          onSave={(res) => {
+            if (res.mode === "crear") {
+              setPendingCreate({ payload: res.payload });
+            } else {
+              if (!res.id) {
+                toast.error("No se encontró el ID del proyecto a actualizar.");
+                return;
+              }
+              setPendingUpdate({ id: res.id, payload: res.payload });
             }
-            setPendingUpdate({ id: res.id, payload: res.payload });
-          }
-        }}
-      />
+          }}
+        />
+      )}
 
-      <ConfirmModal
-        open={!!pendingCreate}
-        title="Crear proyecto"
-        message="¿Deseas crear este proyecto estratégico?"
-        onCancel={() => setPendingCreate(null)}
-        onConfirm={async () => {
-          if (!pendingCreate || !planId || !positionId) return;
-          try {
-            await createStrategicProject(pendingCreate.payload);
-            await invalidateProjectsList(planId, positionId);
-            toast.success("Proyecto creado correctamente");
-            setPendingCreate(null);
-            setModalOpen(false);
-          } catch (err) {
-            toast.error(getHumanErrorMessage(err));
-          }
-        }}
-        confirmText="Crear"
-      />
+      {/* Confirm solo si tiene permiso */}
+      {canCreateProject && (
+        <ConfirmModal
+          open={!!pendingCreate}
+          title="Crear proyecto"
+          message="¿Deseas crear este proyecto estratégico?"
+          onCancel={() => setPendingCreate(null)}
+          onConfirm={async () => {
+            if (!pendingCreate || !planId || !positionId) return;
+            try {
+              await createStrategicProject(pendingCreate.payload);
+              await invalidateProjectsList(planId, positionId);
+              toast.success("Proyecto creado correctamente");
+              setPendingCreate(null);
+              setModalOpen(false);
+            } catch (err) {
+              toast.error(getHumanErrorMessage(err));
+            }
+          }}
+          confirmText="Crear"
+        />
+      )}
     </SidebarLayout>
   );
 }
