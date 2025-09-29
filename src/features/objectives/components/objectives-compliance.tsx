@@ -23,11 +23,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   CheckCircle,
   Target,
-  Map,
-  Rocket,
   Settings,
   StickyNote,
+  Paperclip,
 } from "lucide-react";
+import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 
 import type {
   IcoBoardData,
@@ -167,6 +167,20 @@ export default function ObjectivesCompliance({
   );
   const openNotes = (objectiveId: string) => setNotesForObjective(objectiveId);
   const closeNotes = () => setNotesForObjective(null);
+
+  const [docsFor, setDocsFor] = useState<{
+    open: boolean;
+    id?: string;
+    name?: string | null;
+  }>({
+    open: false,
+    id: undefined,
+    name: null,
+  });
+  const openDocs = (objectiveId: string, name?: string | null) =>
+    setDocsFor({ open: true, id: objectiveId, name: name ?? null });
+  const closeDocs = () =>
+    setDocsFor({ open: false, id: undefined, name: null });
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -441,19 +455,20 @@ export default function ObjectivesCompliance({
                               <Button
                                 size="icon"
                                 variant="outline"
-                                title="Metas"
-                                aria-label="Metas"
-                              >
-                                <Target className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
                                 title="Notas"
                                 aria-label="Notas"
                                 onClick={() => openNotes(r.id)}
                               >
                                 <StickyNote className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Documentos"
+                                aria-label="Documentos"
+                                onClick={() => openDocs(r.id, r.name)}
+                              >
+                                <Paperclip className="w-4 h-4" />
                               </Button>
                               <Button
                                 size="icon"
@@ -572,6 +587,15 @@ export default function ObjectivesCompliance({
                               <Button
                                 size="icon"
                                 variant="outline"
+                                title="Documentos"
+                                aria-label="Documentos"
+                                onClick={() => openDocs(r.id, r.name)}
+                              >
+                                <Paperclip className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
                                 title="Configuración"
                                 aria-label="Configuración"
                                 onClick={() =>
@@ -625,6 +649,13 @@ export default function ObjectivesCompliance({
         isOpen={!!notesForObjective}
         onClose={closeNotes}
         referenceId={notesForObjective ?? ""}
+      />
+      <UploadFilesModal
+        open={docsFor.open}
+        onClose={closeDocs}
+        referenceId={docsFor.id ?? ""}
+        type="document"
+        title={`Documentos de ${docsFor.name ?? "este objetivo"}`}
       />
     </Card>
   );

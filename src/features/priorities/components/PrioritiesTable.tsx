@@ -34,6 +34,7 @@ import {
   Trash2,
   Calendar as CalendarIcon,
   StickyNote,
+  Paperclip,
 } from "lucide-react";
 import ObjectiveSelect from "@/shared/components/objective-select";
 import { SingleDatePicker } from "@/shared/components/date-single-picker";
@@ -46,6 +47,7 @@ import { getPositionId } from "@/shared/auth/storage";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "@/shared/auth/access-control";
 import NotesModal from "@/shared/components/comments/components/notes-modal";
+import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 
 /* ------------------------------------------------------------
    Tipos y utilidades base
@@ -366,6 +368,19 @@ export default function PrioritiesTable({
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
   const [notesFor, setNotesFor] = useState<string | null>(null);
+  const [docsFor, setDocsFor] = useState<{
+    open: boolean;
+    id?: string;
+    name?: string | null;
+  }>({
+    open: false,
+    id: undefined,
+    name: null,
+  });
+  const openDocs = (id: string, name?: string | null) =>
+    setDocsFor({ open: true, id, name: name ?? null });
+  const closeDocs = () =>
+    setDocsFor({ open: false, id: undefined, name: null });
 
   const hasNewDraftValues = !!(
     newDraft.name ||
@@ -564,7 +579,7 @@ export default function PrioritiesTable({
             </TableHead>
 
             {/* Acciones sticky a la derecha */}
-            <TableHead className="text-center w-28 whitespace-nowrap sticky right-0 bg-background z-20 border-l">
+            <TableHead className="text-center w-36 whitespace-nowrap sticky right-0 bg-background z-20 border-l">
               Acciones
             </TableHead>
           </TableRow>
@@ -744,7 +759,7 @@ export default function PrioritiesTable({
                   </TableCell>
 
                   {/* Acciones sticky */}
-                  <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
+                  <TableCell className="w-36 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
                     <Button
                       onClick={() => saveEdit(p.id)}
                       disabled={
@@ -830,7 +845,7 @@ export default function PrioritiesTable({
                 </TableCell>
 
                 {/* ACCIONES sticky */}
-                <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
+                <TableCell className="w-36 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
                   <Button
                     size="sm"
                     variant="ghost"
@@ -847,7 +862,14 @@ export default function PrioritiesTable({
                   >
                     <StickyNote className="h-4 w-4" />
                   </Button>
-
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Documentos"
+                    onClick={() => openDocs(p.id, p.name)}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -983,7 +1005,7 @@ export default function PrioritiesTable({
               </TableCell>
 
               {/* Acciones sticky */}
-              <TableCell className="w-28 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
+              <TableCell className="w-36 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
                 <Button
                   onClick={saveNew}
                   disabled={
@@ -1028,6 +1050,14 @@ export default function PrioritiesTable({
         isOpen={!!notesFor}
         onClose={() => setNotesFor(null)}
         referenceId={notesFor ?? ""}
+      />
+
+      <UploadFilesModal
+        open={docsFor.open}
+        onClose={closeDocs}
+        referenceId={docsFor.id ?? ""}
+        type="document"
+        title={`Documentos de ${docsFor.name ?? "esta prioridad"}`}
       />
     </div>
   );
