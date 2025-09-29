@@ -29,14 +29,16 @@ import { useBusinessUnitUsers } from "@/features/business-units/hooks/use-busine
 import { getCompanyId, getBusinessUnitId } from "@/shared/auth/storage";
 import type { Position } from "../../types/positions";
 import { Button } from "@/components/ui/button";
+import { getPositionsByBusinessUnit } from "../../services/positionsService";
 
 type ModalMode = "crear" | "editar" | "ver";
-
+const NONE_SENTINEL = "__none__";
 export type PositionFormValues = {
   name: string;
   businessUnitId: string;
   userId: string;
   isCeo: boolean;
+  positionSuperiorId?: string | null;
 };
 
 type Props = {
@@ -100,6 +102,7 @@ export function ModalPosition({
       businessUnitId: "",
       userId: "",
       isCeo: false,
+      positionSuperiorId: "",
     },
   });
 
@@ -114,6 +117,11 @@ export function ModalPosition({
 
   const { field: userField } = useController({
     name: "userId",
+    control,
+  });
+
+  const { field: superiorField } = useController({
+    name: "positionSuperiorId",
     control,
   });
 
@@ -134,6 +142,8 @@ export function ModalPosition({
         modo === "crear" ? buIdForCreate : position?.businessUnitId ?? "",
       userId: position?.userId ?? "",
       isCeo: !!position?.isCeo,
+      positionSuperiorId:
+        modo === "crear" ? "" : (position as any)?.positionSuperiorId ?? "",
     };
   }, [
     modo,
@@ -166,6 +176,10 @@ export function ModalPosition({
     if (prevBURef.current !== buField.value) {
       prevBURef.current = buField.value;
       setValue("userId", "", { shouldDirty: true, shouldValidate: true });
+      setValue("positionSuperiorId", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
   }, [isOpen, readOnly, buField.value, setValue]);
 
@@ -177,6 +191,7 @@ export function ModalPosition({
       businessUnitId: values.businessUnitId,
       userId: values.userId || "",
       isCeo: !!values.isCeo,
+      positionSuperiorId: values.positionSuperiorId || "",
     };
 
     if (modo === "crear") onSave({ mode: "crear", payload });
@@ -211,6 +226,27 @@ export function ModalPosition({
     users,
   ]);
 
+  const { data: positionsByBU = [], isPending: positionsLoading } = useQuery({
+    queryKey: buField.value
+      ? QKEY.positionsByBU(buField.value)
+      : ["positions", "bu", "none"],
+    queryFn: () =>
+      buField.value
+        ? getPositionsByBusinessUnit(buField.value)
+        : Promise.resolve([]),
+    enabled: !!buField.value && isOpen,
+    staleTime: 60_000,
+  });
+
+  const positionsForSelect = React.useMemo(() => {
+    let list = Array.isArray(positionsByBU) ? positionsByBU : [];
+    // En edición, evita que se pueda seleccionar a sí misma
+    if (modo === "editar" && position?.id) {
+      list = list.filter((p: any) => p.id !== position.id);
+    }
+    return list;
+  }, [positionsByBU, modo, position?.id]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
       <DialogContent className="sm:max-w-2xl">
@@ -227,10 +263,10 @@ export function ModalPosition({
 
         <form
           onSubmit={handleSubmit(submit)}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
           {/* Nombre */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-3">
             <Label htmlFor="name">Nombre *</Label>
             <Input
               id="name"
@@ -324,8 +360,53 @@ export function ModalPosition({
             )}
           </div>
 
+          {/* Posición superior (opcional) */}
+          <div className="space-y-2">
+            <Label>Posición superior</Label>
+            <Select
+              // Mapear de estado del form → UI (mostrar "Sin superior" si el form tiene "")
+              value={
+                !buField.value
+                  ? undefined
+                  : superiorField.value && superiorField.value !== ""
+                  ? superiorField.value
+                  : NONE_SENTINEL
+              }
+              onValueChange={(v) =>
+                setValue(
+                  "positionSuperiorId",
+                  v === NONE_SENTINEL ? "" : v, // Mapear de UI → form
+                  { shouldDirty: true, shouldValidate: true }
+                )
+              }
+              disabled={!buField.value || readOnly || isSubmitting}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={
+                    !buField.value
+                      ? "Selecciona primero la unidad"
+                      : positionsLoading
+                      ? "Cargando posiciones…"
+                      : "Selecciona una posición superior"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {/* ✅ NO uses value="" */}
+                <SelectItem value={NONE_SENTINEL}>- Sin superior -</SelectItem>
+                {positionsForSelect.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                    {p.userFullName ? ` — ${p.userFullName}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* ¿Es CEO? */}
-          <div className="md:col-span-2 flex items-center justify-between border rounded-md p-3">
+          <div className="md:col-span-3 flex items-center justify-between border rounded-md p-3">
             <div className="space-y-1">
               <Label htmlFor="isCeo">¿Es CEO?</Label>
               <p className="text-xs text-muted-foreground">
@@ -346,7 +427,7 @@ export function ModalPosition({
             />
           </div>
 
-          <DialogFooter className="md:col-span-2 mt-4">
+          <DialogFooter className="md:col-span-3 mt-4">
             <Button variant="outline" type="button" onClick={onClose}>
               Cancelar
             </Button>

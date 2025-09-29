@@ -7,6 +7,7 @@ export type PatchUserBusinessUnitPayload = {
   roleId?: string;
   positionId?: string | null;
   isResponsible?: boolean;
+  positionSuperiorId?: string | null;
 };
 export async function patchUserBusinessUnit(
   userId: string,

@@ -104,7 +104,7 @@ export function PositionsDashboard() {
               await patchUserBusinessUnit(
                 res.payload.userId,
                 res.payload.businessUnitId,
-                { positionId: created.id } // asignación
+                { positionId: created.id }
               );
             }
           } finally {
