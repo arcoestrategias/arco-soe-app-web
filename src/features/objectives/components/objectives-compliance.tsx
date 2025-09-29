@@ -20,7 +20,14 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { CheckCircle, Target, Map, Rocket, Settings } from "lucide-react";
+import {
+  CheckCircle,
+  Target,
+  Map,
+  Rocket,
+  Settings,
+  StickyNote,
+} from "lucide-react";
 
 import type {
   IcoBoardData,
@@ -32,6 +39,7 @@ import {
   ObjectiveComplianceModal,
 } from "./objective-compliance-modal";
 import type { UnconfiguredObjective } from "@/features/strategic-plans/types/objectives";
+import NotesModal from "@/shared/components/comments/components/notes-modal";
 import ObjectiveConfigureModal, {
   ObjectiveConfigureData,
 } from "./objective-configure-modal";
@@ -154,6 +162,11 @@ export default function ObjectivesCompliance({
   const [openConfigure, setOpenConfigure] = useState(false);
   const [configureData, setConfigureData] =
     useState<ObjectiveConfigureData | null>(null);
+  const [notesForObjective, setNotesForObjective] = useState<string | null>(
+    null
+  );
+  const openNotes = (objectiveId: string) => setNotesForObjective(objectiveId);
+  const closeNotes = () => setNotesForObjective(null);
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -436,6 +449,15 @@ export default function ObjectivesCompliance({
                               <Button
                                 size="icon"
                                 variant="outline"
+                                title="Notas"
+                                aria-label="Notas"
+                                onClick={() => openNotes(r.id)}
+                              >
+                                <StickyNote className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
                                 title="Configuración"
                                 aria-label="Configuración"
                                 onClick={() =>
@@ -541,6 +563,15 @@ export default function ObjectivesCompliance({
                               <Button
                                 size="icon"
                                 variant="outline"
+                                title="Notas"
+                                aria-label="Notas"
+                                onClick={() => openNotes(r.id)}
+                              >
+                                <StickyNote className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
                                 title="Configuración"
                                 aria-label="Configuración"
                                 onClick={() =>
@@ -590,6 +621,11 @@ export default function ObjectivesCompliance({
           year={year}
         />
       )}
+      <NotesModal
+        isOpen={!!notesForObjective}
+        onClose={closeNotes}
+        referenceId={notesForObjective ?? ""}
+      />
     </Card>
   );
 }
