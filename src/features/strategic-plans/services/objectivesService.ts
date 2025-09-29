@@ -10,6 +10,7 @@ import type {
   ConfigureObjectiveDto,
   ConfigureObjectiveResponse,
 } from "../types/objectives";
+import { InactivateObjectiveResult } from "@/features/objectives/types/inactivate";
 
 export async function getObjectives(
   strategicPlanId: string,
@@ -66,4 +67,10 @@ export async function configureObjective(
     ...payload,
   });
   return unwrapAny<ConfigureObjectiveResponse>(data);
+}
+
+export async function inactivateObjective(id: string) {
+  const res = await http.patch(routes.objectives.inactivate(id), {});
+  // envelope: { success, message, statusCode, data }
+  return unwrapAny<InactivateObjectiveResult>(res.data ?? res);
 }

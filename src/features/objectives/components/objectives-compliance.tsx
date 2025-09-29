@@ -22,10 +22,10 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   CheckCircle,
-  Target,
   Settings,
   StickyNote,
   Paperclip,
+  Trash2,
 } from "lucide-react";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 
@@ -43,6 +43,9 @@ import NotesModal from "@/shared/components/comments/components/notes-modal";
 import ObjectiveConfigureModal, {
   ObjectiveConfigureData,
 } from "./objective-configure-modal";
+import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
+import { ObjectiveInactivateBlockedModal } from "./objective-inactivate-blocked-modal";
+import { QKEY } from "@/shared/api/query-keys";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -181,6 +184,35 @@ export default function ObjectivesCompliance({
     setDocsFor({ open: true, id: objectiveId, name: name ?? null });
   const closeDocs = () =>
     setDocsFor({ open: false, id: undefined, name: null });
+
+  const [blockedInfo, setBlockedInfo] = useState<{
+    open: boolean;
+    message?: string;
+    projects?: any[];
+    priorities?: any[];
+  }>({ open: false });
+
+  const inactivateMut = useInactivateObjective([
+    QKEY.objectives(strategicPlanId, positionId),
+    QKEY.objectivesUnconfigured(strategicPlanId, positionId),
+    ["objectives", "ico-board"], // invalida por prefijo la board aunque no tengas from/to
+  ]);
+
+  const handleInactivate = (objectiveId: string) => {
+    inactivateMut.mutate(objectiveId, {
+      onSuccess: (data) => {
+        if (data?.blocked) {
+          setBlockedInfo({
+            open: true,
+            message: data.message,
+            projects: data.associations?.projects ?? [],
+            priorities: data.associations?.priorities ?? [],
+          });
+        }
+        // Si no está bloqueado, el hook ya hizo toast  invalidación (si configuraste keys)
+      },
+    });
+  };
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -481,6 +513,17 @@ export default function ObjectivesCompliance({
                               >
                                 <Settings className="w-4 h-4" />
                               </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Inactivar"
+                                aria-label="Inactivar"
+                                className="text-destructive"
+                                onClick={() => handleInactivate(r.id)}
+                                disabled={inactivateMut.isPending}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -604,6 +647,17 @@ export default function ObjectivesCompliance({
                               >
                                 <Settings className="w-4 h-4" />
                               </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                title="Inactivar"
+                                aria-label="Inactivar"
+                                className="text-destructive"
+                                onClick={() => handleInactivate(r.id)}
+                                disabled={inactivateMut.isPending}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -656,6 +710,13 @@ export default function ObjectivesCompliance({
         referenceId={docsFor.id ?? ""}
         type="document"
         title={`Documentos de ${docsFor.name ?? "este objetivo"}`}
+      />
+      <ObjectiveInactivateBlockedModal
+        open={blockedInfo.open}
+        message={blockedInfo.message}
+        projects={blockedInfo.projects}
+        priorities={blockedInfo.priorities}
+        onClose={() => setBlockedInfo({ open: false })}
       />
     </Card>
   );

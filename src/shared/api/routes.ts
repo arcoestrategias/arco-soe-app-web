@@ -151,6 +151,7 @@ export const routes = {
     listByPlan: () => prefixed(Modules.OBJECTIVES),
     create: () => prefixed(Modules.OBJECTIVES),
     update: (objectiveId: string) => prefixed(Modules.OBJECTIVES, objectiveId),
+    inactivate: (id: string) => prefixed("objectives", id, "inactivate"),
     reorder: () => prefixed(Modules.OBJECTIVES, "reorder"),
     icoBoard: () => prefixed("ico", "objectives", "ico-board"),
     unconfigured: () => prefixed(Modules.OBJECTIVES, "unconfigured"),
