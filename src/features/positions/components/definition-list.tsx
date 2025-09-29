@@ -1,3 +1,4 @@
+// src/features/strategic-plans/components/definition-list.tsx
 "use client";
 
 import * as React from "react";
@@ -9,9 +10,9 @@ import { DefinitionItem } from "./definition-item";
 import { toast } from "sonner";
 
 export type DefinitionListItem = {
-  id: number; // índice visual (1..N)
-  content: string; // texto visible
-  metaId?: string; // UUID real del ítem (estable)
+  id: number;
+  content: string;
+  metaId?: string;
   isActive?: boolean;
 };
 
@@ -26,9 +27,7 @@ export type DefinitionListActions = {
 type Props = {
   sectionKey: string;
   title: string;
-
   items: DefinitionListItem[];
-
   hovered?: boolean;
   isEditing?: boolean;
   onHover?: (key: string | null) => void;
@@ -49,6 +48,16 @@ type Props = {
   /** Deshabilita "Guardar Orden" mientras corre la mutation de reorder */
   isReordering?: boolean;
   maxLengthCharacter: number;
+
+  /** Si se provee, reemplaza el flujo de creación inline por una modal externa */
+  onRequestCreate?: () => void;
+
+  /** Si se provee, intercepta la eliminación para mostrar modal externa */
+  onRequestDelete?: (uiIndex: number, item: DefinitionListItem) => void;
+
+  /** Permisos */
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
 export function DefinitionList({
@@ -71,29 +80,28 @@ export function DefinitionList({
   actions,
   isReordering = false,
   maxLengthCharacter = 100,
+  onRequestCreate,
+  onRequestDelete,
+  canEdit = true,
+  canDelete = true,
 }: Props) {
   const [localItems, setLocalItems] = useState<DefinitionListItem[]>([]);
   const [creatingNew, setCreatingNew] = useState(false);
   const [newItemText, setNewItemText] = useState("");
 
-  // Editar por metaId estable
   const [editingMetaId, setEditingMetaId] = useState<string | null>(null);
 
-  // DnD
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
-  // Reindex sin perder metaId/isActive
   const reindex = (arr: DefinitionListItem[]) =>
     arr.map((it, idx) => ({ ...it, id: idx + 1 }));
 
-  // Sincroniza items del parent -> local
   useEffect(() => {
     setLocalItems(reindex(items));
     setEditingMetaId(null);
   }, [items, isEditing]);
 
-  // --- Detección de cambios de orden ---
   const hasReorderChanges = useMemo(() => {
     if (localItems.length !== items.length) return false;
     const orig = items.map((it) => it.metaId ?? `v-${it.id}`);
@@ -104,18 +112,21 @@ export function DefinitionList({
     return false;
   }, [items, localItems]);
 
-  // Drag & Drop
+  // DnD
   const handleDragStart = (dragVisualId: number, e: React.DragEvent) => {
+    if (!canEdit) return;
     e.dataTransfer.effectAllowed = "move";
     setDragId(dragVisualId);
   };
 
   const handleDragOver = (overId: number, e: React.DragEvent) => {
+    if (!canEdit) return;
     e.preventDefault();
     setDragOverItem(overId);
   };
 
   const handleDrop = (dropId: number) => {
+    if (!canEdit) return;
     setDragOverItem(null);
     if (dragId == null) return;
 
@@ -131,6 +142,12 @@ export function DefinitionList({
 
   // Eliminar (inactivar)
   const handleDelete = (uiIndex: number) => {
+    if (!canDelete || !canEdit) return;
+    const item = localItems.find((it) => it.id === uiIndex);
+    if (onRequestDelete && item) {
+      onRequestDelete(uiIndex, item);
+      return;
+    }
     if (hasReorderChanges) {
       toast.warning("Guarda primero el orden para poder eliminar.");
       return;
@@ -141,6 +158,7 @@ export function DefinitionList({
 
   // Crear
   const handleCreate = () => {
+    if (!canEdit) return;
     if (hasReorderChanges) {
       toast.warning(
         "Guarda primero el orden para poder crear nuevos elementos."
@@ -157,12 +175,17 @@ export function DefinitionList({
     );
   };
 
-  // Abrir modal de crear (bloquea si hay cambios de orden)
+  // Abrir modal de crear (si está provista)
   const openCreate = () => {
+    if (!canEdit) return;
     if (hasReorderChanges) {
       toast.warning(
         "Guarda primero el orden para poder crear nuevos elementos."
       );
+      return;
+    }
+    if (onRequestCreate) {
+      onRequestCreate();
       return;
     }
     setCreatingNew(true);
@@ -170,12 +193,13 @@ export function DefinitionList({
 
   // Guardar orden
   const handleSaveAll = () => {
-    if (!hasReorderChanges) return; // seguridad
+    if (!canEdit) return;
+    if (!hasReorderChanges) return;
     actions?.reorder?.(localItems);
   };
 
-  // Editar un item
   const startInlineEdit = (metaId?: string, fallbackId?: number) => {
+    if (!canEdit) return;
     if (hasReorderChanges) {
       toast.warning("Guarda primero el orden para poder editar.");
       return;
@@ -184,6 +208,7 @@ export function DefinitionList({
   };
 
   const saveInlineEdit = (item: DefinitionListItem, newContent: string) => {
+    if (!canEdit) return;
     const value = newContent.trim();
     if (!value) return;
 
@@ -193,7 +218,6 @@ export function DefinitionList({
       actions?.update?.(item.id, value);
     }
 
-    // Optimista: actualiza local por metaId estable
     setLocalItems((prev) =>
       prev.map((i) =>
         i.metaId && i.metaId === item.metaId
@@ -206,13 +230,14 @@ export function DefinitionList({
     setEditingMetaId(null);
   };
 
+  const deleteDisabled = hasReorderChanges || !canDelete || !canEdit;
+
   return (
     <div
       className={`relative group border shadow-sm rounded-xl transition-all duration-200 ${cardColor} ${cardBorderColor}`}
       onMouseEnter={() => onHover?.(sectionKey)}
       onMouseLeave={() => onHover?.(null)}
     >
-      {/* Encabezado */}
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center">
           {Icon ? (
@@ -224,7 +249,25 @@ export function DefinitionList({
         </div>
 
         <div className="flex gap-2 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-          {!isEditing && (
+          {onRequestCreate && canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                if (hasReorderChanges) {
+                  toast.warning(
+                    "Guarda primero el orden para poder crear nuevos elementos."
+                  );
+                  return;
+                }
+                onRequestCreate();
+              }}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Agregar
+            </Button>
+          )}
+
+          {!isEditing && canEdit && (
             <Button size="icon" variant="ghost" onClick={onStartEdit}>
               <Edit3 className="w-4 h-4 text-gray-500" />
             </Button>
@@ -236,14 +279,16 @@ export function DefinitionList({
         {isEditing ? (
           <>
             <p className="text-sm text-gray-600 mb-2">
-              Arrastra los elementos para reordenar
+              {canEdit
+                ? "Arrastra los elementos para reordenar"
+                : "Edición deshabilitada"}
             </p>
 
             <div className="space-y-3">
               {localItems.map((item) => (
                 <div
                   key={item.metaId ?? `row-${item.id}`}
-                  draggable
+                  draggable={canEdit}
                   onDragStart={(e) => handleDragStart(item.id, e)}
                   onDragOver={(e) => handleDragOver(item.id, e)}
                   onDrop={() => handleDrop(item.id)}
@@ -252,7 +297,7 @@ export function DefinitionList({
                     dragOverItem === item.id
                       ? "border-2 border-dashed border-primary"
                       : itemBorderColor
-                  }`}
+                  } ${!canEdit ? "opacity-60" : ""}`}
                 >
                   <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   <div
@@ -270,7 +315,7 @@ export function DefinitionList({
                       showBadge={false}
                       isEditing={editingMetaId === item.metaId}
                       onEdit={() => startInlineEdit(item.metaId, item.id)}
-                      showEditIcon={true}
+                      showEditIcon={canEdit}
                       onSave={(newContent) => saveInlineEdit(item, newContent)}
                       onCancel={() => setEditingMetaId(null)}
                     />
@@ -279,14 +324,19 @@ export function DefinitionList({
                   <Button
                     size="icon"
                     variant="ghost"
+                    disabled={deleteDisabled}
                     className={`flex-shrink-0 ${
-                      hasReorderChanges
+                      deleteDisabled
                         ? "text-gray-300 hover:text-gray-300 cursor-not-allowed"
                         : "text-red-500 hover:text-red-600"
                     }`}
-                    onClick={() => handleDelete(item.id)}
+                    onClick={() =>
+                      deleteDisabled ? undefined : handleDelete(item.id)
+                    }
                     title={
-                      hasReorderChanges
+                      !canDelete
+                        ? "No tienes permiso para eliminar."
+                        : hasReorderChanges
                         ? "Guarda primero el orden para poder crear, editar o eliminar."
                         : "Eliminar"
                     }
@@ -297,14 +347,15 @@ export function DefinitionList({
               ))}
             </div>
 
-            {creatingNew ? (
+            {/* Si onRequestCreate existe, ocultamos el input inline */}
+            {creatingNew && !onRequestCreate ? (
               <div className="space-y-2 mt-4">
                 <Input
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
                   placeholder="Nuevo elemento..."
                   maxLength={100}
-                  disabled={hasReorderChanges || isReordering}
+                  disabled={!canEdit || hasReorderChanges || isReordering}
                 />
                 <div className="flex justify-end gap-2">
                   <Button
@@ -319,12 +370,15 @@ export function DefinitionList({
                     size="sm"
                     onClick={handleCreate}
                     disabled={
+                      !canEdit ||
                       isReordering ||
                       hasReorderChanges ||
                       newItemText.trim().length === 0
                     }
                     title={
-                      hasReorderChanges
+                      !canEdit
+                        ? "No tienes permiso para crear."
+                        : hasReorderChanges
                         ? "Guarda primero el orden para poder crear."
                         : undefined
                     }
@@ -342,9 +396,23 @@ export function DefinitionList({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={openCreate}
-                disabled={isReordering}
+                onClick={() => {
+                  if (hasReorderChanges) {
+                    toast.warning(
+                      "Guarda primero el orden para poder crear nuevos elementos."
+                    );
+                    return;
+                  }
+                  if (!canEdit) return;
+                  if (onRequestCreate) {
+                    onRequestCreate();
+                  } else {
+                    setCreatingNew(true);
+                  }
+                }}
+                disabled={!canEdit || isReordering}
                 className={hasReorderChanges ? "opacity-60 cursor-pointer" : ""}
+                title={!canEdit ? "No tienes permiso para crear." : undefined}
               >
                 <Plus className="w-4 h-4 mr-1" /> Agregar nuevo
               </Button>
@@ -360,7 +428,10 @@ export function DefinitionList({
               </Button>
               <Button
                 onClick={handleSaveAll}
-                disabled={!hasReorderChanges || isReordering}
+                disabled={!canEdit || !hasReorderChanges || isReordering}
+                title={
+                  !canEdit ? "No tienes permiso para reordenar." : undefined
+                }
               >
                 {isReordering ? "Guardando…" : "Guardar Orden"}
               </Button>

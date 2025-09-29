@@ -10,37 +10,29 @@ import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { getBusinessUnitId } from "@/shared/auth/storage";
 
-// --- Services: Strategic Plan (cabecera)
+// Services...
 import {
   getStrategicPlan,
-  updateStrategicPlan, // PATCH /strategic-plans/:id
+  updateStrategicPlan,
 } from "@/features/strategic-plans/services/strategicPlansService";
-
-// --- Services: Factores Clave de Éxito
 import {
   getStrategicSuccessFactors,
   createStrategicSuccessFactor,
   updateStrategicSuccessFactor,
   reorderStrategicSuccessFactors,
 } from "@/features/strategic-plans/services/strategicSuccessFactorsService";
-
-// --- Services: Valores Estratégicos
 import {
   getStrategicValues,
   createStrategicValue,
   updateStrategicValue,
   reorderStrategicValues,
 } from "@/features/strategic-plans/services/strategicValuesService";
-
-// --- Services: Objetivos
 import {
   getObjectives,
   createObjective,
   updateObjective,
   reorderObjectives,
 } from "@/features/strategic-plans/services/objectivesService";
-
-// --- Services: Proyectos Estratégicos
 import {
   getStrategicProjectsByPlanPosition,
   createStrategicProject,
@@ -48,20 +40,27 @@ import {
   reorderStrategicProjects,
 } from "@/features/strategic-plans/services/strategicProjectsService";
 
-// --- Hook utilitario: posición del CEO de la BU (por defecto)
 import { useCeoPositionId } from "@/features/positions/hooks/use-ceo-position";
 
 // UI locales
 import { DefinitionCard } from "./definition-card";
 import { DefinitionList } from "./definition-list";
 
+// Modales de objetivos
+import { NewObjectiveModal } from "@/features/objectives/components/new-objective-modal";
+import { ObjectiveInactivateBlockedModal } from "@/features/objectives/components/objective-inactivate-blocked-modal";
+
 // Iconos
 import { Target, Eye, Shield, Award, Sparkles, Flag } from "lucide-react";
 import { CreateStrategicProjectPayload } from "../types/strategicProjects";
+import { CreateObjectivePayload } from "../types/objectives";
+
+// ✅ Permisos
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
 
 type Props = {
   strategicPlanId?: string;
-  /** opcional: si no se provee, se usa el ceoPositionId de la BU actual */
   positionId?: string;
 };
 
@@ -69,7 +68,33 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const hasPlan = !!strategicPlanId;
   const qc = useQueryClient();
 
-  // Hover + edición de tarjetas de texto
+  // Hook auth (siempre en el top para no romper reglas de hooks)
+  const { me } = useAuth();
+
+  // ✅ Permisos por módulo/acción
+  const canPlanUpdate = hasAccess(me, "strategicPlan", "update");
+
+  const canFactorsCreate = hasAccess(me, "strategicSuccessFactor", "create");
+  const canFactorsUpdate = hasAccess(me, "strategicSuccessFactor", "update");
+  const canFactorsDelete = hasAccess(me, "strategicSuccessFactor", "delete");
+  const canFactorsEdit = canFactorsCreate || canFactorsUpdate;
+
+  const canValuesCreate = hasAccess(me, "strategicValue", "create");
+  const canValuesUpdate = hasAccess(me, "strategicValue", "update");
+  const canValuesDelete = hasAccess(me, "strategicValue", "delete");
+  const canValuesEdit = canValuesCreate || canValuesUpdate;
+
+  const canObjectivesCreate = hasAccess(me, "objective", "create");
+  const canObjectivesUpdate = hasAccess(me, "objective", "update");
+  const canObjectivesDelete = hasAccess(me, "objective", "delete");
+  const canObjectivesEdit = canObjectivesCreate || canObjectivesUpdate;
+
+  const canProjectsCreate = hasAccess(me, "strategicProject", "create");
+  const canProjectsUpdate = hasAccess(me, "strategicProject", "update");
+  const canProjectsDelete = hasAccess(me, "strategicProject", "delete");
+  const canProjectsEdit = canProjectsCreate || canProjectsUpdate;
+
+  // Hover + edición de tarjetas
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<
     | null
@@ -83,12 +108,21 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   >(null);
   const [editText, setEditText] = useState<string>("");
 
-  // --- 0) Resolver position efectiva (prop o CEO)
+  // Modales Objetivos
+  const [openCreateObj, setOpenCreateObj] = useState(false);
+  const [openBlocked, setOpenBlocked] = useState(false);
+  const [blockedPayload, setBlockedPayload] = useState<{
+    message?: string;
+    projects?: any[];
+    priorities?: any[];
+  }>({});
+
+  // Posición efectiva (para objetivos/proyectos)
   const businessUnitId = getBusinessUnitId() ?? undefined;
   const { ceoPositionId } = useCeoPositionId(businessUnitId);
   const effectivePositionId = positionId ?? ceoPositionId;
 
-  // --- 1) Plan (cabecera)
+  // ---- Queries
   const {
     data: plan,
     isPending: planLoading,
@@ -102,7 +136,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // --- 2) Factores
   const {
     data: factors = [],
     isPending: factorsLoading,
@@ -116,7 +149,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // --- 3) Valores
   const {
     data: values = [],
     isPending: valuesLoading,
@@ -130,7 +162,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // --- 4) Objetivos (por plan)
   const {
     data: objectives = [],
     isPending: objectivesLoading,
@@ -145,7 +176,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // --- 5) Proyectos (estructura por plan + posición efectiva)
   const {
     data: projects = [],
     isPending: isProjectsLoading,
@@ -164,7 +194,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // --- Mutations de Plan cabecera
+  // ---- Mutations
   const updatePlanMut = useMutation({
     mutationFn: (payload: any) =>
       updateStrategicPlan(strategicPlanId!, payload),
@@ -174,90 +204,17 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     },
   });
 
-  // --- Mutations Factores
-  const createFactorMut = useMutation({
-    mutationFn: (name: string) =>
-      createStrategicSuccessFactor({
-        name: name.trim(),
-        strategicPlanId: strategicPlanId!,
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-      });
-      toast.success("Factor creado");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  const updateFactorMut = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateStrategicSuccessFactor(id, { name: name.trim() }),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-      });
-      toast.success("Factor actualizado");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  const reorderFactorsMut = useMutation({
-    mutationFn: (payload: any) => reorderStrategicSuccessFactors(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-      });
-      toast.success("Orden guardado exitosamente");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  // --- Mutations Valores
-  const createValueMut = useMutation({
-    mutationFn: (name: string) =>
-      createStrategicValue({
-        name: name.trim(),
-        strategicPlanId: strategicPlanId!,
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicValues(strategicPlanId!),
-      });
-      toast.success("Valor creado");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  const updateValueMut = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateStrategicValue(id, { name: name.trim() }),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicValues(strategicPlanId!),
-      });
-      toast.success("Valor actualizado");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  const reorderValuesMut = useMutation({
-    mutationFn: (payload: any) => reorderStrategicValues(payload),
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicValues(strategicPlanId!),
-      }),
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  // --- Mutations Objetivos
   const createObjectiveMut = useMutation({
-    mutationFn: (name: string) =>
-      createObjective({
+    mutationFn: (name: string) => {
+      const payload: CreateObjectivePayload = {
         name: name.trim(),
         strategicPlanId: strategicPlanId!,
         positionId: effectivePositionId!,
-      }),
+        level: "EST",
+        indicatorName: "Indicador",
+      };
+      return createObjective(payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!),
@@ -290,7 +247,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  // --- Mutations Proyectos
   const createProjectMut = useMutation({
     mutationFn: (name: string) => {
       const payload: CreateStrategicProjectPayload = {
@@ -345,7 +301,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  // --- Estados y errores
+  // ---- Loading & error
   const isLoading =
     planLoading ||
     factorsLoading ||
@@ -365,63 +321,67 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     ? getHumanErrorMessage(projectsError as any)
     : null;
 
-  // --- Cabecera plan
+  // ---- Mapeos
   const mission = plan?.mission ?? "";
   const vision = plan?.vision ?? "";
   const competitiveAdvantage = plan?.competitiveAdvantage ?? "";
 
-  // --- Ordenados por `order`
-  const factorsOrdered = useMemo(() => {
-    const arr = Array.isArray(factors) ? [...factors] : [];
-    arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
-  }, [factors]);
+  const orderBy = (arr: any[]) =>
+    [...(Array.isArray(arr) ? arr : [])].sort(
+      (a, b) => (a?.order ?? 0) - (b?.order ?? 0)
+    );
 
-  const valuesOrdered = useMemo(() => {
-    const arr = Array.isArray(values) ? [...values] : [];
-    arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
-  }, [values]);
+  const factorsItems = useMemo(
+    () =>
+      orderBy(factors).map((x: any, idx: number) => ({
+        id: idx + 1,
+        content: x.name ?? "",
+        metaId: x.id,
+        isActive: x.isActive ?? true,
+      })),
+    [factors]
+  );
 
-  const objectivesOrdered = useMemo(() => {
-    const arr = Array.isArray(objectives) ? [...objectives] : [];
-    arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
-  }, [objectives]);
+  const valuesItems = useMemo(
+    () =>
+      orderBy(values).map((x: any, idx: number) => ({
+        id: idx + 1,
+        content: x.name ?? "",
+        metaId: x.id,
+        isActive: x.isActive ?? true,
+      })),
+    [values]
+  );
 
-  const projectsOrdered = useMemo(() => {
-    const arr = Array.isArray(projects) ? [...projects] : [];
-    arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
-  }, [projects]);
-
-  // --- Items para DefinitionList
-  const toItems = (list: any[]) =>
-    list.map((x: any, idx: number) => ({
-      id: idx + 1,
-      content: x.name ?? "",
-      metaId: x.id,
-      isActive: x.isActive ?? true,
-    }));
-
-  const factorsItems = useMemo(() => toItems(factorsOrdered), [factorsOrdered]);
-  const valuesItems = useMemo(() => toItems(valuesOrdered), [valuesOrdered]);
   const objectivesItems = useMemo(
-    () => toItems(objectivesOrdered),
-    [objectivesOrdered]
-  );
-  const projectsItems = useMemo(
-    () => toItems(projectsOrdered),
-    [projectsOrdered]
+    () =>
+      orderBy(objectives).map((x: any, idx: number) => ({
+        id: idx + 1,
+        content: x.name ?? "",
+        metaId: x.id,
+        isActive: x.isActive ?? true,
+      })),
+    [objectives]
   );
 
-  // --- Handlers comunes de tarjetas de texto
+  const projectsItems = useMemo(
+    () =>
+      orderBy(projects).map((x: any, idx: number) => ({
+        id: idx + 1,
+        content: x.name ?? "",
+        metaId: x.id,
+        isActive: x.isActive ?? true,
+      })),
+    [projects]
+  );
+
+  // ---- Handlers tarjetas
   const startEditCard = (
     key: "mission" | "vision" | "advantage",
-    currentText: string | undefined
+    current: string | undefined
   ) => {
     setEditingKey(key);
-    setEditText(currentText ?? "");
+    setEditText(current ?? "");
   };
 
   const cancelEditCard = () => {
@@ -444,19 +404,13 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     }
   };
 
-  // --- Handlers reorder (reciben items con metaId)
+  // Helpers reorder
   const makeReorderPayload = (
-    strategicPlanId: string,
-    updatedItems: Array<{
-      id: number;
-      content: string;
-      metaId?: string;
-      isActive?: boolean;
-    }>
+    updatedItems: Array<{ metaId?: string; isActive?: boolean }>
   ) => ({
-    strategicPlanId,
+    strategicPlanId: strategicPlanId!,
     items: updatedItems.map((it, idx) => ({
-      id: it.metaId!, // UUID real
+      id: it.metaId!, // UUID
       order: idx + 1,
       isActive: it.isActive ?? true,
     })),
@@ -469,13 +423,11 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       </div>
     );
   }
-
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground">Cargando definición…</div>
     );
   }
-
   if (errorMsg) {
     return <div className="text-sm text-red-600">{errorMsg}</div>;
   }
@@ -499,10 +451,11 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           editText={editingKey === "mission" ? editText : ""}
           hovered={hoveredKey === "mission"}
           onHover={setHoveredKey}
-          onEditClick={() => startEditCard("mission", mission)}
+          onEditClick={() => canPlanUpdate && startEditCard("mission", mission)}
           onChangeText={setEditText}
           onSave={saveEditCard}
           onCancel={cancelEditCard}
+          canEdit={canPlanUpdate}
         />
 
         <DefinitionCard
@@ -520,10 +473,11 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           editText={editingKey === "vision" ? editText : ""}
           hovered={hoveredKey === "vision"}
           onHover={setHoveredKey}
-          onEditClick={() => startEditCard("vision", vision)}
+          onEditClick={() => canPlanUpdate && startEditCard("vision", vision)}
           onChangeText={setEditText}
           onSave={saveEditCard}
           onCancel={cancelEditCard}
+          canEdit={canPlanUpdate}
         />
       </div>
 
@@ -543,11 +497,16 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
         editText={editingKey === "advantage" ? editText : ""}
         hovered={hoveredKey === "advantage"}
         onHover={setHoveredKey}
-        onEditClick={() => startEditCard("advantage", competitiveAdvantage)}
+        onEditClick={() =>
+          canPlanUpdate && startEditCard("advantage", competitiveAdvantage)
+        }
         onChangeText={setEditText}
         onSave={saveEditCard}
         onCancel={cancelEditCard}
+        canEdit={canPlanUpdate}
       />
+
+      {/* Factores / Valores */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Factores Clave de Éxito */}
         <DefinitionList
@@ -565,33 +524,80 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           hovered={hoveredKey === "factors"}
           isEditing={editingKey === "factors"}
           onHover={setHoveredKey}
-          onStartEdit={() => setEditingKey("factors")}
+          onStartEdit={() => canFactorsEdit && setEditingKey("factors")}
           onCancelEdit={() => setEditingKey(null)}
-          isReordering={reorderFactorsMut.isPending}
+          isReordering={false}
           maxLengthCharacter={150}
+          canEdit={canFactorsEdit}
+          canDelete={canFactorsDelete}
+          // (no usamos modal aquí; si quisieras, pasa onRequestCreate/onRequestDelete)
           actions={{
-            create: (name) => createFactorMut.mutate(name),
-            updateById: (id, name) => updateFactorMut.mutate({ id, name }),
-            remove: (uiIndex) => {
-              const payload = {
-                strategicPlanId: strategicPlanId!,
-                items: factorsItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                })),
-              };
-              reorderFactorsMut.mutate(payload);
-            },
-            reorder: (updatedItems) =>
-              reorderFactorsMut.mutate({
-                strategicPlanId: strategicPlanId!,
-                items: updatedItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.isActive ?? true,
-                })),
-              }),
+            create: canFactorsCreate
+              ? async (name: string): Promise<void> => {
+                  try {
+                    await createStrategicSuccessFactor({
+                      name: name.trim(),
+                      strategicPlanId: strategicPlanId!,
+                    });
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+                    });
+                    toast.success("Factor creado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            updateById: canFactorsUpdate
+              ? async (id: string, name: string): Promise<void> => {
+                  try {
+                    await updateStrategicSuccessFactor(id, {
+                      name: name.trim(),
+                    });
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+                    });
+                    toast.success("Factor actualizado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            remove: canFactorsDelete
+              ? async (uiIndex: number): Promise<void> => {
+                  try {
+                    const payload = makeReorderPayload(
+                      factorsItems.map((it) => ({
+                        metaId: it.metaId,
+                        isActive:
+                          it.id === uiIndex ? false : it.isActive ?? true,
+                      }))
+                    );
+                    await reorderStrategicSuccessFactors(payload);
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+                    });
+                    toast.success("Factor eliminado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            reorder: canFactorsEdit
+              ? async (updated): Promise<void> => {
+                  try {
+                    await reorderStrategicSuccessFactors(
+                      makeReorderPayload(updated)
+                    );
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+                    });
+                    toast.success("Orden guardado exitosamente");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
           }}
         />
 
@@ -611,39 +617,82 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           hovered={hoveredKey === "values"}
           isEditing={editingKey === "values"}
           onHover={setHoveredKey}
-          onStartEdit={() => setEditingKey("values")}
+          onStartEdit={() => canValuesEdit && setEditingKey("values")}
           onCancelEdit={() => setEditingKey(null)}
-          isReordering={reorderValuesMut.isPending}
+          isReordering={false}
           maxLengthCharacter={150}
+          canEdit={canValuesEdit}
+          canDelete={canValuesDelete}
           actions={{
-            create: (name) => createValueMut.mutate(name),
-            updateById: (id, name) => updateValueMut.mutate({ id, name }),
-            remove: (uiIndex) => {
-              const payload = {
-                strategicPlanId: strategicPlanId!,
-                items: valuesItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                })),
-              };
-              reorderValuesMut.mutate(payload);
-            },
-            reorder: (updatedItems) =>
-              reorderValuesMut.mutate({
-                strategicPlanId: strategicPlanId!,
-                items: updatedItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.isActive ?? true,
-                })),
-              }),
+            create: canValuesCreate
+              ? async (name: string): Promise<void> => {
+                  try {
+                    await createStrategicValue({
+                      name: name.trim(),
+                      strategicPlanId: strategicPlanId!,
+                    });
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicValues(strategicPlanId!),
+                    });
+                    toast.success("Valor creado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            updateById: canValuesUpdate
+              ? async (id: string, name: string): Promise<void> => {
+                  try {
+                    await updateStrategicValue(id, { name: name.trim() });
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicValues(strategicPlanId!),
+                    });
+                    toast.success("Valor actualizado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            remove: canValuesDelete
+              ? async (uiIndex: number): Promise<void> => {
+                  try {
+                    const payload = makeReorderPayload(
+                      valuesItems.map((it) => ({
+                        metaId: it.metaId,
+                        isActive:
+                          it.id === uiIndex ? false : it.isActive ?? true,
+                      }))
+                    );
+                    await reorderStrategicValues(payload);
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicValues(strategicPlanId!),
+                    });
+                    toast.success("Valor eliminado");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
+            reorder: canValuesEdit
+              ? async (updated): Promise<void> => {
+                  try {
+                    await reorderStrategicValues(makeReorderPayload(updated));
+                    qc.invalidateQueries({
+                      queryKey: QKEY.strategicValues(strategicPlanId!),
+                    });
+                    toast.success("Orden guardado exitosamente");
+                  } catch (e) {
+                    toast.error(getHumanErrorMessage(e as any));
+                  }
+                }
+              : undefined,
           }}
         />
       </div>
 
+      {/* Objetivos + Proyectos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Objetivos */}
+        {/* OBJETIVOS: con modal */}
         <DefinitionList
           sectionKey="objectives"
           title="Objetivos"
@@ -659,37 +708,39 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           hovered={hoveredKey === "objectives"}
           isEditing={editingKey === "objectives"}
           onHover={setHoveredKey}
-          onStartEdit={() => setEditingKey("objectives")}
+          onStartEdit={() => canObjectivesEdit && setEditingKey("objectives")}
           onCancelEdit={() => setEditingKey(null)}
           isReordering={reorderObjectivesMut.isPending}
           maxLengthCharacter={150}
+          canEdit={canObjectivesEdit}
+          canDelete={canObjectivesDelete}
+          onRequestCreate={
+            canObjectivesCreate ? () => setOpenCreateObj(true) : undefined
+          }
+          onRequestDelete={
+            canObjectivesDelete
+              ? (uiIndex, item) => {
+                  setBlockedPayload({
+                    message: "Este objetivo tiene asociaciones activas.",
+                    projects: [],
+                    priorities: [],
+                  });
+                  setOpenBlocked(true);
+                }
+              : undefined
+          }
           actions={{
-            create: (name) => createObjectiveMut.mutate(name),
-            updateById: (id, name) => updateObjectiveMut.mutate({ id, name }),
-            remove: (uiIndex) => {
-              const payload = {
-                strategicPlanId: strategicPlanId!,
-                items: objectivesItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                })),
-              };
-              reorderObjectivesMut.mutate(payload);
-            },
-            reorder: (updatedItems) =>
-              reorderObjectivesMut.mutate({
-                strategicPlanId: strategicPlanId!,
-                items: updatedItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.isActive ?? true,
-                })),
-              }),
+            updateById: canObjectivesUpdate
+              ? (id, name) => updateObjectiveMut.mutate({ id, name })
+              : undefined,
+            reorder: canObjectivesEdit
+              ? (updated) =>
+                  reorderObjectivesMut.mutate(makeReorderPayload(updated))
+              : undefined,
           }}
         />
 
-        {/* Proyectos estratégicos (requieren positionId efectivo) */}
+        {/* Proyectos */}
         <DefinitionList
           sectionKey="projects"
           title="Proyectos Estratégicos"
@@ -705,40 +756,91 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           hovered={hoveredKey === "projects"}
           isEditing={editingKey === "projects"}
           onHover={setHoveredKey}
-          onStartEdit={() => setEditingKey("projects")}
+          onStartEdit={() => canProjectsEdit && setEditingKey("projects")}
           onCancelEdit={() => setEditingKey(null)}
           isReordering={reorderProjectsMut.isPending}
           maxLengthCharacter={150}
+          canEdit={canProjectsEdit}
+          canDelete={canProjectsDelete}
           actions={{
-            create: (name) => {
-              // Si tu creación requiere positionId (CEO u otra), mantén tu lógica actual:
-              if (!effectivePositionId!) return;
-              createProjectMut.mutate(name);
-            },
-            updateById: (id, name) => updateProjectMut.mutate({ id, name }),
-            remove: (uiIndex) => {
-              const payload = {
-                strategicPlanId: strategicPlanId!,
-                items: projectsItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                })),
-              };
-              reorderProjectsMut.mutate(payload);
-            },
-            reorder: (updatedItems) =>
-              reorderProjectsMut.mutate({
-                strategicPlanId: strategicPlanId!,
-                items: updatedItems.map((it, idx) => ({
-                  id: it.metaId!,
-                  order: idx + 1,
-                  isActive: it.isActive ?? true,
-                })),
-              }),
+            create: canProjectsCreate
+              ? (name) => {
+                  if (!effectivePositionId) {
+                    toast.error("No hay posición efectiva seleccionada.");
+                    return;
+                  }
+                  createProjectMut.mutate(name);
+                }
+              : undefined,
+            updateById: canProjectsUpdate
+              ? (id, name) => updateProjectMut.mutate({ id, name })
+              : undefined,
+            remove: canProjectsDelete
+              ? (uiIndex) => {
+                  const payload = {
+                    strategicPlanId: strategicPlanId!,
+                    items: projectsItems.map((it, idx) => ({
+                      id: it.metaId!,
+                      order: idx + 1,
+                      isActive: it.id === uiIndex ? false : it.isActive ?? true,
+                    })),
+                  };
+                  reorderProjectsMut.mutate(payload);
+                }
+              : undefined,
+            reorder: canProjectsEdit
+              ? (updatedItems) =>
+                  reorderProjectsMut.mutate({
+                    strategicPlanId: strategicPlanId!,
+                    items: updatedItems.map((it, idx) => ({
+                      id: it.metaId!,
+                      order: idx + 1,
+                      isActive: it.isActive ?? true,
+                    })),
+                  })
+              : undefined,
           }}
         />
       </div>
+
+      {/* MODALES Objetivos */}
+      <NewObjectiveModal
+        open={openCreateObj}
+        onOpenChange={setOpenCreateObj}
+        onCreate={(p) => {
+          if (!canObjectivesCreate) {
+            toast.error("No tienes permiso para crear objetivos.");
+            return;
+          }
+          const payload: CreateObjectivePayload = {
+            name: (p.objectiveText ?? "").trim(),
+            level: p.nivel || "EST",
+            indicatorName: p.indicador || "Indicador",
+            strategicPlanId: strategicPlanId!,
+            positionId: effectivePositionId!,
+          };
+          createObjective(payload)
+            .then(() => {
+              qc.invalidateQueries({
+                queryKey: QKEY.objectives(
+                  strategicPlanId!,
+                  effectivePositionId!
+                ),
+              });
+              toast.success("Objetivo creado");
+              setOpenCreateObj(false);
+            })
+            .catch((e) => toast.error(getHumanErrorMessage(e as any)));
+        }}
+      />
+
+      <ObjectiveInactivateBlockedModal
+        open={openBlocked}
+        message={blockedPayload.message}
+        projects={blockedPayload.projects}
+        priorities={blockedPayload.priorities}
+        onClose={() => setOpenBlocked(false)}
+      />
     </div>
   );
 }

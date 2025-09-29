@@ -1,3 +1,4 @@
+// src/features/strategic-plans/components/definition-card.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -25,6 +26,9 @@ interface DefinitionCardProps {
   onChangeText: (text: string) => void;
   onSave: () => void;
   onCancel: () => void;
+
+  /** ✅ Permiso para editar (oculta lápiz y edición si es false) */
+  canEdit?: boolean;
 }
 
 export function DefinitionCard({
@@ -46,7 +50,11 @@ export function DefinitionCard({
   onChangeText,
   onSave,
   onCancel,
+  canEdit = true,
 }: DefinitionCardProps) {
+  // Solo mostramos edición si ambas cosas son ciertas
+  const effectiveEditing = isEditing && canEdit;
+
   return (
     <Card
       className={`relative group border-0 shadow-sm ${cardColor} hover:shadow-lg transition-all duration-300 rounded-xl border ${cardBorderColor}`}
@@ -61,26 +69,33 @@ export function DefinitionCard({
             </div>
             {title}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-white/50 transition-all duration-200 rounded-lg ${
-              hovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
-            }`}
-            onClick={onEditClick}
-          >
-            <Edit3 className="h-4 w-4" />
-          </Button>
+
+          {/* ✏️ Oculto si no hay permiso */}
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-white/50 transition-all duration-200 rounded-lg ${
+                hovered
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-1"
+              }`}
+              onClick={onEditClick}
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
+
       <CardContent>
-        {isEditing ? (
+        {effectiveEditing ? (
           <div className="space-y-3">
             <Textarea
               value={editText}
               onChange={(e) => onChangeText(e.target.value.slice(0, 500))}
               className="min-h-[100px] resize-none bg-white border border-gray-200 rounded-lg text-sm p-3"
-              placeholder={`Enter ${title.toLowerCase()}...`}
+              placeholder={`Ingresa ${title.toLowerCase()}...`}
             />
             <div className="flex justify-between items-center">
               <span
@@ -88,14 +103,14 @@ export function DefinitionCard({
                   editText.length > 450 ? "text-red-500" : "text-gray-500"
                 }`}
               >
-                {500 - editText.length} characters left
+                {500 - editText.length} caracteres restantes
               </span>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={onCancel}>
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button size="sm" onClick={onSave}>
-                  Save
+                  Guardar
                 </Button>
               </div>
             </div>
