@@ -47,6 +47,10 @@ import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-ina
 import { ObjectiveInactivateBlockedModal } from "./objective-inactivate-blocked-modal";
 import { QKEY } from "@/shared/api/query-keys";
 
+// 🔐 permisos
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
+
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
   EST: "Estratégico",
@@ -91,6 +95,7 @@ type ObjectivesComplianceProps = {
   error?: boolean;
   onCreateObjective?: (payload: NewObjectivePayload) => void | Promise<void>;
   onComplianceUpdate?: (changes: ObjectiveComplianceChange[]) => void;
+  /** Si te lo pasan, tiene prioridad; si no, se calcula con hasAccess */
   canCreateObjective?: boolean;
 
   // NO configurados
@@ -120,10 +125,7 @@ function SharedColGroup() {
 function monthsFromIcoMonthly(icoMonthly: any[] = []) {
   return icoMonthly
     .filter((p) => p && p.isMeasured)
-    .map((p) => ({
-      month: Number(p.month),
-      year: Number(p.year),
-    }))
+    .map((p) => ({ month: Number(p.month), year: Number(p.year) }))
     .filter(
       (m) =>
         Number.isInteger(m.month) &&
@@ -157,6 +159,12 @@ export default function ObjectivesCompliance({
   positionId,
   year,
 }: ObjectivesComplianceProps) {
+  // 🔐 Permisos (usa tu access-control)
+  const { me } = useAuth();
+  const allowCreate = me ? hasAccess(me, "objective", "create") : false;
+  const allowConfigure = me ? hasAccess(me, "objective", "update") : false;
+  const allowInactivate = me ? hasAccess(me, "objective", "delete") : false;
+
   /* --------- configurados / registrables --------- */
   const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
   const [openCompliance, setOpenCompliance] = useState(false);
@@ -195,10 +203,11 @@ export default function ObjectivesCompliance({
   const inactivateMut = useInactivateObjective([
     QKEY.objectives(strategicPlanId, positionId),
     QKEY.objectivesUnconfigured(strategicPlanId, positionId),
-    ["objectives", "ico-board"], // invalida por prefijo la board aunque no tengas from/to
+    ["objectives", "ico-board"],
   ]);
 
   const handleInactivate = (objectiveId: string) => {
+    if (!allowInactivate) return;
     inactivateMut.mutate(objectiveId, {
       onSuccess: (data) => {
         if (data?.blocked) {
@@ -209,7 +218,6 @@ export default function ObjectivesCompliance({
             priorities: data.associations?.priorities ?? [],
           });
         }
-        // Si no está bloqueado, el hook ya hizo toast  invalidación (si configuraste keys)
       },
     });
   };
@@ -248,7 +256,7 @@ export default function ObjectivesCompliance({
     [rows]
   );
 
-  /* --------- no configurados (misma forma de tabla) --------- */
+  /* --------- no configurados --------- */
   const unconfRows: RowItem[] = useMemo(
     () =>
       unconfigured.map((o, idx) => {
@@ -273,12 +281,12 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "configurados"
   const openConfigureFromConfigured = (objectiveId: string) => {
+    if (!allowConfigure) return;
     const item = rows.find((it) => it.objective?.id === objectiveId);
     if (!item?.objective) return;
 
     const o = item.objective as any;
     const ind = (o.indicator ?? {}) as any;
-
     const icoMonthly: any[] = Array.isArray(o.icoMonthly) ? o.icoMonthly : [];
     const ranges = firstWithRanges(icoMonthly);
 
@@ -310,7 +318,6 @@ export default function ObjectivesCompliance({
         periodStart: ind.periodStart ?? null,
         periodEnd: ind.periodEnd ?? null,
       },
-
       months: monthsFromIcoMonthly(icoMonthly),
       rangeExceptional: ranges?.rangeExceptional ?? undefined,
       rangeInacceptable: ranges?.rangeInacceptable ?? undefined,
@@ -323,6 +330,7 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "no configurados"
   const openConfigureFromUnconfigured = (objectiveId: string) => {
+    if (!allowConfigure) return;
     const u = unconfigured.find((x) => x.id === objectiveId) as any;
     if (!u) return;
 
@@ -372,14 +380,16 @@ export default function ObjectivesCompliance({
       {/* Header global */}
       <CardHeader className="flex flex-row items-center justify-between py-3 px-4 border-b">
         <h2 className="text-base font-semibold">Objetivos</h2>
-        <Button
-          size="sm"
-          className="h-9 btn-gradient"
-          onClick={() => setOpenCreate(true)}
-          disabled={canCreateObjective === false}
-        >
-          + Nuevo Objetivo
-        </Button>
+        {/* Ocultar completamente si no tiene permiso */}
+        {allowCreate && (
+          <Button
+            size="sm"
+            className="h-9 btn-gradient"
+            onClick={() => setOpenCreate(true)}
+          >
+            + Nuevo Objetivo
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="p-0">
@@ -441,7 +451,6 @@ export default function ObjectivesCompliance({
                             {r.index}
                           </TableCell>
 
-                          {/* objetivo + indicador */}
                           <TableCell className="align-top px-2 py-2">
                             <div className="font-medium leading-5 break-words whitespace-pre-wrap">
                               {r.name}
@@ -454,7 +463,6 @@ export default function ObjectivesCompliance({
                           <TableCell className="text-center align-center px-2 py-2">
                             <div className="text-sm">{r.level}</div>
                           </TableCell>
-
                           <TableCell className="text-center align-center px-2 py-2">
                             <div className="text-sm">{r.type}</div>
                           </TableCell>
@@ -502,28 +510,36 @@ export default function ObjectivesCompliance({
                               >
                                 <Paperclip className="w-4 h-4" />
                               </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Configuración"
-                                aria-label="Configuración"
-                                onClick={() =>
-                                  openConfigureFromConfigured(r.id)
-                                }
-                              >
-                                <Settings className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Inactivar"
-                                aria-label="Inactivar"
-                                className="text-destructive"
-                                onClick={() => handleInactivate(r.id)}
-                                disabled={inactivateMut.isPending}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+
+                              {/* Mostrar solo si tiene permiso de actualización */}
+                              {allowConfigure && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Configuración"
+                                  aria-label="Configuración"
+                                  onClick={() =>
+                                    openConfigureFromConfigured(r.id)
+                                  }
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              )}
+
+                              {/* Mostrar solo si tiene permiso de eliminar/inactivar */}
+                              {allowInactivate && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Inactivar"
+                                  aria-label="Inactivar"
+                                  className="text-destructive"
+                                  onClick={() => handleInactivate(r.id)}
+                                  disabled={inactivateMut.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -584,7 +600,6 @@ export default function ObjectivesCompliance({
                             {r.index}
                           </TableCell>
 
-                          {/* objetivo + indicador */}
                           <TableCell className="align-top px-2 py-2">
                             <div className="font-medium leading-5 break-words whitespace-pre-wrap">
                               {r.name}
@@ -597,7 +612,6 @@ export default function ObjectivesCompliance({
                           <TableCell className="text-center align-center px-2 py-2">
                             <div className="text-sm">{r.level}</div>
                           </TableCell>
-
                           <TableCell className="text-center align-center px-2 py-2">
                             <div className="text-sm">{r.type}</div>
                           </TableCell>
@@ -615,7 +629,7 @@ export default function ObjectivesCompliance({
                             </Badge>
                           </TableCell>
 
-                          {/* acciones (solo configuración) */}
+                          {/* acciones (notas, docs siempre; config/inactivar según permiso) */}
                           <TableCell className="text-center sticky right-0 bg-background z-10 border-l px-2 py-1">
                             <div className="inline-flex items-center gap-1 whitespace-nowrap">
                               <Button
@@ -636,28 +650,34 @@ export default function ObjectivesCompliance({
                               >
                                 <Paperclip className="w-4 h-4" />
                               </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Configuración"
-                                aria-label="Configuración"
-                                onClick={() =>
-                                  openConfigureFromUnconfigured(r.id)
-                                }
-                              >
-                                <Settings className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Inactivar"
-                                aria-label="Inactivar"
-                                className="text-destructive"
-                                onClick={() => handleInactivate(r.id)}
-                                disabled={inactivateMut.isPending}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+
+                              {allowConfigure && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Configuración"
+                                  aria-label="Configuración"
+                                  onClick={() =>
+                                    openConfigureFromUnconfigured(r.id)
+                                  }
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              )}
+
+                              {allowInactivate && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Inactivar"
+                                  aria-label="Inactivar"
+                                  className="text-destructive"
+                                  onClick={() => handleInactivate(r.id)}
+                                  disabled={inactivateMut.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -672,15 +692,17 @@ export default function ObjectivesCompliance({
       </CardContent>
 
       {/* Modales */}
-      <NewObjectiveModal
-        open={openCreate}
-        onOpenChange={setOpenCreate}
-        onCreate={async (payload) => {
-          if (!onCreateObjective) return;
-          await onCreateObjective(payload);
-          setOpenCreate(false);
-        }}
-      />
+      {allowCreate && (
+        <NewObjectiveModal
+          open={openCreate}
+          onOpenChange={setOpenCreate}
+          onCreate={async (payload) => {
+            if (!onCreateObjective || !allowCreate) return;
+            await onCreateObjective(payload);
+            setOpenCreate(false);
+          }}
+        />
+      )}
 
       <ObjectiveComplianceModal
         open={openCompliance}
