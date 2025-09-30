@@ -194,14 +194,12 @@ function Controls({
 }
 
 export function OrganizationChartOverview({
-  companyId,
   businessUnitId,
   strategicPlanId,
   year,
   month,
-  positionId, // <— NUEVO
+  positionId,
 }: {
-  companyId?: string;
   businessUnitId?: string;
   strategicPlanId?: string | null;
   year?: number | string;
@@ -209,7 +207,6 @@ export function OrganizationChartOverview({
   positionId?: string | null;
 }) {
   const { data, isLoading, isError } = useOrgChartOverview(
-    companyId,
     businessUnitId,
     strategicPlanId ?? undefined,
     year,

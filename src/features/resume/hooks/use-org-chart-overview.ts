@@ -3,15 +3,15 @@ import { QKEY } from "@/shared/api/query-keys";
 import { getOrgChartOverview } from "../services/org-chart-overview";
 
 export function useOrgChartOverview(
-  companyId?: string,
   businessUnitId?: string,
   strategicPlanId?: string,
   year?: number | string,
   month?: number | string,
   positionId?: string | null
 ) {
+  console.log({ businessUnitId, strategicPlanId, year, month });
+
   const enabled =
-    !!companyId &&
     !!businessUnitId &&
     !!strategicPlanId &&
     !!year &&
@@ -21,7 +21,6 @@ export function useOrgChartOverview(
 
   return useQuery({
     queryKey: QKEY.positionsOrgChartOverview(
-      String(companyId ?? ""),
       String(businessUnitId ?? ""),
       String(strategicPlanId ?? ""),
       String(year ?? ""),
@@ -30,7 +29,6 @@ export function useOrgChartOverview(
     ),
     queryFn: () =>
       getOrgChartOverview({
-        companyId: companyId!,
         businessUnitId: businessUnitId!,
         strategicPlanId: strategicPlanId!,
         year: year!,

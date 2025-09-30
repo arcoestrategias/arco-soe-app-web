@@ -46,7 +46,6 @@ export const QKEY = {
   ],
 
   positionsOrgChartOverview: (
-    companyId: string,
     businessUnitId: string,
     strategicPlanId: string,
     year: number | string,
@@ -56,7 +55,6 @@ export const QKEY = {
     [
       "positions",
       "org-chart-overview",
-      String(companyId),
       String(businessUnitId),
       String(strategicPlanId),
       String(year),

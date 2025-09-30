@@ -101,7 +101,6 @@ export default function PositionsPage() {
 
           <TabsContent value="organigram" className="mt-6">
             <OrganizationChartOverview
-              companyId={companyId}
               businessUnitId={businessUnitId}
               strategicPlanId={strategicPlanId ?? undefined}
               month={month}

@@ -4,7 +4,6 @@ import { routes } from "@/shared/api/routes";
 import type { OrgChartOverviewResponse } from "../types/org-chart-overview";
 
 export type GetOrgChartOverviewParams = {
-  companyId: string;
   businessUnitId: string;
   strategicPlanId: string;
   year: number | string;
@@ -13,6 +12,8 @@ export type GetOrgChartOverviewParams = {
 };
 
 export async function getOrgChartOverview(params: GetOrgChartOverviewParams) {
+  console.log(params);
+
   const res = await http.get(routes.positions.orgChartOverview(), { params });
   return unwrapAny<OrgChartOverviewResponse>(res);
 }
