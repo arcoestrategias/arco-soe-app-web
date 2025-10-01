@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StrategicProjectStructureTask as Task } from "../types/strategicProjectStructure";
 import { DateRange } from "react-day-picker";
 import { TaskRowEditor } from "./task-row-editor";
@@ -45,6 +45,13 @@ export function TaskRow({
     to: parseYmdOrIsoToLocalDate(task.untilAt),
   });
   const [showConfirm, setShowConfirm] = useState(false);
+
+  useEffect(() => {
+    setRange({
+      from: parseYmdOrIsoToLocalDate(task.fromAt),
+      to: parseYmdOrIsoToLocalDate(task.untilAt),
+    });
+  }, [task.fromAt, task.untilAt]);
 
   const formatShortDate = (date?: Date) => {
     if (!date || !isValid(date)) return "";
