@@ -140,6 +140,7 @@ export default function PrioritiesDashboard({
             items={items}
             planId={planId}
             positionId={positionId}
+            year={year}
             otherPositions={otherPositions}
             onInactivate={handleInactivate}
             inactivatingId={toggleActiveMut.variables?.id}

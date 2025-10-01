@@ -33,6 +33,7 @@ export default function ObjectiveSelect({
   switchLabel = "Permitir objetivos de terceros",
   triggerClassName,
   hideSwitch = false,
+  year,
 }: {
   planId?: string;
   positionId?: string;
@@ -45,6 +46,7 @@ export default function ObjectiveSelect({
   switchLabel?: string;
   triggerClassName?: string;
   hideSwitch?: boolean;
+  year?: number;
 }) {
   const [allowThirdParty, setAllowThirdParty] = useState(
     defaultAllowThirdParty
@@ -53,7 +55,8 @@ export default function ObjectiveSelect({
 
   const { objectives: ownObjectives, isLoading: loadingOwn } = useObjectives(
     planId!,
-    positionId!
+    positionId!,
+    year
   );
 
   const ownOpts: ObjectiveOpt[] = useMemo(
@@ -90,10 +93,10 @@ export default function ObjectiveSelect({
 
   const thirdQueries = useQueries({
     queries: thirdPositions.map((pos) => ({
-      queryKey: QKEY.objectives(planId!, pos.id),
-      queryFn: () => getObjectives(planId!, pos.id),
+      queryKey: QKEY.objectives(planId!, pos.id, year),
+      queryFn: () => getObjectives(planId!, pos.id, year),
       staleTime: 60_000,
-      enabled: !!planId,
+      enabled: !!planId && !!year,
     })),
   });
 

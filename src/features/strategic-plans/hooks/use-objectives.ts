@@ -17,16 +17,20 @@ import type {
   Objective,
 } from "../types/objectives";
 
-export function useObjectives(strategicPlanId?: string, positionId?: string) {
+export function useObjectives(
+  strategicPlanId?: string,
+  positionId?: string,
+  year?: number
+) {
   const qc = useQueryClient();
 
   const listQuery = useQuery({
     queryKey:
       strategicPlanId && positionId
-        ? QKEY.objectives(strategicPlanId, positionId)
+        ? QKEY.objectives(strategicPlanId, positionId, year)
         : ["objectives", "disabled"],
-    queryFn: () => getObjectives(strategicPlanId!, positionId!),
-    enabled: !!strategicPlanId && !!positionId,
+    queryFn: () => getObjectives(strategicPlanId!, positionId!, year),
+    enabled: !!strategicPlanId && !!positionId && !!year,
     staleTime: 60_000,
   });
 

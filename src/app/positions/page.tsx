@@ -96,6 +96,7 @@ export default function PositionsPage() {
             <DefinitionTab
               strategicPlanId={strategicPlanId ?? undefined}
               positionId={positionId ?? undefined}
+              year={year ?? undefined}
             />
           </TabsContent>
 

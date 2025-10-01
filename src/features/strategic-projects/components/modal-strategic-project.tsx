@@ -325,6 +325,7 @@ export function ModalStrategicProject({
                 <ObjectiveSelect
                   planId={resolvedPlanId ?? undefined}
                   positionId={resolvedPositionId ?? undefined}
+                  year={new Date().getFullYear()}
                   value={field.value ?? undefined}
                   onChange={(v) => field.onChange(v ?? null)}
                   hideSwitch

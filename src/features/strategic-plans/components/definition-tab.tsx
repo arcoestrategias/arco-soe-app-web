@@ -67,6 +67,7 @@ type Props = {
 export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const hasPlan = !!strategicPlanId;
   const qc = useQueryClient();
+  const year = new Date().getFullYear();
 
   // Hook auth (siempre en el top para no romper reglas de hooks)
   const { me } = useAuth();
@@ -169,10 +170,10 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   } = useQuery({
     queryKey:
       hasPlan && !!effectivePositionId
-        ? QKEY.objectives(strategicPlanId!, effectivePositionId!)
+        ? QKEY.objectives(strategicPlanId!, effectivePositionId!, year)
         : ["objectives", "disabled"],
-    queryFn: () => getObjectives(strategicPlanId!, effectivePositionId!),
-    enabled: hasPlan && !!effectivePositionId,
+    queryFn: () => getObjectives(strategicPlanId!, effectivePositionId!, year),
+    enabled: hasPlan && !!effectivePositionId && Number.isInteger(year),
     staleTime: 60_000,
   });
 
@@ -217,7 +218,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     },
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!),
+        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
       });
       toast.success("Objetivo creado");
     },
@@ -229,7 +230,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       updateObjective(id, { name: name.trim() }),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!),
+        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
       });
       toast.success("Objetivo actualizado");
     },
@@ -240,7 +241,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     mutationFn: (payload: any) => reorderObjectives(payload),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!),
+        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
       });
       toast.success("Orden de objetivos guardado");
     },
@@ -824,7 +825,8 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
               qc.invalidateQueries({
                 queryKey: QKEY.objectives(
                   strategicPlanId!,
-                  effectivePositionId!
+                  effectivePositionId!,
+                  year
                 ),
               });
               toast.success("Objetivo creado");

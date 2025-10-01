@@ -56,9 +56,10 @@ import { DefinitionList, DefinitionListItem } from "./definition-list";
 type Props = {
   strategicPlanId?: string;
   positionId?: string;
+  year: number;
 };
 
-export function DefinitionTab({ strategicPlanId, positionId }: Props) {
+export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   const qc = useQueryClient();
   const hasPlanAndPos = !!strategicPlanId && !!positionId;
 
@@ -117,10 +118,10 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     error: objectivesError,
   } = useQuery({
     queryKey: hasPlanAndPos
-      ? QKEY.objectives(strategicPlanId!, positionId!)
+      ? QKEY.objectives(strategicPlanId!, positionId!, year)
       : ["objectives", "disabled"],
-    queryFn: () => getObjectives(strategicPlanId!, positionId!),
-    enabled: hasPlanAndPos,
+    queryFn: () => getObjectives(strategicPlanId!, positionId!, year),
+    enabled: hasPlanAndPos && Number.isInteger(year),
     staleTime: 60_000,
   });
 
@@ -166,7 +167,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       updateObjective(id, { name: name.trim() }),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, positionId!),
+        queryKey: QKEY.objectives(strategicPlanId!, positionId!, year),
       });
       toast.success("Objetivo actualizado");
     },
@@ -180,7 +181,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     }) => reorderObjectives(payload),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, positionId!),
+        queryKey: QKEY.objectives(strategicPlanId!, positionId!, year),
       });
       setEditingKey(null);
       toast.success("Orden de objetivos guardado");
@@ -622,7 +623,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           createObjective(payload)
             .then(() => {
               qc.invalidateQueries({
-                queryKey: QKEY.objectives(strategicPlanId!, positionId!),
+                queryKey: QKEY.objectives(strategicPlanId!, positionId!, year),
               });
               toast.success("Objetivo creado");
               setOpenCreateObj(false);

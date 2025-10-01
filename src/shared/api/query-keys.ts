@@ -73,8 +73,8 @@ export const QKEY = {
   strategicSuccessFactors: (strategicPlanId: string) =>
     ["strategic-success-factors", strategicPlanId] as const,
 
-  objectives: (strategicPlanId: string, positionId: string) =>
-    ["objectives", strategicPlanId, positionId] as const,
+  objectives: (planId: string, positionId: string, year?: number) =>
+    ["objectives", planId, positionId, year ?? "all"] as const,
 
   strategicProjects: (strategicPlanId: string, positionId: string) =>
     ["strategic-projects", "structure", strategicPlanId, positionId] as const,

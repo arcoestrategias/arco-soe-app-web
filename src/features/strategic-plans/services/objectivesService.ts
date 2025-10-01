@@ -14,10 +14,11 @@ import { InactivateObjectiveResult } from "@/features/objectives/types/inactivat
 
 export async function getObjectives(
   strategicPlanId: string,
-  positionId: string
+  positionId: string,
+  year?: number
 ): Promise<Objective[]> {
   const res = await http.get(routes.objectives.listByPlan(), {
-    params: { strategicPlanId, positionId },
+    params: { strategicPlanId, positionId, year },
   });
 
   return unwrapAny<Objective[]>(res.data);

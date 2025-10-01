@@ -330,6 +330,7 @@ export default function PrioritiesTable({
   items,
   planId,
   positionId,
+  year,
   otherPositions,
   onInactivate,
   inactivatingId,
@@ -345,6 +346,7 @@ export default function PrioritiesTable({
   items: Priority[];
   planId?: string;
   positionId?: string;
+  year?: number;
   otherPositions?: Array<{ id: string; name: string }>;
   onInactivate?: (id: string) => void;
   inactivatingId?: string;
@@ -668,6 +670,7 @@ export default function PrioritiesTable({
                           <ObjectiveSelect
                             planId={planId}
                             positionId={positionId}
+                            year={year}
                             value={d?.objectiveId}
                             onChange={(val) =>
                               setDrafts((ds) => ({
@@ -941,6 +944,7 @@ export default function PrioritiesTable({
                       <ObjectiveSelect
                         planId={planId}
                         positionId={positionId}
+                        year={year}
                         value={newDraft.objectiveId}
                         onChange={(val) =>
                           setNewDraft((d) => ({ ...d, objectiveId: val }))
