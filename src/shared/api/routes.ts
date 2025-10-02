@@ -48,6 +48,7 @@ export const Modules = {
 
   PRIORITIES: "priorities",
   FILES: "files",
+  REPORTS: "reports",
   // agrega aquí más módulos a futuro…
 } as const;
 
@@ -241,6 +242,11 @@ export const routes = {
     update: (id: string) => prefixed("comments", id),
     // PATCH /comments/:id/inactivate
     inactivate: (id: string) => prefixed("comments", id, "inactivate"),
+  },
+
+  reports: {
+    strategicPlanDefinitionsPdf: () =>
+      prefixed(Modules.REPORTS, "strategic-plans/definitions/pdf"),
   },
 } as const;
 

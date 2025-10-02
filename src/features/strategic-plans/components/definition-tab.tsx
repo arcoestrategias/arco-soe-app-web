@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
-import { getBusinessUnitId } from "@/shared/auth/storage";
+import { getBusinessUnitId, getCompanyId } from "@/shared/auth/storage";
 
 // Services...
 import {
@@ -43,6 +43,7 @@ import {
 import { useCeoPositionId } from "@/features/positions/hooks/use-ceo-position";
 
 // UI locales
+import { Button } from "@/components/ui/button";
 import { DefinitionCard } from "./definition-card";
 import { DefinitionList } from "./definition-list";
 
@@ -51,13 +52,25 @@ import { NewObjectiveModal } from "@/features/objectives/components/new-objectiv
 import { ObjectiveInactivateBlockedModal } from "@/features/objectives/components/objective-inactivate-blocked-modal";
 
 // Iconos
-import { Target, Eye, Shield, Award, Sparkles, Flag } from "lucide-react";
+import {
+  Target,
+  Eye,
+  Shield,
+  Award,
+  Sparkles,
+  Flag,
+  FileDown,
+} from "lucide-react";
 import { CreateStrategicProjectPayload } from "../types/strategicProjects";
 import { CreateObjectivePayload } from "../types/objectives";
 
 // ✅ Permisos
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "@/shared/auth/access-control";
+import {
+  exportStrategicPlanDefinitionsPDF,
+  StrategicPlanDefinitionsReportPayload,
+} from "@/features/reports/services/reportsService";
 
 type Props = {
   strategicPlanId?: string;
@@ -302,6 +315,85 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
+  // GENERAR REPORTE (PDF)
+  const byOrder = (a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0);
+
+  // 1) arma el payload con los datos de la UI
+  const buildPayload = (): StrategicPlanDefinitionsReportPayload => {
+    const companyId = getCompanyId() ?? undefined;
+    const businessUnitId = getBusinessUnitId() ?? undefined;
+
+    return {
+      companyId,
+      businessUnitId,
+      strategicPlan: {
+        id: plan!.id,
+        name: plan?.name ?? "Plan estratégico",
+        periodStart: (plan?.fromAt ?? "").slice(0, 10),
+        periodEnd: (plan?.untilAt ?? "").slice(0, 10),
+        mission: plan?.mission ?? "",
+        vision: plan?.vision ?? "",
+        competitiveAdvantage: plan?.competitiveAdvantage ?? "",
+      },
+      successFactors: [...(factors ?? [])].sort(byOrder).map((x: any) => ({
+        id: x.id,
+        name: x.name ?? "",
+        order: x.order ?? 0,
+        isActive: x.isActive ?? true,
+      })),
+      strategicValues: [...(values ?? [])].sort(byOrder).map((x: any) => ({
+        id: x.id,
+        name: x.name ?? "",
+        order: x.order ?? 0,
+        isActive: x.isActive ?? true,
+      })),
+      objectives: [...(objectives ?? [])].sort(byOrder).map((x: any) => ({
+        id: x.id,
+        name: x.name ?? "",
+        order: x.order ?? 0,
+        isActive: x.isActive ?? true,
+      })),
+      strategicProjects: [...(projects ?? [])].sort(byOrder).map((x: any) => ({
+        id: x.id,
+        name: x.name ?? "",
+        order: x.order ?? 0,
+        isActive: x.isActive ?? true,
+      })),
+    };
+  };
+
+  // 2) define la mutation SOLO con la función
+  const exportMut = useMutation({
+    mutationFn: (payload: StrategicPlanDefinitionsReportPayload) =>
+      exportStrategicPlanDefinitionsPDF(payload),
+  });
+
+  // 3) handler del botón
+  const handleGenerateReport = async () => {
+    try {
+      if (!plan) {
+        toast.error("No hay información del plan aún.");
+        return;
+      }
+      const payload = buildPayload();
+      const buffer = await exportMut.mutateAsync(payload); // <- ya es ArrayBuffer
+
+      const blob = new Blob([buffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `definiciones-estrategicas-${new Date().getFullYear()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Reporte generado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
   // ---- Loading & error
   const isLoading =
     planLoading ||
@@ -435,6 +527,16 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
 
   return (
     <div className="grid grid-cols-1 gap-6">
+      <div className="flex items-center justify-start">
+        <Button
+          onClick={handleGenerateReport}
+          disabled={exportMut.isPending}
+          className="btn-gradient h-9"
+        >
+          <FileDown className="h-4 w-4 mr-2" />
+          Generar Reporte
+        </Button>
+      </div>
       {/* Misión / Visión */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DefinitionCard
@@ -485,7 +587,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       {/* Ventaja competitiva */}
       <DefinitionCard
         sectionKey="advantage"
-        title="Ventaja competitiva"
+        title="Ventaja Distintiva"
         content={competitiveAdvantage}
         icon={Shield}
         iconColor="text-emerald-600"
@@ -605,7 +707,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
         {/* Valores Estratégicos */}
         <DefinitionList
           sectionKey="values"
-          title="Valores Estratégicos"
+          title="Valores"
           items={valuesItems}
           icon={Sparkles}
           iconColor="text-amber-600"
