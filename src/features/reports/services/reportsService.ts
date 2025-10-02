@@ -53,3 +53,47 @@ export async function exportStrategicPlanDefinitionsPDF(
   );
   return res.data;
 }
+
+export type PrioritiesReportPayload = {
+  companyId?: string;
+  businessUnitId?: string;
+  positionId: string;
+  strategicPlan: {
+    id: string;
+    name: string;
+    periodStart: string; // YYYY-MM-DD
+    periodEnd: string; // YYYY-MM-DD
+    mission: string;
+    vision: string;
+    competitiveAdvantage?: string | null;
+  };
+  icp: {
+    month: number;
+    year: number;
+    positionId: string;
+    totalPlanned: number;
+    totalCompleted: number;
+    icp: number | null;
+    notCompletedPreviousMonths: number;
+    notCompletedOverdue: number;
+    inProgress: number;
+    completedPreviousMonths: number;
+    completedLate: number;
+    completedInOtherMonth: number;
+    completedOnTime: number;
+    canceled: number;
+    completedEarly: number;
+  };
+  priorities: Array<any>;
+};
+
+export async function exportPrioritiesPDF(
+  payload: PrioritiesReportPayload
+): Promise<ArrayBuffer> {
+  const res = await http.post<ArrayBuffer>(
+    routes.reports.prioritiesPdf(),
+    payload,
+    { responseType: "arraybuffer" }
+  );
+  return res.data;
+}
