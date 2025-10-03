@@ -72,6 +72,5 @@ export async function configureObjective(
 
 export async function inactivateObjective(id: string) {
   const res = await http.patch(routes.objectives.inactivate(id), {});
-  // envelope: { success, message, statusCode, data }
   return unwrapAny<InactivateObjectiveResult>(res.data ?? res);
 }

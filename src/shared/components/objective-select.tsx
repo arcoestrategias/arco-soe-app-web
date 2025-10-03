@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 import { useObjectives } from "@/features/strategic-plans/hooks/use-objectives";
 import { getObjectives } from "@/features/strategic-plans/services/objectivesService";
@@ -51,6 +52,7 @@ export default function ObjectiveSelect({
   const [allowThirdParty, setAllowThirdParty] = useState(
     defaultAllowThirdParty
   );
+  const [query, setQuery] = useState("");
   const switchId = useId();
 
   const { objectives: ownObjectives, isLoading: loadingOwn } = useObjectives(
@@ -116,6 +118,30 @@ export default function ObjectiveSelect({
 
   const isLoadingThird = thirdQueries.some((q) => q.isPending);
 
+  // ==== filtro ====
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "");
+  const match = (s: string, q: string) => norm(s).includes(norm(q));
+
+  const filteredOwn = useMemo(
+    () => (query ? ownOpts.filter((o) => match(o.name, query)) : ownOpts),
+    [ownOpts, query]
+  );
+
+  const filteredThird: Record<string, ObjectiveOpt[]> = useMemo(() => {
+    if (!canUseThirdParty) return {};
+    if (!query) return thirdGroups;
+    const out: Record<string, ObjectiveOpt[]> = {};
+    Object.entries(thirdGroups).forEach(([k, list]) => {
+      const f = list.filter((o) => match(o.name, query));
+      if (f.length) out[k] = f; // oculta grupos sin resultados
+    });
+    return out;
+  }, [thirdGroups, canUseThirdParty, query]);
+
   return (
     <div
       className={
@@ -128,6 +154,9 @@ export default function ObjectiveSelect({
           value={value ?? ""}
           onValueChange={(v) => onChange?.(v || undefined)}
           disabled={disabled || loadingOwn || isLoadingThird}
+          onOpenChange={(open) => {
+            if (!open) setQuery(""); // limpio el buscador al cerrar
+          }}
         >
           <SelectTrigger className={triggerClassName ?? "w-full"}>
             <SelectValue
@@ -140,14 +169,26 @@ export default function ObjectiveSelect({
           </SelectTrigger>
 
           <SelectContent>
+            {/* Buscador sticky */}
+            <div className="p-2 sticky top-0 z-10 bg-popover border-b">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar objetivo..."
+                className="h-8"
+                onKeyDown={(e) => e.stopPropagation()} // evita que Radix capture arrows/esc
+              />
+            </div>
+
+            {/* Mis objetivos */}
             <SelectGroup>
               <SelectLabel>Mis objetivos</SelectLabel>
-              {ownOpts.length === 0 ? (
+              {filteredOwn.length === 0 ? (
                 <SelectItem value="__empty_own" disabled>
-                  (Sin objetivos)
+                  {query ? "(Sin resultados)" : "(Sin objetivos)"}
                 </SelectItem>
               ) : (
-                ownOpts.map((o) => (
+                filteredOwn.map((o) => (
                   <SelectItem key={`own-${o.id}`} value={o.id}>
                     {o.name}
                   </SelectItem>
@@ -155,13 +196,14 @@ export default function ObjectiveSelect({
               )}
             </SelectGroup>
 
+            {/* Terceros (solo grupos con resultados) */}
             {canUseThirdParty &&
-              Object.entries(thirdGroups).map(([cargo, list]) => (
+              Object.entries(filteredThird).map(([cargo, list]) => (
                 <SelectGroup key={cargo}>
                   <SelectLabel>{cargo}</SelectLabel>
                   {list.length === 0 ? (
                     <SelectItem value={`__empty_${cargo}`} disabled>
-                      (Sin objetivos)
+                      {query ? "(Sin resultados)" : "(Sin objetivos)"}
                     </SelectItem>
                   ) : (
                     list.map((o) => (

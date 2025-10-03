@@ -71,6 +71,8 @@ import {
   exportStrategicPlanDefinitionsPDF,
   StrategicPlanDefinitionsReportPayload,
 } from "@/features/reports/services/reportsService";
+import { useInactivateObjective } from "../hooks/use-inactivate-objective";
+import { getPositionsByBusinessUnit } from "@/features/positions/services/positionsService";
 
 type Props = {
   strategicPlanId?: string;
@@ -128,7 +130,11 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const [blockedPayload, setBlockedPayload] = useState<{
     message?: string;
     projects?: any[];
-    priorities?: any[];
+    prioritiesByPosition?: Array<{
+      positionId: string;
+      positionName: string;
+      priorities: Array<{ id: string; name: string }>;
+    }>;
   }>({});
 
   // Posición efectiva (para objetivos/proyectos)
@@ -136,6 +142,21 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const { ceoPositionId } = useCeoPositionId(businessUnitId);
   const effectivePositionId = positionId ?? ceoPositionId;
 
+  const buId = getBusinessUnitId();
+  const { data: positions = [] } = useQuery({
+    queryKey: buId ? QKEY.positionsByBU(buId) : ["positions", "disabled"],
+    queryFn: () => getPositionsByBusinessUnit(buId!),
+    enabled: !!buId,
+    staleTime: 60_000,
+  });
+
+  const otherPositions = useMemo(
+    () =>
+      (positions as Array<{ id: string; name: string }>)
+        .filter((p) => p.id !== positionId)
+        .map((p) => ({ id: p.id, name: p.name })),
+    [positions, positionId]
+  );
   // ---- Queries
   const {
     data: plan,
@@ -260,6 +281,12 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
+
+  const inactivateMut = useInactivateObjective([
+    QKEY.objectives(strategicPlanId!, effectivePositionId!, year as number),
+    QKEY.objectivesUnconfigured(strategicPlanId!, effectivePositionId!),
+    ["objectives", "ico-board"],
+  ]);
 
   const createProjectMut = useMutation({
     mutationFn: (name: string) => {
@@ -633,7 +660,6 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           maxLengthCharacter={150}
           canEdit={canFactorsEdit}
           canDelete={canFactorsDelete}
-          // (no usamos modal aquí; si quisieras, pasa onRequestCreate/onRequestDelete)
           actions={{
             create: canFactorsCreate
               ? async (name: string): Promise<void> => {
@@ -822,13 +848,21 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           }
           onRequestDelete={
             canObjectivesDelete
-              ? (uiIndex, item) => {
-                  setBlockedPayload({
-                    message: "Este objetivo tiene asociaciones activas.",
-                    projects: [],
-                    priorities: [],
+              ? (_uiIndex, item) => {
+                  const objectiveId = item.metaId!;
+                  inactivateMut.mutate(objectiveId, {
+                    onSuccess: (data) => {
+                      if (data?.blocked) {
+                        setBlockedPayload({
+                          message: data.message,
+                          projects: data.associations?.projects ?? [],
+                          prioritiesByPosition:
+                            data.associations?.prioritiesByPosition ?? [],
+                        });
+                        setOpenBlocked(true);
+                      }
+                    },
                   });
-                  setOpenBlocked(true);
                 }
               : undefined
           }
@@ -942,8 +976,21 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
         open={openBlocked}
         message={blockedPayload.message}
         projects={blockedPayload.projects}
-        priorities={blockedPayload.priorities}
+        // antes: priorities={blockedPayload.priorities}
+        prioritiesByPosition={blockedPayload.prioritiesByPosition}
         onClose={() => setOpenBlocked(false)}
+        strategicPlanId={strategicPlanId}
+        positionId={effectivePositionId}
+        year={year}
+        otherPositions={otherPositions}
+        // opcional pero recomendado: sincroniza la lista si se mueven prioridades desde la modal
+        onListChanged={(next) =>
+          setBlockedPayload((prev) => ({
+            ...prev,
+            projects: next.projects,
+            prioritiesByPosition: next.prioritiesByPosition,
+          }))
+        }
       />
     </div>
   );

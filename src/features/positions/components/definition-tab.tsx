@@ -52,6 +52,7 @@ import {
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { hasAccess } from "@/shared/auth/access-control";
 import { DefinitionList, DefinitionListItem } from "./definition-list";
+import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
 
 type Props = {
   strategicPlanId?: string;
@@ -188,6 +189,12 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
+
+  const inactivateMut = useInactivateObjective([
+    QKEY.objectives(strategicPlanId!, positionId!, year as number),
+    QKEY.objectivesUnconfigured(strategicPlanId!, positionId!),
+    ["objectives", "ico-board"], // mismo bucket usado en Objectives
+  ]);
 
   const createProjectMut = useMutation({
     mutationFn: (name: string) => {
@@ -490,13 +497,20 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
           }
           onRequestDelete={
             canObjectivesDelete
-              ? (uiIndex, item) => {
-                  setBlockedPayload({
-                    message: "Este objetivo tiene asociaciones activas.",
-                    projects: [],
-                    priorities: [],
+              ? (_uiIndex, item) => {
+                  const objectiveId = item.metaId!;
+                  inactivateMut.mutate(objectiveId, {
+                    onSuccess: (data) => {
+                      if (data?.blocked) {
+                        setBlockedPayload({
+                          message: data.message,
+                          projects: data.associations?.projects ?? [],
+                          priorities: data.associations?.priorities ?? [],
+                        });
+                        setOpenBlocked(true);
+                      }
+                    },
                   });
-                  setOpenBlocked(true);
                 }
               : undefined
           }
