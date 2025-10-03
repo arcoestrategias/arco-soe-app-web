@@ -313,7 +313,7 @@ export default function PrioritiesDashboard({
               title={!planId ? "Selecciona un plan" : "Generar Reporte"}
             >
               <FileDown className="h-4 w-4 mr-2" />
-              Generar Reporte
+              Reporte
             </Button>
 
             {/* Nueva Prioridad (existente) */}

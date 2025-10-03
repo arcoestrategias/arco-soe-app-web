@@ -248,6 +248,8 @@ export const routes = {
     strategicPlanDefinitionsPdf: () =>
       prefixed(Modules.REPORTS, "strategic-plans", "definitions", "pdf"),
     prioritiesPdf: () => prefixed(Modules.REPORTS, "priorities", "pdf"),
+    strategicProjectsPdf: () =>
+      prefixed(Modules.REPORTS, "strategic-projects", "pdf"),
   },
 } as const;
 

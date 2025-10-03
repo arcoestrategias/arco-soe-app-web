@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CheckSquare, FileText, Settings, Target, Edit3 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/shared/utils";
+import { formatCurrency } from "@/shared/utils";
 import { TextWithTooltip } from "@/components/ui/text-with-tooltip";
 import { parseYmdOrIsoToLocalDate } from "@/shared/utils/dateFormatters";
 import { format } from "date-fns";
@@ -32,6 +32,12 @@ interface ProjectCardProps {
   ) => void;
 
   onEdit?: (projectId: string) => void;
+
+  /** NUEVO: generar reporte de este proyecto */
+  onReport?: (projectId: string, projectName: string) => void;
+  /** NUEVO: estado de carga global para deshabilitar botón de reporte */
+  exporting?: boolean;
+
   showEditIcon?: boolean;
 }
 
@@ -58,6 +64,8 @@ export function ProjectCard({
   animatedProgress,
   onOpenModal,
   onEdit,
+  onReport,
+  exporting = false,
   showEditIcon = true,
 }: ProjectCardProps) {
   return (
@@ -183,7 +191,13 @@ export function ProjectCard({
             <CheckSquare className="h-3 w-3 mr-1" />
             Tareas ({totalTareas})
           </Badge>
-          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200 text-[10px] flex-1 justify-center">
+          <Badge
+            className={`bg-gray-100 text-gray-700 hover:bg-gray-200 text-[10px] flex-1 justify-center cursor-pointer ${
+              exporting ? "opacity-60 pointer-events-none" : ""
+            }`}
+            onClick={() => onReport?.(id, titulo)}
+            title="Generar reporte PDF"
+          >
             <FileText className="h-3 w-3 mr-1" />
             Reporte
           </Badge>

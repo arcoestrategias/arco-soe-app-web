@@ -97,3 +97,30 @@ export async function exportPrioritiesPDF(
   );
   return res.data;
 }
+
+type StrategicProjectsReportPayload = {
+  businessUnitId: string;
+  positionId: string;
+  projectId: string;
+  strategicPlan: {
+    id: string;
+    name: string;
+    periodStart: string; // YYYY-MM-DD
+    periodEnd: string; // YYYY-MM-DD
+    mission?: string;
+    vision?: string;
+    competitiveAdvantage?: string;
+  };
+};
+
+export async function exportStrategicProjectsPDF(
+  payload: StrategicProjectsReportPayload
+): Promise<ArrayBuffer> {
+  const res = await http.post<ArrayBuffer>(
+    routes.reports.strategicProjectsPdf(),
+    payload,
+    { responseType: "arraybuffer" }
+  );
+
+  return res.data;
+}

@@ -534,7 +534,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           className="btn-gradient h-9"
         >
           <FileDown className="h-4 w-4 mr-2" />
-          Generar Reporte
+          Reporte
         </Button>
       </div>
       {/* Misión / Visión */}

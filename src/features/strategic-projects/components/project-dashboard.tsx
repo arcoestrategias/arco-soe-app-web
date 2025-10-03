@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Target, CheckSquare, DollarSign, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/shared/utils";
@@ -8,13 +9,16 @@ import { ProjectCard } from "./project-card";
 import { useProjectsDashboard } from "@/features/strategic-plans/hooks/use-projects-dashboard";
 import type { StrategicProjectsDashboardProject } from "@/features/strategic-projects/types/dashboard";
 import { ModalFactorsTasks } from "./modal-factors-tasks";
-import { useQueryClient } from "@tanstack/react-query";
 import { ModalStrategicProject } from "./modal-strategic-project";
 import { updateStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
 import { toast } from "sonner";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { QKEY } from "@/shared/api/query-keys";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
+
+import { getBusinessUnitId } from "@/shared/auth/storage";
+import { getStrategicPlan } from "@/features/strategic-plans/services/strategicPlansService";
+import { exportStrategicProjectsPDF } from "@/features/reports/services/reportsService";
 
 type Props = {
   strategicPlanId?: string;
@@ -48,6 +52,16 @@ export function StrategicProjectsDashboard({
   );
 
   const qc = useQueryClient();
+
+  // Traer plan (para el payload del reporte)
+  const { data: plan } = useQuery({
+    queryKey: strategicPlanId
+      ? QKEY.strategicPlan(strategicPlanId)
+      : ["strategic-plan", "disabled"],
+    queryFn: () => getStrategicPlan(strategicPlanId!),
+    enabled: !!strategicPlanId,
+    staleTime: 60_000,
+  });
 
   // proyecto que se está editando
   const [editOpen, setEditOpen] = useState(false);
@@ -90,19 +104,19 @@ export function StrategicProjectsDashboard({
   const mappedProjects = useMemo(() => {
     const apiProjects = data?.projects ?? [];
     return apiProjects.map((p: StrategicProjectsDashboardProject) => ({
-      id: p.id, // id numérico de UI
+      id: p.id, // id
       iniciales: initialsFrom(p.name ?? ""),
       color: colorFromId(p.id),
       titulo: p.name,
       descripcion: p.description ?? "",
-      fechaInicio: p.fromAt ?? "", // ProjectCardProps exige string
-      fechaFin: p.untilAt ?? "", // ProjectCardProps exige string
+      fechaInicio: p.fromAt ?? "",
+      fechaFin: p.untilAt ?? "",
       presupuestoProyecto: p.budget ?? 0,
       presupuestoReal: p.executed ?? 0,
       totalTareas: p.tasksTotal ?? 0,
       tareasCompletadas: p.tasksClosed ?? 0,
       cumplimiento: p.compliance ?? 0,
-      metaEstrategica: p.objectiveName ?? "", // <- FALLO corregido: string, no undefined
+      metaEstrategica: p.objectiveName ?? "",
       factoresClave: p.factorsTotal ?? 0,
     }));
   }, [data?.projects]);
@@ -120,7 +134,7 @@ export function StrategicProjectsDashboard({
     return () => clearTimeout(timer);
   }, [mappedProjects]);
 
-  // Handlers de modal (sin cambiar contratos)
+  // Handlers de modal
   const openModal = (
     type: "factors" | "tasks",
     projectId: string,
@@ -135,13 +149,69 @@ export function StrategicProjectsDashboard({
     setSelectedProject(null);
   };
 
+  // ---- Exportación (PDF Proyectos)
+  const exportMut = useMutation({
+    mutationFn: exportStrategicProjectsPDF,
+  });
+
+  const handleExport = async (projectId: string, projectName: string) => {
+    try {
+      const businessUnitId = getBusinessUnitId() ?? undefined;
+
+      if (!enabled || !positionId) {
+        toast.error("Selecciona un plan y una posición.");
+        return;
+      }
+      if (!plan) {
+        toast.error("No se pudo cargar la información del plan estratégico.");
+        return;
+      }
+
+      const payload = {
+        businessUnitId: businessUnitId!,
+        positionId: positionId!,
+        projectId,
+        strategicPlan: {
+          id: plan.id,
+          name: plan.name ?? "Plan estratégico",
+          // el servicio del plan frecuentemente expone fromAt/untilAt
+          periodStart: (plan.fromAt ?? plan.fromAt ?? "").slice(0, 10),
+          periodEnd: (plan.untilAt ?? plan.untilAt ?? "").slice(0, 10),
+          mission: plan.mission ?? "",
+          vision: plan.vision ?? "",
+          competitiveAdvantage: plan.competitiveAdvantage ?? "",
+        },
+      };
+
+      const buffer = await exportMut.mutateAsync(payload);
+      const blob = new Blob([buffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+
+      const fileSafe =
+        (projectName || "proyecto").replace(/[^\p{L}\p{N}\-_ ]/gu, "").trim() ||
+        "proyecto";
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proyecto-estrategico-${fileSafe}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Reporte generado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
   // Resumen (usa backend si enabled; si no hay datos, muestra 0)
   const totalProjects = data?.summary?.totalProjects ?? 0;
   const avgProgress = data?.summary?.avgCompliance ?? 0;
   const totalBudget = data?.summary?.totalBudget ?? 0;
   const totalExecuted = data?.summary?.totalExecuted ?? 0;
 
-  // Mensaje cuando faltan filtros (igual que en DefinitionTab)
+  // Mensaje cuando faltan filtros
   if (!enabled) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -238,6 +308,8 @@ export function StrategicProjectsDashboard({
                 animatedProgress={animatedProgress[project.id] || 0}
                 onOpenModal={openModal}
                 onEdit={onEditProject}
+                onReport={(pid, name) => handleExport(pid, name)}
+                exporting={exportMut.isPending}
               />
             ))}
       </div>
