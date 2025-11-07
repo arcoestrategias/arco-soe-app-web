@@ -25,6 +25,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { hasAccess } from "@/shared/auth/access-control";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -71,6 +73,17 @@ function invalidateUsersCompanyList(qc: ReturnType<typeof useQueryClient>) {
 export function UsersDashboard() {
   const qc = useQueryClient();
   const { groups, total, isLoading, create, update, remove } = useUsers();
+
+  // Hook auth (siempre en el top para no romper reglas de hooks)
+  const { me } = useAuth();
+  // ✅ Permisos por módulo/acción
+  const canRolAccess = hasAccess(me, "permission", "access");
+  const canPermissionAssign = hasAccess(me, "permission", "assign");
+  const canBusinessUnitManagementAssign = hasAccess(
+    me,
+    "businessUnitManagement",
+    "assign"
+  );
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -329,9 +342,11 @@ export function UsersDashboard() {
                           <th className="px-4 py-2 text-left w-[250px]">
                             Correo
                           </th>
-                          <th className="px-4 py-2 text-center w-[180px]">
-                            Rol
-                          </th>
+                          {canRolAccess && (
+                            <th className="px-4 py-2 text-center w-[180px]">
+                              Rol
+                            </th>
+                          )}
                           <th className="px-4 py-2 text-center w-[230px]">
                             Posición
                           </th>
@@ -370,15 +385,17 @@ export function UsersDashboard() {
                             <td className="px-4 py-2 w-[250px]">{u.email}</td>
 
                             {/* Rol */}
-                            <td className="px-4 py-2 text-center w-[180px]">
-                              {u.roleName ? (
-                                <span>{u.roleName}</span>
-                              ) : (
-                                <Badge className="bg-red-500 text-white">
-                                  Sin Rol
-                                </Badge>
-                              )}
-                            </td>
+                            {canRolAccess && (
+                              <td className="px-4 py-2 text-center">
+                                {u.roleName ? (
+                                  <span>{u.roleName}</span>
+                                ) : (
+                                  <Badge className="bg-red-500 text-white">
+                                    Sin Rol
+                                  </Badge>
+                                )}
+                              </td>
+                            )}
 
                             {/* Posición */}
                             <td className="px-4 py-2 text-center w-[230px]">
@@ -438,15 +455,18 @@ export function UsersDashboard() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => openPerms(u, g.businessUnitId)}
-                                title="Permisos (unidad)"
-                                disabled={!g.businessUnitId}
-                              >
-                                <ShieldCheck className="h-4 w-4" />
-                              </Button>
+                              {/* Oculto si no hay permiso */}
+                              {canPermissionAssign && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => openPerms(u, g.businessUnitId)}
+                                  title="Permisos (unidad)"
+                                  disabled={!g.businessUnitId}
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="secondary"
                                 size="icon"
@@ -485,6 +505,7 @@ export function UsersDashboard() {
         onClose={closeModal}
         onSave={handleSaveFromModal}
         businessUnitId={modal.businessUnitId ?? ""}
+        canBusinessUnitManagementAssign={canBusinessUnitManagementAssign}
       />
 
       {/* Confirmación (editar / inactivar) */}

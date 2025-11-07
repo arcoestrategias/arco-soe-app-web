@@ -82,6 +82,7 @@ type Props = {
     payload: any;
   }) => void;
   businessUnitId?: string;
+  canBusinessUnitManagementAssign?: boolean;
 };
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
@@ -119,7 +120,15 @@ function generateSecurePassword(): string {
 }
 
 export function ModalUser(props: Props) {
-  const { isOpen, modo, user, onClose, onSave, businessUnitId } = props;
+  const {
+    isOpen,
+    modo,
+    user,
+    onClose,
+    onSave,
+    businessUnitId,
+    canBusinessUnitManagementAssign,
+  } = props;
 
   // Catálogos
   const rolesQuery = useQuery({ queryKey: QKEY.roles, queryFn: getRoles });
@@ -193,6 +202,10 @@ export function ModalUser(props: Props) {
 
   // Prefill cuando llegan catálogos (por si defaultValues no alcanzan)
   useEffect(() => {
+    if (filteredBUs.length === 1 && !watch("businessUnitId")) {
+      setValue("businessUnitId", filteredBUs[0].id, { shouldValidate: false });
+    }
+
     if (modo === "crear") {
       // BU por storage si existe y está en el filtrado
       if (!watch("businessUnitId")) {
@@ -225,6 +238,12 @@ export function ModalUser(props: Props) {
 
   const onSubmit = (values: FormValues) => {
     try {
+      // Autogenerar solo en CREAR si viene vacía
+      const autoPwd =
+        modo === "crear" && !values.password?.trim()
+          ? generateSecurePassword()
+          : values.password?.trim();
+
       const clean = {
         // Obligatorios
         firstName: values.firstName?.trim(),
@@ -240,12 +259,15 @@ export function ModalUser(props: Props) {
         businessUnitId: values.businessUnitId,
 
         // Crear
-        password: values.password?.trim() || undefined,
+        password: modo === "crear" ? autoPwd : undefined,
         addToAnotherBU: !!values.addToAnotherBU,
       };
 
       if (modo === "crear") {
         onSave({ mode: "crear", payload: clean });
+        if (!values.password?.trim()) {
+          toast.success("Se generó automáticamente una contraseña segura.");
+        }
       } else if (modo === "editar") {
         onSave({ mode: "editar", id: user?.id, payload: clean });
       }
@@ -481,7 +503,7 @@ export function ModalUser(props: Props) {
           </section>
 
           {/* ========== Sección 2: Confirmación de correo (no se muestra en CREAR) ========== */}
-          {modo !== "crear" && (
+          {modo !== "crear" && canBusinessUnitManagementAssign && (
             <>
               <Separator />
               <section className="space-y-4">
@@ -558,126 +580,130 @@ export function ModalUser(props: Props) {
           )}
 
           {/* ========== Sección 3: Configuración en unidad de negocio ========== */}
-          <Separator />
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold">
-              Configuración en unidad de negocio
-            </h3>
+          {canBusinessUnitManagementAssign && (
+            <>
+              <Separator />
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold">
+                  Configuración en unidad de negocio
+                </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Rol */}
-              <div className="space-y-2">
-                <Label>Rol</Label>
-                <Controller
-                  control={control}
-                  name="roleId"
-                  rules={{
-                    required: modo !== "ver" ? "Rol es obligatorio" : false,
-                  }}
-                  render={({ field }) => (
-                    <>
-                      <Select
-                        disabled={modo === "ver"}
-                        value={field.value ?? ""}
-                        onValueChange={(val) =>
-                          field.onChange(val || undefined)
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona un rol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(rolesQuery.data ?? []).map((r: any) => (
-                            <SelectItem key={r.id} value={r.id}>
-                              {r.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors.roleId && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {String(errors.roleId.message)}
-                        </p>
-                      )}
-                    </>
-                  )}
-                />
-              </div>
-
-              {/* Unidad de negocio (filtrada por companyId en storage) */}
-              <div className="space-y-2">
-                <Label>Unidad de negocio</Label>
-                <Controller
-                  control={control}
-                  name="businessUnitId"
-                  rules={{
-                    required:
-                      modo !== "ver"
-                        ? "Unidad de negocio es obligatoria"
-                        : false,
-                  }}
-                  render={({ field }) => (
-                    <>
-                      <Select
-                        disabled={disabled || filteredBUs.length === 0}
-                        value={field.value ?? ""}
-                        onValueChange={(val) =>
-                          field.onChange(val || undefined)
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              filteredBUs.length
-                                ? "Selecciona una unidad de negocio"
-                                : "No hay unidades disponibles para la compañía"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Rol */}
+                  <div className="space-y-2">
+                    <Label>Rol</Label>
+                    <Controller
+                      control={control}
+                      name="roleId"
+                      rules={{
+                        // solo requerido si se muestra la sección
+                        required:
+                          canBusinessUnitManagementAssign && modo !== "ver"
+                            ? "Rol es obligatorio"
+                            : false,
+                      }}
+                      render={({ field }) => (
+                        <>
+                          <Select
+                            disabled={modo === "ver"}
+                            value={field.value ?? ""}
+                            onValueChange={(val) =>
+                              field.onChange(val || undefined)
                             }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredBUs.map((b: any) => (
-                            <SelectItem key={b.id} value={b.id}>
-                              {b.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors.businessUnitId && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {String(errors.businessUnitId.message)}
-                        </p>
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecciona un rol" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(rolesQuery.data ?? []).map((r: any) => (
+                                <SelectItem key={r.id} value={r.id}>
+                                  {r.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {errors.roleId && (
+                            <p className="text-xs text-red-500 mt-1">
+                              {String(errors.roleId.message)}
+                            </p>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                />
-              </div>
-            </div>
+                    />
+                  </div>
 
-            {modo === "editar" && (
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={!!watch("addToAnotherBU")}
-                  onCheckedChange={(v) => setValue("addToAnotherBU", v)}
-                  disabled={false}
-                />
-                <span className="text-sm">
-                  Agregar a otra unidad (no mover)
-                </span>
-              </div>
-            )}
+                  {/* Unidad de negocio */}
+                  <div className="space-y-2">
+                    <Label>Unidad de negocio</Label>
+                    <Controller
+                      control={control}
+                      name="businessUnitId"
+                      rules={{
+                        required:
+                          canBusinessUnitManagementAssign && modo !== "ver"
+                            ? "Unidad de negocio es obligatoria"
+                            : false,
+                      }}
+                      render={({ field }) => (
+                        <>
+                          <Select
+                            disabled={disabled || filteredBUs.length === 0}
+                            value={field.value ?? ""}
+                            onValueChange={(val) =>
+                              field.onChange(val || undefined)
+                            }
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue
+                                placeholder={
+                                  filteredBUs.length
+                                    ? "Selecciona una unidad de negocio"
+                                    : "No hay unidades disponibles para la compañía"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filteredBUs.map((b: any) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {errors.businessUnitId && (
+                            <p className="text-xs text-red-500 mt-1">
+                              {String(errors.businessUnitId.message)}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    />
+                  </div>
+                </div>
 
-            <p className="text-xs text-muted-foreground">
-              <strong>Importante:</strong> si cambias el <em>rol</em>, el
-              sistema reemplaza los permisos de esa unidad por los del rol. Si
-              cambias la <em>unidad de negocio</em>:
-              <br />• con <em>“Agregar a otra unidad”</em> activado → el usuario
-              quedará en ambas BUs (no se mueve).
-              <br />• con el switch apagado → se moverá a la nueva BU.
-            </p>
-          </section>
+                {modo === "editar" && (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={!!watch("addToAnotherBU")}
+                      onCheckedChange={(v) => setValue("addToAnotherBU", v)}
+                      disabled={false}
+                    />
+                    <span className="text-sm">
+                      Agregar a otra unidad (no mover)
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  <strong>Importante:</strong> si cambias el <em>rol</em>, el
+                  sistema reemplaza los permisos de esa unidad por los del rol…
+                </p>
+              </section>
+            </>
+          )}
 
           {/* Crear: sección de password (sin sección de correo) */}
-          {modo === "crear" && (
+          {false && modo === "crear" && (
             <>
               <Separator />
               <section className="space-y-4">
@@ -688,7 +714,6 @@ export function ModalUser(props: Props) {
                       type="text"
                       placeholder="Genera o ingresa una contraseña segura"
                       {...register("password", {
-                        required: "La contraseña es obligatoria",
                         validate: (v) =>
                           (!!v &&
                             v.length >= 6 &&
@@ -700,11 +725,6 @@ export function ModalUser(props: Props) {
                       })}
                       className={errors.password ? "border-red-500" : ""}
                     />
-                    {errors.password && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {String(errors.password.message)}
-                      </p>
-                    )}
                   </div>
                   <div className="flex items-end">
                     <Button

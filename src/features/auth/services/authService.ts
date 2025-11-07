@@ -7,6 +7,7 @@ import {
   getAccessToken,
   getBusinessUnitId,
   setBusinessUnitId,
+  setCompanyId,
   setPositionId,
   setTokens,
 } from "@/shared/auth/storage";
@@ -22,6 +23,7 @@ export interface LoginResult {
 export interface BusinessUnitLite {
   id: string;
   name: string;
+  companyId?: string | null;
   positionId?: string | null;
   positionName?: string | null;
 }
@@ -47,6 +49,7 @@ export interface MeData {
   companies?: Company[];
   needsBusinessUnit?: boolean;
   businessUnits?: BusinessUnitLite[];
+  currentCompanyId?: string | null;
   currentBusinessUnit?: BusinessUnitLite | null;
   permissions?: string[];
 }
@@ -97,6 +100,7 @@ export const authService = {
 
       if (!storedBU && apiBU) {
         setBusinessUnitId(apiBU);
+        setCompanyId(data.currentCompanyId ?? null);
       }
       return data;
     }
@@ -109,6 +113,7 @@ export const authService = {
     // Si el back auto-usó la única BU o devolvió currentBusinessUnit:
     if (!storedBU && apiBU) {
       setBusinessUnitId(apiBU);
+      setCompanyId(data.currentCompanyId ?? null);
     }
 
     // 💾 PERSISTIR SIEMPRE EL POSITION ID (cuando exista)
