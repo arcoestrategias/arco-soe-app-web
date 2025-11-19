@@ -145,4 +145,7 @@ export const QKEY = {
   comments: ["comments"] as const,
   commentsByReference: (referenceId: string) =>
     ["comments", "ref", referenceId] as const,
+
+  notifications: "notifications",
+  notificationsUnreadCount: "notifications.unreadCount",
 };

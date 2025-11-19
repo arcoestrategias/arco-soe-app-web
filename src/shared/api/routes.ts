@@ -230,6 +230,8 @@ export const routes = {
 
   notifications: {
     send: () => prefixed("/notifications/send"),
+    list: () => prefixed("/notifications"),
+    markRead: (id: string) => prefixed(`/notifications/${id}/read`),
   },
 
   comments: {

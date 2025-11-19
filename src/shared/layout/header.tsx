@@ -26,6 +26,8 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { toast } from "sonner";
 import { setBusinessUnitId } from "../auth/storage";
+import { ShowIfAccess } from "../auth/access-control";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
 
 export function Header({
   currentPageTitle,
@@ -101,17 +103,10 @@ export function Header({
         </h1>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-            aria-label="Notificaciones"
-          >
-            <Bell className="h-5 w-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#FF6B35] text-[10px] text-white flex items-center justify-center p-0 border-2 border-white">
-              3
-            </Badge>
-          </Button>
+          {/* <ShowIfAccess module="notification" action="access">
+            <NotificationBell />
+          </ShowIfAccess> */}
+          <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
