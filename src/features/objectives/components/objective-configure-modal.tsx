@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { InputWithCounter } from "@/shared/components/input-with-counter";
+import ObjectiveStrategicSelect from "@/shared/components/objective-strategic-select";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 import { getHumanErrorMessage } from "@/shared/api/response";
@@ -429,32 +430,31 @@ export default function ObjectiveConfigureModal({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-            {/* Nombre */}
-            <div className="md:col-span-12 min-w-0">
-              <label className="mb-1 block text-xs font-medium text-foreground">
-                Nombre
-              </label>
-              <InputWithCounter
-                className="w-full"
-                value={objective.name ?? ""}
-                onChange={(val) => setObjective((s) => ({ ...s, name: val }))}
-                maxLength={500}
-                placeholder="Nombre del objetivo"
-              />
-            </div>
+          {/* Nombre del objetivo (siempre visible) */}
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-foreground">
+              Nombre
+            </label>
+            <InputWithCounter
+              className="w-full"
+              value={objective.name ?? ""}
+              onChange={(val) => setObjective((s) => ({ ...s, name: val }))}
+              maxLength={500}
+              placeholder="Nombre del objetivo"
+            />
+          </div>
 
-            {/* Campos de mapa (opcionales) */}
-            {showMapFields && (
-              <>
-                <div className="md:col-span-3 min-w-0">
+          {/* Campos de mapa (opcionales) */}
+          {showMapFields && (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-4">
+              <div className="md:col-span-6 min-w-0">
                   <label className="mb-1 block text-xs font-medium text-foreground">
                     Nivel
                   </label>
                   <Select
                     value={objective.level ?? undefined}
                     onValueChange={(v) =>
-                      setObjective((s) => ({ ...s, level: v as any }))
+                      setObjective((s) => ({ ...s, level: v as any, }))
                     }
                   >
                     <SelectTrigger className="w-full">
@@ -467,7 +467,7 @@ export default function ObjectiveConfigureModal({
                   </Select>
                 </div>
 
-                <div className="md:col-span-3 min-w-0">
+              <div className="md:col-span-6 min-w-0">
                   <label className="mb-1 block text-xs font-medium text-foreground">
                     Orientación
                   </label>
@@ -490,15 +490,16 @@ export default function ObjectiveConfigureModal({
                   </Select>
                 </div>
 
-                <div className="md:col-span-3 min-w-0">
+              <div className="md:col-span-6 min-w-0">
                   <label className="mb-1 block text-xs font-medium text-foreground">
                     Perspectiva
                   </label>
                   <Select
                     value={objective.perspective ?? undefined}
                     onValueChange={(v) =>
-                      setObjective((s) => ({ ...s, perspective: v as any }))
+                      setObjective((s) => ({ ...s, perspective: v as any, }))
                     }
+                    disabled={objective.level === "OPE"}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Selecciona" />
@@ -512,42 +513,23 @@ export default function ObjectiveConfigureModal({
                   </Select>
                 </div>
 
-                <div className="md:col-span-3 min-w-0">
+              <div className="md:col-span-6 min-w-0">
                   <label className="mb-1 block text-xs font-medium text-foreground">
                     Objetivo al que impacta
                   </label>
-                  <Input
-                    className="w-full"
-                    value={objective.objectiveParentId ?? ""}
-                    onChange={(e) =>
-                      setObjective((s) => ({
-                        ...s,
-                        objectiveParentId: e.target.value || null,
-                      }))
+                  <ObjectiveStrategicSelect
+                    planId={strategicPlanId}
+                    value={objective.objectiveParentId ?? undefined}
+                    onChange={(val) =>
+                      setObjective((s) => ({ ...s, objectiveParentId: val ?? null, }))
                     }
-                    placeholder="Opcional"
+                    currentObjectiveId={objective.id}
+                    disabled={objective.level === "OPE"}
                   />
                 </div>
 
-                <div className="md:col-span-3 min-w-0">
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Estado
-                  </label>
-                  <Input
-                    className="w-full"
-                    value={objective.status ?? ""}
-                    onChange={(e) =>
-                      setObjective((s) => ({
-                        ...s,
-                        status: e.target.value || null,
-                      }))
-                    }
-                    placeholder="Opcional (p.ej. OPE)"
-                  />
-                </div>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </section>
 
         <hr className="my-4" />

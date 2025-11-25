@@ -156,6 +156,8 @@ export const routes = {
     reorder: () => prefixed(Modules.OBJECTIVES, "reorder"),
     icoBoard: () => prefixed("ico", "objectives", "ico-board"),
     unconfigured: () => prefixed(Modules.OBJECTIVES, "unconfigured"),
+    strategyMap: (strategicPlanId: string) =>
+      prefixed("ico", "objectives", "strategic-map") + qs({ strategicPlanId }),
     configure: (objectiveId: string) =>
       prefixed(Modules.OBJECTIVES, objectiveId, "configure"),
   },

@@ -1,5 +1,6 @@
 "use client";
 
+import { useStrategyMap } from "@/features/strategic-plans/hooks/useStrategyMap";
 import { useCallback, useEffect, useState } from "react";
 import {
   ReactFlow,
@@ -15,16 +16,72 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { StrategyMapNode } from "./strategy-map-node";
-import type { ObjetivoEstrategico } from "./strategy-map-types";
+import type { StrategyMapObjective } from "@/features/strategic-plans/types/strategy-map";
+
+// Tipos internos del componente, ahora en inglés
+type MappedPerspective = "financiera" | "cliente" | "procesos" | "persona";
+
+interface MappedObjective {
+  id: string;
+  nombre: string;
+  estado: "cumplido" | "en-proceso" | "no-cumplido" | "no-se-mide";
+  perspectiva: MappedPerspective;
+  padreId: string | null;
+}
 
 type Props = {
   strategicPlanId?: string;
 };
 
-export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
+// --- Funciones de Mapeo ---
+
+const mapPerspective = (
+  p: StrategyMapObjective["perspective"]
+): MappedPerspective => {
+  const mapping: Record<
+    StrategyMapObjective["perspective"],
+    MappedPerspective
+  > = {
+    FIN: "financiera",
+    CLI: "cliente",
+    PRO: "procesos",
+    PER: "persona",
+  };
+  return mapping[p];
+};
+
+const mapStatus = (
+  objective: StrategyMapObjective
+): MappedObjective["estado"] => {
+  // La API devuelve un solo elemento en icoMonthly con la data relevante.
+  const currentMonthData = objective.icoMonthly[0];
+
+  // Si no hay data del mes o si explícitamente no se mide, el estado es 'anulado'.
+  if (!currentMonthData || !currentMonthData.isMeasured) {
+    return "no-se-mide";
+  }
+
+  // Mapeamos el 'semáforo' numérico al estado correspondiente.
+  const statusMap: Record<number, MappedObjective["estado"]> = {
+    1: "cumplido",
+    2: "en-proceso",
+    3: "no-cumplido",
+  };
+
+  // Si lightNumeric es null, también se considera 'anulado'.
+  return currentMonthData.lightNumeric !== null
+    ? statusMap[currentMonthData.lightNumeric]
+    : "no-se-mide";
+};
+
+// --- Componente Principal ---
+
+export function StrategyMapTab({ strategicPlanId }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const { data: objectivesFromApi, isLoading } =
+    useStrategyMap(strategicPlanId);
 
   const perspectivas = [
     { id: "pers-fin", nombre: "FINANCIERA", y: 120, color: "text-blue-700" },
@@ -33,14 +90,14 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
     { id: "pers-per", nombre: "PERSONA", y: 810, color: "text-purple-700" },
   ];
 
-  const perspectiveY: Record<string, number> = {
+  const perspectiveY: Record<MappedPerspective, number> = {
     financiera: 120,
     cliente: 350,
     procesos: 580,
     persona: 810,
   };
 
-  const perspectiveOrder: Record<string, number> = {
+  const perspectiveOrder: Record<MappedPerspective, number> = {
     persona: 1,
     procesos: 2,
     cliente: 3,
@@ -52,7 +109,7 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
   const TOTAL_CARD_SPACE = CARD_WIDTH + CARD_SPACING;
   const START_X = 120;
 
-  const getPosition = (index: number, perspectiva: string) => ({
+  const getPosition = (index: number, perspectiva: MappedPerspective) => ({
     x: START_X + index * TOTAL_CARD_SPACE,
     y: perspectiveY[perspectiva],
   });
@@ -323,180 +380,7 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
   //   },
   // ];
 
-  const objetivos: ObjetivoEstrategico[] = [
-    // PERSONA
-    {
-      id: "uuid-pe1",
-      nombre: "Desarrollar competencias y aumentar capacitación un 20%",
-      estado: "cumplido",
-      perspectiva: "persona",
-    },
-    {
-      id: "uuid-pe2",
-      nombre: "Mejorar clima alcanzando 85% de satisfacción",
-      estado: "cumplido",
-      perspectiva: "persona",
-    },
-    {
-      id: "uuid-pe3",
-      nombre: "Implementar gestión del conocimiento en 90% de procesos",
-      estado: "cumplido",
-      perspectiva: "persona",
-    },
-    // {
-    //   id: "uuid-pe4",
-    //   nombre: "Capacitación digital",
-    //   estado: "cumplido",
-    //   perspectiva: "persona",
-    //   padreId: "",
-    // },
-    // {
-    //   id: "uuid-pe5",
-    //   nombre: "Marca empleadora",
-    //   estado: "en-proceso",
-    //   perspectiva: "persona",
-    //   padreId: "",
-    // },
-
-    // PROCESOS
-    {
-      id: "uuid-pr1",
-      nombre:
-        "Alcanzar un 90% de eficiencia operativa en los procesos de fabricación",
-      estado: "en-proceso",
-      perspectiva: "procesos",
-      padreId: "uuid-pe1",
-    },
-    {
-      id: "uuid-pr3",
-      nombre: "Acelerar tiempo de respuesta en un 25% en servicios clave",
-      estado: "no-cumplido",
-      perspectiva: "procesos",
-      padreId: "uuid-pe2",
-    },
-    {
-      id: "uuid-pr2",
-      nombre: "Implementar tecnología digital en 100% de procesos clave",
-      estado: "cumplido",
-      perspectiva: "procesos",
-      padreId: "uuid-pe3",
-    },
-
-    // {
-    //   id: "uuid-pr4",
-    //   nombre: "Control de calidad",
-    //   estado: "cumplido",
-    //   perspectiva: "procesos",
-    //   padreId: "",
-    // },
-    // {
-    //   id: "uuid-pr5",
-    //   nombre: "Gestión documental",
-    //   estado: "en-proceso",
-    //   perspectiva: "procesos",
-    //   padreId: "",
-    // },
-
-    // CLIENTE
-    {
-      id: "uuid-cl1",
-      nombre: "Mejorar satisfacción del cliente a más del 90%",
-      estado: "cumplido",
-      perspectiva: "cliente",
-      padreId: "uuid-pr1",
-    },
-    {
-      id: "uuid-cl2",
-      nombre: "Aumentar retención de clientes en un 15%",
-      estado: "cumplido",
-      perspectiva: "cliente",
-      padreId: "uuid-cl1",
-    },
-    {
-      id: "uuid-cl3",
-      nombre:
-        "Incrementar un 30% el reconocimiento de marca en nuevos segmentos",
-      estado: "en-proceso",
-      perspectiva: "cliente",
-      padreId: "uuid-cl4",
-    },
-    {
-      id: "uuid-cl4",
-      nombre: "Mejorar experiencia digital logrando 90% de satisfacción",
-      estado: "anulado",
-      perspectiva: "cliente",
-      padreId: "uuid-pr3",
-    },
-    // {
-    //   id: "uuid-cl5",
-    //   nombre: "Propuesta de valor",
-    //   estado: "en-proceso",
-    //   perspectiva: "cliente",
-    //   padreId: "uuid-cl4",
-    // },
-
-    // FINANCIERA
-    {
-      id: "uuid-fi1",
-      nombre: "Aumentar un 5% la utilidad de la empresa",
-      estado: "en-proceso",
-      perspectiva: "financiera",
-      padreId: "uuid-fi2",
-      // padreId: "uuid-cl5",
-    },
-    {
-      id: "uuid-fi2",
-      nombre: "Incrementar en un 12% el ROI de la empresa",
-      estado: "en-proceso",
-      perspectiva: "financiera",
-      padreId: "uuid-fi4",
-    },
-    {
-      id: "uuid-fi3",
-      nombre: "Alcanzar al menos 20% en ingresos de nuevas líneas de negocio",
-      estado: "no-cumplido",
-      perspectiva: "financiera",
-      padreId: "uuid-cl3",
-    },
-    {
-      id: "uuid-fi4",
-      nombre: "Aumentar un 10% el flujo de caja mensual",
-      estado: "en-proceso",
-      perspectiva: "financiera",
-      padreId: "uuid-cl2",
-    },
-    // {
-    //   id: "uuid-fi5",
-    //   nombre: "QUITAR - Productividad financiera Productividad",
-    //   estado: "cumplido",
-    //   perspectiva: "financiera",
-    //   padreId: "uuid-fi4",
-    // },
-    // {
-    //   id: "uuid-fi6",
-    //   nombre:
-    //     "QUITAR - Ser reconocidos como líderes en la transformación estratégica de organizaciones, creando valor a través de soluciones que definan el futuro.",
-    //   estado: "cumplido",
-    //   perspectiva: "financiera",
-    // },
-  ];
-
-  const agrupados: Record<string, ObjetivoEstrategico[]> = {
-    financiera: objetivos.filter((o) => o.perspectiva === "financiera"),
-    cliente: objetivos.filter((o) => o.perspectiva === "cliente"),
-    procesos: objetivos.filter((o) => o.perspectiva === "procesos"),
-    persona: objetivos.filter((o) => o.perspectiva === "persona"),
-  };
-
-  const maxObjetivos = Math.max(
-    agrupados.financiera.length,
-    agrupados.cliente.length,
-    agrupados.procesos.length,
-    agrupados.persona.length
-  );
-
-  const perspectivaWidth = TOTAL_CARD_SPACE * maxObjetivos + 100;
-
+  //   perspectiva: "financiera",
   const nodeTypes = {
     objetivo: StrategyMapNode,
     perspectiva: ({ data }: any) => (
@@ -515,6 +399,28 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
     Math.max(1800, TOTAL_CARD_SPACE * objetivosCount + 100);
 
   useEffect(() => {
+    if (!objectivesFromApi) return;
+
+    // 1. Mapear datos de la API a la estructura del componente
+    const mappedObjectives: MappedObjective[] = objectivesFromApi.map((o) => ({
+      id: o.id,
+      nombre: o.name,
+      perspectiva: mapPerspective(o.perspective),
+      padreId: o.objectiveParentId,
+      estado: mapStatus(o),
+    }));
+
+    // 2. Agrupar por perspectiva
+    const groupedByPerspective: Record<MappedPerspective, MappedObjective[]> = {
+      financiera: mappedObjectives.filter(
+        (o) => o.perspectiva === "financiera"
+      ),
+      cliente: mappedObjectives.filter((o) => o.perspectiva === "cliente"),
+      procesos: mappedObjectives.filter((o) => o.perspectiva === "procesos"),
+      persona: mappedObjectives.filter((o) => o.perspectiva === "persona"),
+    };
+
+    // 3. Crear nodos de perspectiva
     const perspectivaNodes: Node[] = perspectivas.map((p) => {
       return {
         id: p.id,
@@ -523,7 +429,13 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
         data: {
           nombre: p.nombre,
           color: p.color,
-          width: perspectivaWidth,
+          width: getPerspectiveWidth(
+            Math.max(
+              ...Object.values(groupedByPerspective).map(
+                (lista) => lista.length
+              )
+            )
+          ),
           height: 180,
         },
         draggable: false,
@@ -532,12 +444,13 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
       };
     });
 
-    const objetivoNodes: Node[] = Object.entries(agrupados).flatMap(
+    // 4. Crear nodos de objetivo
+    const objetivoNodes: Node[] = Object.entries(groupedByPerspective).flatMap(
       ([perspectiva, lista]) =>
         lista.map((o, index) => ({
           id: o.id,
           type: "objetivo",
-          position: getPosition(index, perspectiva),
+          position: getPosition(index, perspectiva as MappedPerspective),
           data: {
             nombre: o.nombre,
             estado: o.estado,
@@ -549,10 +462,11 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
         }))
     );
 
-    const edgeList: Edge[] = objetivos
+    // 5. Crear las conexiones (edges)
+    const edgeList: Edge[] = mappedObjectives
       .filter((o) => o.padreId)
       .map((o) => {
-        const parent = objetivos.find((p) => p.id === o.padreId);
+        const parent = mappedObjectives.find((p) => p.id === o.padreId);
         if (!parent) return null;
 
         const sourceLevel = perspectiveOrder[parent.perspectiva];
@@ -592,7 +506,7 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
 
     setNodes([...perspectivaNodes, ...objetivoNodes]);
     setEdges(edgeList);
-  }, [selectedNodeId]);
+  }, [selectedNodeId, objectivesFromApi]);
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();
@@ -602,6 +516,14 @@ export function StrategyMapTab({ strategicPlanId: _strategicPlanId }: Props) {
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="h-[900px] w-full flex items-center justify-center bg-gray-50 rounded-lg border">
+        <p className="text-gray-500">Cargando mapa estratégico...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[900px] w-full relative bg-gray-50 rounded-lg border border-gray-200">
