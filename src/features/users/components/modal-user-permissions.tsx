@@ -9,6 +9,7 @@ import {
   Loader2,
   Save,
   X,
+  RotateCcw,
 } from "lucide-react";
 
 import {
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +38,7 @@ import {
   useUpdateUserPermissionsMutation,
 } from "../hooks/use-user-permissions";
 import type { UserPermission } from "../types/types";
+import { useResetUserPermissionsMutation } from "../services/use-user-permissions";
 
 interface ModalUserPermissionsProps {
   isOpen: boolean;
@@ -57,6 +60,7 @@ export function ModalUserPermissions({
     userId
   );
   const updateMutation = useUpdateUserPermissionsMutation();
+  const resetMutation = useResetUserPermissionsMutation();
 
   const [allowedIds, setAllowedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -106,6 +110,23 @@ export function ModalUserPermissions({
         },
         onError: () => {
           toast.error("Error al actualizar permisos.");
+        },
+      }
+    );
+  };
+
+  const handleReset = () => {
+    if (!userId || !businessUnitId) return;
+
+    resetMutation.mutate(
+      { businessUnitId, userId },
+      {
+        onSuccess: () => {
+          toast.success("Permisos restablecidos al rol correctamente.");
+          // No cerramos la modal para que el usuario vea el cambio reflejado
+        },
+        onError: () => {
+          toast.error("Error al restablecer permisos.");
         },
       }
     );
@@ -417,6 +438,22 @@ export function ModalUserPermissions({
             )}
           </div>
         </TooltipProvider>
+        <DialogFooter className="sm:justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleReset}
+            disabled={resetMutation.isPending || isLoading}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {resetMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4 mr-2" />
+            )}
+            Restablecer al Rol
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
