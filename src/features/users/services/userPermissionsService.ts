@@ -27,3 +27,13 @@ export async function updateUserPermissions(
   );
   return unwrapAny<any>(res.data);
 }
+
+export async function resetUserPermissions(
+  businessUnitId: string,
+  userId: string
+) {
+  const res = await http.post(
+    routes.businessUnits.resetUserPermissions(businessUnitId, userId)
+  );
+  return unwrapAny<any>(res.data);
+}
