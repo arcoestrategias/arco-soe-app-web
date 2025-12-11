@@ -49,6 +49,8 @@ export const Modules = {
   PRIORITIES: "priorities",
   FILES: "files",
   REPORTS: "reports",
+  MODULES: "modules",
+  PERMISSIONS: "permissions",
   // agrega aquí más módulos a futuro…
 } as const;
 
@@ -67,7 +69,13 @@ export const routes = {
   },
 
   roles: {
-    list: () => prefixed(Modules.ROLES),
+    list: (params?: { includeInactive: boolean }) =>
+      prefixed(Modules.ROLES) + qs(params),
+    create: () => prefixed(Modules.ROLES),
+    byId: (id: string) => prefixed(Modules.ROLES, id),
+    update: (id: string) => prefixed(Modules.ROLES, id),
+    remove: (id: string) => prefixed(Modules.ROLES, id),
+    permissions: (id: string) => prefixed(Modules.ROLES, id, "permissions"),
   },
 
   companies: {
@@ -234,6 +242,16 @@ export const routes = {
     send: () => prefixed("/notifications/send"),
     list: () => prefixed("/notifications"),
     markRead: (id: string) => prefixed(`/notifications/${id}/read`),
+  },
+
+  modules: {
+    list: () => prefixed(Modules.MODULES),
+    permissions: (moduleId: string) =>
+      prefixed(Modules.MODULES, moduleId, "permissions"),
+  },
+
+  permissions: {
+    list: () => prefixed(Modules.PERMISSIONS),
   },
 
   comments: {

@@ -61,3 +61,15 @@ export type UpdateUserPayload = Partial<Omit<CreateUserPayload, "password">> & {
 };
 
 export type Role = { id: string; name: string };
+
+export interface UserPermission {
+  id: string;
+  name: string;
+  description: string | null;
+  module: string;
+  isAllowed: boolean;
+}
+
+export interface UpdateUserPermissionsPayload {
+  permissions: { id: string; isAllowed: boolean }[];
+}

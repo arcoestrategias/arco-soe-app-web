@@ -58,7 +58,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   };
 
   return (
-    <div className="rounded-lg border bg-background shadow-lg">
+    <div className="rounded-lg border bg-background shadow-lg flex flex-col max-h-[70vh]">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <div className="text-sm font-semibold">Notificaciones</div>
@@ -82,17 +82,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       </div>
 
       {/* Contenido */}
-      {isLoading ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </div>
-      ) : !items.length ? (
-        <div className="flex h-40 items-center justify-center text-xs text-muted-foreground px-4 text-center">
-          No tienes notificaciones por el momento.
-        </div>
-      ) : (
-        // Crece según contenido, pero máximo hasta ~10 ítems.
-        <ScrollArea className="max-h-[600px]">
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex h-40 items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : !items.length ? (
+          <div className="flex h-40 items-center justify-center text-xs text-muted-foreground px-4 text-center">
+            No tienes notificaciones por el momento.
+          </div>
+        ) : (
+          // Ya no se necesita ScrollArea aquí, el div padre se encarga.
           <ul className="divide-y">
             {items.map((notif) => (
               <li
@@ -145,8 +145,8 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
               </li>
             ))}
           </ul>
-        </ScrollArea>
-      )}
+        )}
+      </div>
     </div>
   );
 }

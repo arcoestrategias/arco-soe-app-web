@@ -1,40 +1,29 @@
 import http from "@/shared/api/http";
 import { routes } from "@/shared/api/routes";
 import { unwrapAny } from "@/shared/api/response";
-
-export type PermissionFlags = {
-  access: boolean;
-  create: boolean;
-  read: boolean;
-  update: boolean;
-  delete: boolean;
-  export: boolean;
-  approve: boolean;
-  assign: boolean;
-};
-
-export type PermissionModules = Record<string, PermissionFlags>; // e.g. "businessUnit": { ... }
+import type {
+  UserPermission,
+  UpdateUserPermissionsPayload,
+} from "../types/types";
 
 export async function getUserPermissions(
   businessUnitId: string,
   userId: string
-): Promise<PermissionModules> {
+): Promise<UserPermission[]> {
   const res = await http.get(
     routes.businessUnits.userPermissions(businessUnitId, userId)
   );
-  // unwrapAny → { modules: { ... } }
-  const { modules } = unwrapAny<{ modules: PermissionModules }>(res.data);
-  return modules ?? {};
+  return unwrapAny<UserPermission[]>(res.data);
 }
 
 export async function updateUserPermissions(
   businessUnitId: string,
   userId: string,
-  permissions: Record<string, boolean>
+  payload: UpdateUserPermissionsPayload
 ) {
-  const res = await http.put(
+  const res = await http.patch(
     routes.businessUnits.userPermissions(businessUnitId, userId),
-    { permissions }
+    payload
   );
   return unwrapAny<any>(res.data);
 }

@@ -32,33 +32,28 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 import {
-  useUserPermissionsQuery,
-  useUpdateUserPermissionsMutation,
-} from "../hooks/use-user-permissions";
-import type { UserPermission } from "../types/types";
+  useRolePermissionsQuery,
+  useUpdateRolePermissionsMutation,
+} from "../hooks/use-roles";
+import type { RolePermission } from "../types/types";
 
-interface ModalUserPermissionsProps {
+interface ModalRolePermissionsProps {
   isOpen: boolean;
   onClose: () => void;
-  userId: string;
-  businessUnitId: string;
-  userName?: string;
+  roleId: string | null;
+  roleName?: string;
 }
 
-export function ModalUserPermissions({
+export function ModalRolePermissions({
   isOpen,
   onClose,
-  userId,
-  businessUnitId,
-  userName,
-}: ModalUserPermissionsProps) {
-  const { data: permissions, isLoading } = useUserPermissionsQuery(
-    businessUnitId,
-    userId
-  );
-  const updateMutation = useUpdateUserPermissionsMutation();
+  roleId,
+  roleName,
+}: ModalRolePermissionsProps) {
+  const { data: permissions, isLoading } = useRolePermissionsQuery(roleId);
+  const updateMutation = useUpdateRolePermissionsMutation();
 
-  const [allowedIds, setAllowedIds] = useState<Set<string>>(new Set());
+  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
     new Set()
@@ -66,10 +61,10 @@ export function ModalUserPermissions({
 
   useEffect(() => {
     if (permissions) {
-      const allowed = new Set(
-        permissions.filter((p) => p.isAllowed).map((p) => p.id)
+      const active = new Set(
+        permissions.filter((p) => p.isActive).map((p) => p.id)
       );
-      setAllowedIds(allowed);
+      setActiveIds(active);
     }
   }, [permissions, isOpen]);
 
@@ -81,27 +76,27 @@ export function ModalUserPermissions({
   }, [isOpen]);
 
   const handleToggle = (id: string, checked: boolean) => {
-    const next = new Set(allowedIds);
+    const next = new Set(activeIds);
     if (checked) next.add(id);
     else next.delete(id);
-    setAllowedIds(next);
+    setActiveIds(next);
   };
 
   const handleSave = () => {
-    if (!userId || !businessUnitId || !permissions) return;
+    if (!roleId || !permissions) return;
 
     const payload = {
       permissions: permissions.map((p) => ({
         id: p.id,
-        isAllowed: allowedIds.has(p.id),
+        isActive: activeIds.has(p.id),
       })),
     };
 
     updateMutation.mutate(
-      { businessUnitId, userId, payload },
+      { roleId, payload },
       {
         onSuccess: () => {
-          toast.success("Permisos de usuario actualizados correctamente.");
+          toast.success("Permisos actualizados correctamente.");
           onClose();
         },
         onError: () => {
@@ -119,7 +114,7 @@ export function ModalUserPermissions({
       if (!acc[mod]) acc[mod] = [];
       acc[mod].push(p);
       return acc;
-    }, {} as Record<string, UserPermission[]>);
+    }, {} as Record<string, RolePermission[]>);
   }, [permissions]);
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -128,7 +123,7 @@ export function ModalUserPermissions({
   const filteredGroupedPermissions = useMemo(() => {
     if (!normalizedSearch) return groupedPermissions;
 
-    const result: Record<string, UserPermission[]> = {};
+    const result: Record<string, RolePermission[]> = {};
     Object.entries(groupedPermissions).forEach(([moduleName, perms]) => {
       const filtered = perms.filter((p) => {
         const text = `${p.description || ""} ${p.name || ""}`.toLowerCase();
@@ -153,7 +148,7 @@ export function ModalUserPermissions({
     checked: boolean | "indeterminate"
   ) => {
     const permsInGroup = groupedPermissions[moduleName] ?? [];
-    const next = new Set(allowedIds);
+    const next = new Set(activeIds);
 
     if (checked === true) {
       permsInGroup.forEach((p) => next.add(p.id));
@@ -161,7 +156,7 @@ export function ModalUserPermissions({
       permsInGroup.forEach((p) => next.delete(p.id));
     }
 
-    setAllowedIds(next);
+    setActiveIds(next);
   };
 
   // Expand/collapse módulo + su par de fila
@@ -209,43 +204,45 @@ export function ModalUserPermissions({
   };
 
   const totalPerms = permissions?.length ?? 0;
-  const totalAllowed = permissions
-    ? permissions.filter((p) => allowedIds.has(p.id)).length
+  const totalActive = permissions
+    ? permissions.filter((p) => activeIds.has(p.id)).length
     : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      {/* Modal ancho y solo scroll vertical */}
       <DialogContent className="sm:max-w-6xl w-[95vw] max-h-[80vh] overflow-y-auto overflow-x-hidden">
+        {/* Título + descripción (solo) */}
         <DialogHeader className="pb-2">
-          <DialogTitle>Permisos de Usuario: {userName}</DialogTitle>
+          <DialogTitle>Permisos del Rol: {roleName}</DialogTitle>
           <DialogDescription>
-            Configura los permisos específicos para este usuario en la unidad de
-            negocio.
+            Activa o desactiva los permisos para este rol.
           </DialogDescription>
         </DialogHeader>
 
-        {/* TOOLBAR */}
+        {/* TOOLBAR: buscador + resumen + acciones */}
         <div className="mb-4 mt-1 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {/* Buscador (izquierda, ocupa espacio) */}
           <div className="flex-1 max-w-xl space-y-1">
-            <Label htmlFor="user-perm-search" className="text-sm font-medium">
+            <Label htmlFor="perm-search" className="text-sm font-medium">
               Buscar permisos
             </Label>
             <Input
-              id="user-perm-search"
-              placeholder="Busca por descripción o código..."
+              id="perm-search"
+              placeholder="Busca por descripción o código del permiso..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
+          {/* Centro: resumen */}
           <div className="md:text-center text-sm text-muted-foreground">
-            Permisos permitidos:{" "}
-            <span className="font-semibold text-foreground">
-              {totalAllowed}
-            </span>{" "}
+            Permisos activos:{" "}
+            <span className="font-semibold text-foreground">{totalActive}</span>{" "}
             / {totalPerms}
           </div>
 
+          {/* Derecha: acciones */}
           <div className="flex flex-wrap items-center gap-2 justify-end">
             <Button
               type="button"
@@ -296,6 +293,7 @@ export function ModalUserPermissions({
                 No se encontraron permisos que coincidan con la búsqueda.
               </div>
             ) : (
+              // 2 grupos por fila
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {sortedModules.map((moduleName) => {
                   const permsInFilteredGroup =
@@ -304,11 +302,14 @@ export function ModalUserPermissions({
 
                   const totalGroupPerms = permsInFullGroup.length;
                   const selectedInGroup = permsInFullGroup.filter((p) =>
-                    allowedIds.has(p.id)
+                    activeIds.has(p.id)
                   ).length;
 
                   const allSelectedGroup =
                     totalGroupPerms > 0 && selectedInGroup === totalGroupPerms;
+                  const someSelectedGroup =
+                    selectedInGroup > 0 && !allSelectedGroup;
+
                   const isExpanded = expandedModules.has(moduleName);
 
                   return (
@@ -316,6 +317,7 @@ export function ModalUserPermissions({
                       key={moduleName}
                       className="border rounded-lg p-3 flex flex-col gap-3 bg-muted/30"
                     >
+                      {/* Header del grupo */}
                       <div className="flex items-start justify-between gap-3">
                         <button
                           type="button"
@@ -335,23 +337,24 @@ export function ModalUserPermissions({
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {selectedInGroup}/{totalGroupPerms} permitidos
+                              {selectedInGroup}/{totalGroupPerms} activos
                               {normalizedSearch &&
-                                ` · ${permsInFilteredGroup.length} coinciden`}
+                                ` · ${permsInFilteredGroup.length} coinciden con la búsqueda`}
                             </p>
                           </div>
                         </button>
 
+                        {/* Select all del grupo (NO es clickeable para expandir) */}
                         <div className="flex items-center gap-2 ml-2">
                           <Checkbox
-                            checked={allSelectedGroup}
+                            checked={allSelectedGroup} // solo true cuando todos están activos
                             onCheckedChange={(checked) =>
                               handleToggleGroup(moduleName, checked)
                             }
-                            id={`group-user-${moduleName}`}
+                            id={`group-${moduleName}`}
                           />
                           <Label
-                            htmlFor={`group-user-${moduleName}`}
+                            htmlFor={`group-${moduleName}`}
                             className="text-xs cursor-pointer text-muted-foreground"
                           >
                             Seleccionar todo
@@ -359,11 +362,13 @@ export function ModalUserPermissions({
                         </div>
                       </div>
 
+                      {/* Lista de permisos (1 col en la mayoría, 2 col en pantallas muy grandes si quieres) */}
                       {isExpanded && (
                         <>
                           {permsInFilteredGroup.length === 0 ? (
                             <div className="text-xs text-muted-foreground italic">
-                              Ningún permiso coincide.
+                              Ningún permiso de este módulo coincide con la
+                              búsqueda.
                             </div>
                           ) : (
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
@@ -388,7 +393,7 @@ export function ModalUserPermissions({
                                     </Tooltip>
 
                                     <Label
-                                      htmlFor={`uperm-${perm.id}`}
+                                      htmlFor={perm.id}
                                       className="text-sm font-normal cursor-pointer leading-snug break-words"
                                     >
                                       {perm.description || perm.name}
@@ -397,8 +402,8 @@ export function ModalUserPermissions({
 
                                   <div className="flex-shrink-0 self-start mt-1">
                                     <Switch
-                                      id={`uperm-${perm.id}`}
-                                      checked={allowedIds.has(perm.id)}
+                                      id={perm.id}
+                                      checked={activeIds.has(perm.id)}
                                       onCheckedChange={(checked) =>
                                         handleToggle(perm.id, checked)
                                       }

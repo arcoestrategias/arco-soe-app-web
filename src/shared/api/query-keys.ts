@@ -19,7 +19,11 @@ export const QKEY = {
   users: ["users"] as const,
   userAvatar: (id: string) => ["user-avatar", id] as const,
 
-  roles: ["roles"] as const,
+  roles: (params?: { includeInactive: boolean }) =>
+    ["roles", params ?? {}] as const,
+  role: (id: string) => ["roles", id] as const,
+  rolePermissions: (id: string) => ["roles", id, "permissions"] as const,
+  allPermissions: () => ["permissions", "all"] as const,
 
   userPermissions: (businessUnitId: string, userId: string) =>
     ["user-permissions", businessUnitId, userId] as const,
@@ -151,4 +155,6 @@ export const QKEY = {
 
   notifications: "notifications",
   notificationsUnreadCount: "notifications.unreadCount",
+  modules: () => ["modules"],
+  modulePermissions: (moduleId: string) => ["modules", moduleId, "permissions"],
 };

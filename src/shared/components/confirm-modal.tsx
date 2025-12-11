@@ -7,6 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ActionButton } from "@/components/ui/action-button";
+import { cn } from "@/lib/utils";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   children?: React.ReactNode;
+  isDestructive?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -29,6 +31,7 @@ export function ConfirmModal({
   confirmText = "Aceptar",
   cancelText = "Cancelar",
   children,
+  isDestructive = false,
   onOpenChange,
 }: ConfirmModalProps) {
   return (
@@ -55,7 +58,12 @@ export function ConfirmModal({
           />
           <ActionButton
             label={confirmText}
-            className="btn-cancel-gradient "
+            className={cn(
+              // Estilo por defecto: el gradiente naranja principal
+              "btn-gradient",
+              // Si es destructivo, usa el gradiente rojo en su lugar
+              isDestructive && "btn-cancel-gradient"
+            )}
             onAction={onConfirm}
           />
         </div>

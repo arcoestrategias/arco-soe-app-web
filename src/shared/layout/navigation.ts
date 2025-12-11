@@ -12,6 +12,7 @@ import {
   Users2,
   BookOpenCheck,
   IdCardLanyard,
+  Shield,
   UserCog2,
 } from "lucide-react";
 
@@ -91,6 +92,18 @@ export const navigationSections = [
         url: "/strategic-plans/manage",
         icon: BookOpenCheck,
         module: "strategicPlanManagement",
+      },
+      {
+        title: "Módulos",
+        url: "/modules",
+        icon: Settings,
+        module: "module",
+      },
+      {
+        title: "Roles",
+        url: "/roles",
+        icon: Shield,
+        module: "role",
       },
     ],
   },
