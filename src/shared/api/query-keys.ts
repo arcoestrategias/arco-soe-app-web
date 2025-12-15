@@ -157,4 +157,24 @@ export const QKEY = {
   notificationsUnreadCount: "notifications.unreadCount",
   modules: () => ["modules"],
   modulePermissions: (moduleId: string) => ["modules", moduleId, "permissions"],
+
+  meetings: ["meetings"] as const,
+  meetingsCalendar: (
+    from: string,
+    to: string,
+    companyId: string,
+    businessUnitId?: string,
+    onlyMine?: boolean
+  ) =>
+    [
+      "meetings",
+      "calendar",
+      from,
+      to,
+      companyId,
+      businessUnitId ?? "all",
+      String(onlyMine),
+    ] as const,
+  meetingsMy: (companyId: string) => ["meetings", "my", companyId] as const,
+  meeting: (id: string) => ["meetings", id] as const,
 };

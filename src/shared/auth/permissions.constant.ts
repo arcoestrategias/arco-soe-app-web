@@ -44,6 +44,7 @@ export const PERMISSIONS = {
   PERFORMANCE: buildPermissions("performance"),
   COMMENTS: buildPermissions("comment"),
   NOTIFICATIONS: buildPermissions("notification"),
+  MEETINGS: buildPermissions("meeting"),
   FILTERS: {
     STRATEGIC_PLAN: "filter.strategicPlan",
     POSITION: "filter.position",

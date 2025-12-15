@@ -51,6 +51,7 @@ export const Modules = {
   REPORTS: "reports",
   MODULES: "modules",
   PERMISSIONS: "permissions",
+  MEETINGS: "meetings",
   // agrega aquí más módulos a futuro…
 } as const;
 
@@ -281,6 +282,22 @@ export const routes = {
     prioritiesPdf: () => prefixed(Modules.REPORTS, "priorities", "pdf"),
     strategicProjectsPdf: () =>
       prefixed(Modules.REPORTS, "strategic-projects", "pdf"),
+  },
+
+  meetings: {
+    base: () => prefixed(Modules.MEETINGS),
+    calendar: (params?: {
+      from: string;
+      to: string;
+      onlyMine?: boolean;
+      companyId?: string;
+      businessUnitId?: string;
+    }) => prefixed(Modules.MEETINGS, "calendar") + qs(params),
+    my: (params?: { companyId?: string }) =>
+      prefixed(Modules.MEETINGS, "my") + qs(params),
+    byId: (id: string) => prefixed(Modules.MEETINGS, id),
+    execute: (id: string) =>
+      prefixed(Modules.MEETINGS, "occurrences", id, "execute"),
   },
 } as const;
 

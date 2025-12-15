@@ -14,6 +14,7 @@ import {
   IdCardLanyard,
   Shield,
   UserCog2,
+  Calendar,
 } from "lucide-react";
 
 export const navigationSections = [
@@ -56,6 +57,12 @@ export const navigationSections = [
         url: "/priorities",
         icon: Star,
         module: "priority",
+      },
+      {
+        title: "Reuniones",
+        url: "/meetings",
+        icon: Calendar,
+        module: "meeting",
       },
       // {
       //   title: "Performance",
