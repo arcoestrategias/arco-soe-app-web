@@ -25,8 +25,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -74,16 +74,10 @@ export function UsersDashboard() {
   const qc = useQueryClient();
   const { groups, total, isLoading, create, update, remove } = useUsers();
 
-  // Hook auth (siempre en el top para no romper reglas de hooks)
-  const { me } = useAuth();
   // ✅ Permisos por módulo/acción
-  const canRolAccess = hasAccess(me, "permission", "access");
-  const canPermissionAssign = hasAccess(me, "permission", "assign");
-  const canBusinessUnitManagementAssign = hasAccess(
-    me,
-    "businessUnitManagement",
-    "assign"
-  );
+  const canRolAccess = usePermission(PERMISSIONS.USERS.SET_ROLES);
+  const canPermissionAssign = usePermission(PERMISSIONS.USERS.SET_PERMISSIONS);
+  const canBusinessUnitManagementAssign = usePermission(PERMISSIONS.USERS.SET_BUSINESS_UNITS);
 
   const [modal, setModal] = useState<ModalState>({
     open: false,

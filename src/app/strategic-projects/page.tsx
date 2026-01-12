@@ -28,22 +28,13 @@ import { getHumanErrorMessage } from "@/shared/api/response";
 import { createStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
 
 // Auth/Permisos
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 export default function StrategicProjectsPage() {
-  const { me } = useAuth();
-
   // Permisos
-  const canAssignPosition = React.useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"),
-    [me]
-  );
-
-  const canCreateProject = React.useMemo(
-    () => !!me && hasAccess(me, "strategicProject", "create"),
-    [me]
-  );
+  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
+  const canCreateProject = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.CREATE);
 
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
@@ -90,10 +81,10 @@ export default function StrategicProjectsPage() {
   }
 
   React.useEffect(() => {
-    if (!canAssignPosition) {
+    if (!canFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canAssignPosition]);
+  }, [canFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/strategic-projects" onNavigate={() => {}}>
@@ -121,7 +112,7 @@ export default function StrategicProjectsPage() {
             </div>
 
             {/* Posición */}
-            {canAssignPosition ? (
+            {canFilterPosition ? (
               <div className="w-64">
                 <FilterField label="Posición">
                   <PositionSelect

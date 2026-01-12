@@ -44,8 +44,8 @@ import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
 import { TextareaWithCounter } from "../../../shared/components/textarea-with-counter";
 
 import { getPositionId } from "@/shared/auth/storage";
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 import NotesModal from "@/shared/components/comments/components/notes-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 
@@ -357,11 +357,7 @@ export default function PrioritiesTable({
   onDirtyChange?: (dirty: boolean) => void;
   resetSignal?: number;
 }) {
-  const { me } = useAuth();
-  const canAssignPosition = useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
-    [me]
-  );
+  const canUpdateFinishedAt = usePermission(PERMISSIONS.PRIORITIES.UPDATE_FINISHED_AT);
 
   const createMut = useCreatePriority(invalidateKey);
   const updateMut = useUpdatePriority(invalidateKey);
@@ -729,7 +725,7 @@ export default function PrioritiesTable({
                                 }
                               />
                             </div>
-                            {canAssignPosition ? (
+                            {canUpdateFinishedAt ? (
                               <div>
                                 <label className="text-xs text-muted-foreground block mb-1">
                                   Fecha Terminado

@@ -21,8 +21,8 @@ import PrioritiesDashboard from "@/features/priorities/components/priorities-das
 import { ConfirmModal } from "../../shared/components/confirm-modal";
 
 import { getPositionId } from "@/shared/auth/storage";
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 type PendingChangeKind = "plan" | "position" | "month" | "year";
 type PendingChange = {
@@ -31,11 +31,7 @@ type PendingChange = {
 };
 
 export default function PrioritiesPage() {
-  const { me } = useAuth();
-  const canAssignPosition = React.useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
-    [me]
-  );
+  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
 
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
@@ -102,10 +98,10 @@ export default function PrioritiesPage() {
   };
 
   React.useEffect(() => {
-    if (!canAssignPosition) {
+    if (!canFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canAssignPosition]);
+  }, [canFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/priorities">
@@ -138,7 +134,7 @@ export default function PrioritiesPage() {
               </FilterField>
             </div>
 
-            {canAssignPosition ? (
+            {canFilterPosition ? (
               <div className="w-full">
                 <FilterField label="Posición">
                   <PositionSelect

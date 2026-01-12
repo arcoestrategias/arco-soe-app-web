@@ -12,6 +12,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 import type { PositionOverviewItem } from "../types/positions-overview";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,16 +53,46 @@ type Point = {
   performance?: number;
 };
 
-function toChartData(positions: PositionOverviewItem[]): Point[] {
-  return positions.map((p) => ({
-    id: p.idPosition,
-    x: Number(p.icp ?? 0),
-    y: Number(p.ico ?? 0),
-    z: 40,
-    name: p.namePosition,
-    user: p.nameUser ?? "", // <- coacción a string para evitar el error
-    performance: typeof p.performance === "number" ? p.performance : undefined,
-  }));
+type GroupedPoint = {
+  x: number;
+  y: number;
+  z: number;
+  items: Point[];
+};
+
+function groupPositions(positions: PositionOverviewItem[]): GroupedPoint[] {
+  const groups = new Map<string, GroupedPoint>();
+
+  positions.forEach((p) => {
+    const x = Number(p.icp ?? 0);
+    const y = Number(p.ico ?? 0);
+    const key = `${x}-${y}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, { x, y, z: 40, items: [] });
+    }
+    groups.get(key)!.items.push({
+      id: p.idPosition,
+      x,
+      y,
+      z: 40,
+      name: p.namePosition,
+      user: p.nameUser ?? "",
+      performance:
+        typeof p.performance === "number" ? p.performance : undefined,
+    });
+  });
+
+  return Array.from(groups.values());
+}
+
+// Función para obtener colores vivos tipo semáforo/calor
+function getVividColor(value: number) {
+  // Clampear entre 0 y 100
+  const v = Math.max(0, Math.min(100, value));
+  // HSL: 0=Rojo, 60=Amarillo, 120=Verde. Usamos 90% saturación y 45% luz para que sea "vivo".
+  const hue = (v / 100) * 120;
+  return `hsl(${hue}, 90%, 45%)`;
 }
 
 export default function PerformanceMap({
@@ -91,41 +122,36 @@ export default function PerformanceMap({
     [labels]
   );
 
-  const points = React.useMemo(() => toChartData(positions), [positions]);
+  // Estado para forzar el re-render del gráfico y cerrar el tooltip al salir del componente
+  const [chartKey, setChartKey] = React.useState(0);
 
-  // Clasificación por ICP (eje X) usando thresholds
-  function getStatusByICP(icp: number) {
-    if (icp >= th.excellentMin)
-      return { key: "excellent", fill: "#10B981", text: lb.excellent };
-    if (icp >= th.acceptableMin && icp <= th.acceptableMax)
-      return { key: "acceptable", fill: "#F59E0B", text: lb.acceptable };
-    return { key: "critical", fill: "#EF4444", text: lb.critical };
-  }
-
-  const criticos = points.filter((p) => getStatusByICP(p.x).key === "critical");
-  const aceptables = points.filter(
-    (p) => getStatusByICP(p.x).key === "acceptable"
-  );
-  const excelentes = points.filter(
-    (p) => getStatusByICP(p.x).key === "excellent"
+  const groupedPoints = React.useMemo(
+    () => groupPositions(positions),
+    [positions]
   );
 
-  const ticks10 = [50, 60, 70, 80, 90, 100]; // paso de 10 para ICP e ICO
+  const ticks10 = [0, 20, 40, 60, 80, 100];
 
-  const renderShape = (baseFill: string) => (props: any) => {
+  const renderVividShape = (props: any) => {
     const { cx, cy, payload } = props;
-    const isHovered = hoveredId && payload?.id === hoveredId;
-    const r = isHovered ? 7 : 5.5;
+    // Resaltar si el ID hovereado está dentro de este grupo
+    const isHovered =
+      hoveredId && payload?.items?.some((i: Point) => i.id === hoveredId);
+    const r = isHovered ? 8 : 6;
+    const fill = getVividColor(payload.x); // Color basado en ICP
+
     return (
       <g>
-        <circle cx={cx} cy={cy} r={r + 1.5} fill="#ffffff" />
+        {/* Borde blanco para resaltar sobre el fondo de color */}
+        <circle cx={cx} cy={cy} r={r + 2} fill="#ffffff" />
         <circle
           cx={cx}
           cy={cy}
           r={r}
-          fill={baseFill}
-          stroke={isHovered ? "#2563EB" : "transparent"}
+          fill={fill}
+          stroke={isHovered ? "#000" : "none"}
           strokeWidth={isHovered ? 2 : 0}
+          style={{ transition: "all 0.3s ease" }}
         />
       </g>
     );
@@ -133,63 +159,93 @@ export default function PerformanceMap({
 
   function CustomTooltip({ active, payload }: any) {
     if (!active || !payload?.length) return null;
-    const p = payload[0].payload as Point;
-    const status = getStatusByICP(p.x);
+    const group = payload[0].payload as GroupedPoint;
+    const color = getVividColor(group.x);
 
     return (
-      <div className="rounded-lg border border-gray-200 bg-white shadow-md px-4 py-3">
-        <div className="font-semibold text-gray-900">{p.name}</div>
-        <div className="text-xs text-gray-600 mb-1">{p.user}</div>
-        <div className="text-sm text-gray-800">ICO: {p.y}%</div>
-        <div className="text-sm text-gray-800">ICP: {p.x}%</div>
-        {typeof p.performance === "number" && (
-          <div className="text-sm text-gray-800">
-            Performance: {p.performance}%
+      <div className="rounded-lg border border-gray-200 bg-white shadow-md px-4 py-3 max-h-[320px] overflow-y-auto max-w-[300px]">
+        {group.items.length > 1 && (
+          <div className="mb-2 pb-2 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {group.items.length} Posiciones en este punto
           </div>
         )}
-        <div
-          className={clsx(
-            "mt-1 text-sm font-medium",
-            status.key === "excellent"
-              ? "text-green-600"
-              : status.key === "acceptable"
-              ? "text-amber-600"
-              : "text-red-600"
-          )}
-        >
-          Estado: {status.text}
-        </div>
+        {group.items.map((p, idx) => (
+          <div
+            key={p.id}
+            className={clsx(idx > 0 && "mt-3 pt-3 border-t border-gray-100")}
+          >
+            <div className="font-semibold text-gray-900 leading-tight">
+              {p.name}
+            </div>
+            <div className="text-xs text-gray-600 mb-1">{p.user}</div>
+            <div className="flex gap-3 text-sm text-gray-800">
+              <span>ICO: {p.y}%</span>
+              <span>ICP: {p.x}%</span>
+            </div>
+            {typeof p.performance === "number" && (
+              <div className="text-sm text-gray-800">
+                Performance: {p.performance}%
+              </div>
+            )}
+            <div className="mt-1 text-sm font-medium flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-xs text-gray-600">
+                {p.x >= th.excellentMin
+                  ? lb.excellent
+                  : p.x >= th.acceptableMin
+                  ? lb.acceptable
+                  : lb.critical}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
-  // Leyenda dinámica con rangos basados en thresholds
-  const legendCritical = `${lb.critical} (<${th.criticalMax}%)`;
-  const legendAcceptable = `${lb.acceptable} (${th.acceptableMin}–${th.acceptableMax}%)`;
-  const legendExcellent = `${lb.excellent} (≥${th.excellentMin}%)`;
-
   return (
-    <Card>
+    <Card
+      onMouseLeave={() => {
+        setChartKey((prev) => prev + 1);
+        onHoverIdChange?.(null);
+      }}
+    >
       <div className="p-5">
         <CardHeader className="pb-2">
           <CardTitle className="text-base text-gray-900">
             Mapa de Performance por Posición
           </CardTitle>
-          <p className="text-xs text-gray-600">
-            Distribución de posiciones según su ICO (eje Y) e ICP (eje X)
-          </p>
         </CardHeader>
 
         <div className="h-[360px] w-full">
           <ResponsiveContainer>
-            <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 24 }}>
+            <ScatterChart
+              key={chartKey}
+              margin={{ top: 10, right: 16, left: 0, bottom: 24 }}
+            >
+              <defs>
+                <linearGradient
+                  id="heatmapGradient"
+                  x1="0"
+                  y1="1"
+                  x2="1"
+                  y2="0"
+                >
+                  <stop offset="0%" stopColor="rgba(255, 0, 0, 0.6)" />
+                  <stop offset="50%" stopColor="rgba(255, 255, 0, 0.6)" />
+                  <stop offset="100%" stopColor="rgba(0, 255, 0, 0.6)" />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 type="number"
                 dataKey="x"
                 name="ICP"
                 unit="%"
-                domain={[50, 100]}
+                domain={[0, 100]}
                 ticks={ticks10} // 👈 paso de 10
                 tick={{ fontSize: 12, fill: "#374151" }}
                 label={{
@@ -204,7 +260,7 @@ export default function PerformanceMap({
                 dataKey="y"
                 name="ICO"
                 unit="%"
-                domain={[50, 100]}
+                domain={[0, 100]}
                 ticks={ticks10}
                 tick={{ fontSize: 12, fill: "#374151" }}
                 label={{
@@ -217,52 +273,37 @@ export default function PerformanceMap({
               />
               <ZAxis type="number" dataKey="z" range={[60, 100]} />
 
-              {/* Línea de referencia opcional (p.ej., umbral aceptable mínimo) */}
-              <ReferenceLine
-                x={th.acceptableMin}
-                stroke="#9CA3AF"
-                strokeDasharray="4 4"
+              {/* Fondo con gradiente para simular mapa de calor */}
+              <ReferenceArea
+                x1={0}
+                x2={100}
+                y1={0}
+                y2={100}
+                fill="url(#heatmapGradient)"
+                stroke="none"
               />
 
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip />}
+                trigger="click"
+                wrapperStyle={{ pointerEvents: "auto" }}
+              />
 
-              {/* Capas por estado (clasificación por ICP) */}
+              {/* Puntos con color dinámico */}
               <Scatter
-                data={criticos}
-                shape={renderShape("#EF4444")}
-                onMouseEnter={(e: any) => onHoverIdChange?.(e?.id ?? null)}
-                onMouseLeave={() => onHoverIdChange?.(null)}
-              />
-              <Scatter
-                data={aceptables}
-                shape={renderShape("#F59E0B")}
-                onMouseEnter={(e: any) => onHoverIdChange?.(e?.id ?? null)}
-                onMouseLeave={() => onHoverIdChange?.(null)}
-              />
-              <Scatter
-                data={excelentes}
-                shape={renderShape("#10B981")}
-                onMouseEnter={(e: any) => onHoverIdChange?.(e?.id ?? null)}
+                data={groupedPoints}
+                shape={renderVividShape}
+                onMouseEnter={(e: any) => {
+                  // Si hay un solo item, notificamos su ID para resaltar en tabla.
+                  // Si hay varios, podríamos no resaltar nada o resaltar el primero.
+                  onHoverIdChange?.(
+                    e?.items?.length === 1 ? e.items[0].id : null
+                  );
+                }}
                 onMouseLeave={() => onHoverIdChange?.(null)}
               />
             </ScatterChart>
           </ResponsiveContainer>
-        </div>
-
-        {/* Leyenda */}
-        <div className="mt-3 flex items-center gap-6 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
-            <span className="text-gray-700">{legendCritical}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span className="text-gray-700">{legendAcceptable}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
-            <span className="text-gray-700">{legendExcellent}</span>
-          </div>
         </div>
       </div>
     </Card>

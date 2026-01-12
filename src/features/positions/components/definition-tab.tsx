@@ -49,8 +49,8 @@ import {
 } from "@/features/positions/services/leversService";
 
 // ✅ Permisos: hook de auth + función pura
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 import { DefinitionList, DefinitionListItem } from "./definition-list";
 import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
 
@@ -64,25 +64,22 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   const qc = useQueryClient();
   const hasPlanAndPos = !!strategicPlanId && !!positionId;
 
-  // ✅ Hook estable (siempre al tope)
-  const { me } = useAuth();
-
   // ✅ Calcula permisos
-  const canPositionUpdate = hasAccess(me, "position", "update");
+  const canPositionUpdate = usePermission(PERMISSIONS.POSITIONS.UPDATE);
 
-  const canObjectivesCreate = hasAccess(me, "objective", "create");
-  const canObjectivesUpdate = hasAccess(me, "objective", "update");
-  const canObjectivesDelete = hasAccess(me, "objective", "delete");
+  const canObjectivesCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
+  const canObjectivesUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
+  const canObjectivesDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
   const canObjectivesEdit = canObjectivesCreate || canObjectivesUpdate;
 
-  const canProjectsCreate = hasAccess(me, "strategicProject", "create");
-  const canProjectsUpdate = hasAccess(me, "strategicProject", "update");
-  const canProjectsDelete = hasAccess(me, "strategicProject", "delete");
+  const canProjectsCreate = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.CREATE);
+  const canProjectsUpdate = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.UPDATE);
+  const canProjectsDelete = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.DELETE);
   const canProjectsEdit = canProjectsCreate || canProjectsUpdate;
 
-  const canLeversCreate = hasAccess(me, "lever", "create");
-  const canLeversUpdate = hasAccess(me, "lever", "update");
-  const canLeversDelete = hasAccess(me, "lever", "delete");
+  const canLeversCreate = usePermission(PERMISSIONS.LEVERS.CREATE);
+  const canLeversUpdate = usePermission(PERMISSIONS.LEVERS.UPDATE);
+  const canLeversDelete = usePermission(PERMISSIONS.LEVERS.DELETE);
   const canLeversEdit = canLeversCreate || canLeversUpdate;
 
   // Hover / edición

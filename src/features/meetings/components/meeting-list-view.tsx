@@ -15,16 +15,79 @@ import {
   useMyMeetingsQuery,
   useDeleteMeetingMutation,
 } from "../hooks/use-meetings";
+import type { Meeting } from "../types/meetings.types";
 
 interface MeetingListViewProps {
   onEdit: (meetingId: string) => void;
 }
 
 export function MeetingListView({ onEdit }: MeetingListViewProps) {
+  // 🚩 BANDERA: Activar para ver datos de prueba visualmente sin API
+  const SHOW_TEST_DATA = true;
+
   const companyId = getCompanyId();
-  const { data: meetings, isLoading } = useMyMeetingsQuery(companyId ?? "");
+  const { data: apiMeetings, isLoading: isLoadingApi } = useMyMeetingsQuery(
+    companyId ?? ""
+  );
   const deleteMutation = useDeleteMeetingMutation();
   const [meetingToDelete, setMeetingToDelete] = useState<string | null>(null);
+
+  // Datos de prueba (Mock)
+  const mockMeetings: Meeting[] = [
+    {
+      id: "mock-1",
+      name: "Daily Standup - Equipo de Desarrollo",
+      frequency: "DAILY",
+      startDate: new Date().toISOString(),
+      endDate: new Date().toISOString(),
+      participants: Array(5).fill({}),
+      createdAt: "",
+      updatedAt: "",
+    } as Meeting,
+    {
+      id: "mock-2",
+      name: "Revisión Semanal de KPIs",
+      frequency: "WEEKLY",
+      startDate: new Date(Date.now() + 86400000 * 2).toISOString(),
+      endDate: new Date().toISOString(),
+      participants: Array(3).fill({}),
+      createdAt: "",
+      updatedAt: "",
+    } as Meeting,
+    {
+      id: "mock-5",
+      name: "Seguimiento Quincenal de Proyectos",
+      frequency: "BIWEEKLY",
+      startDate: new Date(Date.now() + 86400000 * 5).toISOString(),
+      endDate: new Date().toISOString(),
+      participants: Array(6).fill({}),
+      createdAt: "",
+      updatedAt: "",
+    } as Meeting,
+    {
+      id: "mock-3",
+      name: "Comité Mensual de Dirección",
+      frequency: "MONTHLY",
+      startDate: new Date(Date.now() + 86400000 * 10).toISOString(),
+      endDate: new Date().toISOString(),
+      participants: Array(12).fill({}),
+      createdAt: "",
+      updatedAt: "",
+    } as Meeting,
+    {
+      id: "mock-4",
+      name: "Planificación Trimestral (Q4)",
+      frequency: "ONCE",
+      startDate: new Date(Date.now() + 86400000 * 20).toISOString(),
+      endDate: new Date().toISOString(),
+      participants: Array(8).fill({}),
+      createdAt: "",
+      updatedAt: "",
+    } as Meeting,
+  ];
+
+  const meetings = SHOW_TEST_DATA ? mockMeetings : apiMeetings;
+  const isLoading = SHOW_TEST_DATA ? false : isLoadingApi;
 
   const handleDelete = () => {
     if (!meetingToDelete) return;
@@ -76,6 +139,8 @@ export function MeetingListView({ onEdit }: MeetingListViewProps) {
                 <Badge variant="secondary">
                   {meeting.frequency === "ONCE"
                     ? "Una vez"
+                    : meeting.frequency === "DAILY"
+                    ? "Diario"
                     : meeting.frequency === "WEEKLY"
                     ? "Semanal"
                     : meeting.frequency === "BIWEEKLY"

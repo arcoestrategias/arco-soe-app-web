@@ -48,8 +48,8 @@ import { ObjectiveInactivateBlockedModal } from "./objective-inactivate-blocked-
 import { QKEY } from "@/shared/api/query-keys";
 
 // 🔐 permisos
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -160,10 +160,9 @@ export default function ObjectivesCompliance({
   year,
 }: ObjectivesComplianceProps) {
   // 🔐 Permisos (usa tu access-control)
-  const { me } = useAuth();
-  const allowCreate = me ? hasAccess(me, "objective", "create") : false;
-  const allowConfigure = me ? hasAccess(me, "objective", "update") : false;
-  const allowInactivate = me ? hasAccess(me, "objective", "delete") : false;
+  const canCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
+  const canUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
+  const canDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
 
   /* --------- configurados / registrables --------- */
   const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
@@ -207,7 +206,7 @@ export default function ObjectivesCompliance({
   ]);
 
   const handleInactivate = (objectiveId: string) => {
-    if (!allowInactivate) return;
+    if (!canDelete) return;
     inactivateMut.mutate(objectiveId, {
       onSuccess: (data) => {
         if (data?.blocked) {
@@ -281,7 +280,7 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "configurados"
   const openConfigureFromConfigured = (objectiveId: string) => {
-    if (!allowConfigure) return;
+    if (!canUpdate) return;
     const item = rows.find((it) => it.objective?.id === objectiveId);
     if (!item?.objective) return;
 
@@ -330,7 +329,7 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "no configurados"
   const openConfigureFromUnconfigured = (objectiveId: string) => {
-    if (!allowConfigure) return;
+    if (!canUpdate) return;
     const u = unconfigured.find((x) => x.id === objectiveId) as any;
     if (!u) return;
 
@@ -381,7 +380,7 @@ export default function ObjectivesCompliance({
       <CardHeader className="flex flex-row items-center justify-between py-3 px-4 border-b">
         <h2 className="text-base font-semibold">Objetivos</h2>
         {/* Ocultar completamente si no tiene permiso */}
-        {allowCreate && (
+        {canCreate && (
           <Button
             size="sm"
             className="h-9 btn-gradient"
@@ -512,7 +511,7 @@ export default function ObjectivesCompliance({
                               </Button>
 
                               {/* Mostrar solo si tiene permiso de actualización */}
-                              {allowConfigure && (
+                              {canUpdate && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -527,7 +526,7 @@ export default function ObjectivesCompliance({
                               )}
 
                               {/* Mostrar solo si tiene permiso de eliminar/inactivar */}
-                              {allowInactivate && (
+                              {canDelete && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -651,7 +650,7 @@ export default function ObjectivesCompliance({
                                 <Paperclip className="w-4 h-4" />
                               </Button>
 
-                              {allowConfigure && (
+                              {canUpdate && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -665,7 +664,7 @@ export default function ObjectivesCompliance({
                                 </Button>
                               )}
 
-                              {allowInactivate && (
+                              {canDelete && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -692,12 +691,12 @@ export default function ObjectivesCompliance({
       </CardContent>
 
       {/* Modales */}
-      {allowCreate && (
+      {canCreate && (
         <NewObjectiveModal
           open={openCreate}
           onOpenChange={setOpenCreate}
           onCreate={async (payload) => {
-            if (!onCreateObjective || !allowCreate) return;
+            if (!onCreateObjective || !canCreate) return;
             await onCreateObjective(payload);
             setOpenCreate(false);
           }}

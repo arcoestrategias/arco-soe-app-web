@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { setPositionId as setStoragePositionId } from "@/shared/auth/storage";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useOrgChartOverview } from "../hooks/use-org-chart-overview";
@@ -206,6 +208,7 @@ export function OrganizationChartOverview({
   month?: number | string;
   positionId?: string | null;
 }) {
+  const router = useRouter();
   const { data, isLoading, isError } = useOrgChartOverview(
     businessUnitId,
     strategicPlanId ?? undefined,
@@ -408,10 +411,24 @@ export function OrganizationChartOverview({
                 top: b.y,
                 width: b.width,
                 height: b.height,
+                cursor: "default", // Forzar cursor por defecto para quitar la mano
               }}
+              onMouseDown={(e) => e.stopPropagation()} // Evitar que inicie el arrastre (pan)
+              onClick={(e) => e.stopPropagation()} // Evitar propagación de clics
             >
               <div className="relative">
-                <PositionCard node={b.node} />
+                <PositionCard
+                  node={b.node}
+                  onMetricClick={(metric) => {
+                    // 1. Guardar la posición seleccionada en storage para que la página destino la lea
+                    setStoragePositionId(b.node.idPosition);
+                    // 2. Navegar a la ruta correspondiente
+                    if (metric === "ICO") router.push("/objectives");
+                    if (metric === "ICP") router.push("/priorities");
+                    if (metric === "PROJECTS")
+                      router.push("/strategic-projects");
+                  }}
+                />
                 {b.hasChildren && (
                   <Button
                     variant="outline"

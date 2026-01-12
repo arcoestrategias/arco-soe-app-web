@@ -11,11 +11,13 @@ function Metric({
   value,
   gradient,
   icon,
+  onClick,
 }: {
   label: string;
   value: number;
   gradient: string;
   icon: React.ReactNode;
+  onClick?: () => void;
 }) {
   const [p, setP] = React.useState(0);
   React.useEffect(() => {
@@ -32,7 +34,15 @@ function Metric({
   return (
     <div className="flex-1 min-w-0">
       <div
-        className={`rounded-2xl p-3 h-[118px] flex flex-col items-center justify-between bg-gradient-to-r ${gradient} shadow-sm`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className={`rounded-2xl p-3 h-[118px] flex flex-col items-center justify-between bg-gradient-to-r ${gradient} shadow-sm ${
+          onClick ? "cursor-pointer hover:opacity-90 transition-opacity" : ""
+        }`}
+        style={{ cursor: onClick ? "pointer" : "default" }}
       >
         <div className="flex items-center gap-1 text-white/90 text-[11px] font-medium leading-none">
           {icon}
@@ -40,7 +50,7 @@ function Metric({
         </div>
         <div className="relative" style={{ width: size, height: size }}>
           <svg
-            className="absolute inset-0 -rotate-90"
+            className="absolute inset-0 -rotate-90 pointer-events-none"
             width={size}
             height={size}
           >
@@ -67,7 +77,7 @@ function Metric({
               }}
             />
           </svg>
-          <div className="absolute inset-0 grid place-items-center">
+          <div className="absolute inset-0 grid place-items-center pointer-events-none">
             <span className="text-white text-sm font-bold leading-none">
               {Math.round(p)}%
             </span>
@@ -78,7 +88,13 @@ function Metric({
   );
 }
 
-export function PositionCard({ node }: { node: OrgChartNodeDTO }) {
+export function PositionCard({
+  node,
+  onMetricClick,
+}: {
+  node: OrgChartNodeDTO;
+  onMetricClick?: (metric: "ICO" | "ICP" | "PROJECTS") => void;
+}) {
   const initials =
     (node.nameUser ?? node.namePosition)
       .split(" ")
@@ -90,7 +106,7 @@ export function PositionCard({ node }: { node: OrgChartNodeDTO }) {
   const { data: imgUrl } = useUserPhoto(node.idUser);
 
   return (
-    <div className="relative w-full rounded-3xl shadow-lg overflow-hidden pb-6">
+    <div className="relative w-full rounded-3xl shadow-lg overflow-hidden pb-6 cursor-default">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[96px] -z-0 bg-gradient-to-br from-orange-50 via-orange-100 to-orange-50" />
 
       <div className="relative z-10 px-3 pt-3 pb-2 bg-transparent">
@@ -128,18 +144,21 @@ export function PositionCard({ node }: { node: OrgChartNodeDTO }) {
             value={Number(node.ico ?? 0)}
             gradient="from-sky-400 to-cyan-400"
             icon={<Target className="h-4 w-4" />}
+            onClick={() => onMetricClick?.("ICO")}
           />
           <Metric
             label="ICP"
             value={Number(node.icp ?? 0)}
             gradient="from-emerald-400 to-green-500"
             icon={<Award className="h-4 w-4" />}
+            onClick={() => onMetricClick?.("ICP")}
           />
           <Metric
             label="Avance"
             value={Number(node.generalAverageProjects ?? 0)}
             gradient="from-orange-400 to-orange-500"
             icon={<TrendingUp className="h-4 w-4" />}
+            onClick={() => onMetricClick?.("PROJECTS")}
           />
         </div>
       </div>

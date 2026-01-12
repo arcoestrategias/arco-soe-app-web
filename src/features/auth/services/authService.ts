@@ -44,7 +44,7 @@ export interface MeData {
   lastName?: string;
   fullName?: string;
   email?: string;
-  isPlatformAdmin?: boolean;
+  isPlatformAdmin: boolean;
 
   companies?: Company[];
   needsBusinessUnit?: boolean;

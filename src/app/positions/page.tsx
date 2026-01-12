@@ -13,15 +13,11 @@ import { YearSelect } from "@/shared/filters/components/YearSelect";
 import { DefinitionTab } from "@/features/positions/components/definition-tab";
 import { OrganizationChartOverview } from "@/features/resume/components/organization-chart-overview";
 import { getPositionId } from "@/shared/auth/storage";
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 export default function PositionsPage() {
-  const { me } = useAuth();
-  const canAssignPosition = React.useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"), // ← ajusta module/action si aplica
-    [me]
-  );
+  const canUpdatePosition = usePermission(PERMISSIONS.POSITIONS.UPDATE);
 
   const businessUnitId = getBusinessUnitId() ?? undefined;
   const companyId = getCompanyId() ?? undefined;
@@ -35,10 +31,10 @@ export default function PositionsPage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
   React.useEffect(() => {
-    if (!canAssignPosition) {
+    if (!canUpdatePosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canAssignPosition]);
+  }, [canUpdatePosition]);
 
   return (
     <SidebarLayout currentPath="/positions" onNavigate={() => {}}>
@@ -63,7 +59,7 @@ export default function PositionsPage() {
                 clearOnUnmount
               />
             </FilterField>
-            {canAssignPosition ? (
+            {canUpdatePosition ? (
               <FilterField label="Posición">
                 <PositionSelect
                   businessUnitId={businessUnitId}

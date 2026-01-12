@@ -26,7 +26,6 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { toast } from "sonner";
 import { setBusinessUnitId } from "../auth/storage";
-import { ShowIfAccess } from "../auth/access-control";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 
 export function Header({

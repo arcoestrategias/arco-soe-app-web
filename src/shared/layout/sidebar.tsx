@@ -15,8 +15,8 @@ import {
 import { navigationSections } from "@/shared/layout/navigation";
 import type { SidebarProps } from "@/shared/layout/types";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "../auth/access-control";
 import Link from "next/link";
+import { hasPermission } from "@/shared/auth/access-control";
 
 const norm = (p?: string) =>
   p ? (p.endsWith("/") && p !== "/" ? p.slice(0, -1) : p) : "";
@@ -57,7 +57,8 @@ export function Sidebar({
       items: sec.items.filter((it: any) => {
         if (it.adminOnly) return isAdmin;
         if (!it.module) return true;
-        return hasAccess(me, it.module, "access");
+        const action = it.action ?? "menu";
+        return hasPermission(me, `${it.module}.${action}`);
       }),
     }))
     .filter((sec) => sec.items.length > 0);

@@ -4,6 +4,7 @@
 import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, Calendar, Target } from "lucide-react";
+import { IndicatorEvolutionModal } from "./indicator-evolution-modal";
 import type {
   IcoBoardData,
   IcoBoardMonthlyAverage,
@@ -70,6 +71,9 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
 
   const { activeIndicators, generalAverage, lastActiveMonth } = data.resume;
 
+  const [selectedObj, setSelectedObj] = React.useState<any>(null);
+  const [showEvolution, setShowEvolution] = React.useState(false);
+
   // Filas por objetivo (normalizadas al año)
   const rows = React.useMemo(() => {
     const objetivos = data?.listObjectives ?? [];
@@ -89,7 +93,13 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
         return { month: m, point };
       });
 
-      return { title, subtitle, unitLabel, cells };
+      return {
+        title,
+        subtitle,
+        unitLabel,
+        cells,
+        originalObjective: objective,
+      };
     });
   }, [data, year]);
 
@@ -220,8 +230,15 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                       className="hover:bg-gray-50/50 transition-colors"
                     >
                       <td className="p-4 bg-gray-50/50 border-r border-gray-200 w-64 min-w-[250px]">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
+                        <div
+                          className="cursor-pointer group"
+                          onClick={() => {
+                            setSelectedObj(row.originalObjective);
+                            setShowEvolution(true);
+                          }}
+                          title="Ver evolución del indicador"
+                        >
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors underline decoration-dotted underline-offset-4 decoration-gray-300 group-hover:decoration-blue-400">
                             {row.title}
                           </p>
                           <p className="text-xs text-gray-500">
@@ -347,6 +364,13 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
           </div>
         </div>
       </Card>
+
+      <IndicatorEvolutionModal
+        open={showEvolution}
+        onClose={() => setShowEvolution(false)}
+        objective={selectedObj}
+        year={year}
+      />
     </div>
   );
 }

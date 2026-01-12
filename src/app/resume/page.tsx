@@ -29,18 +29,12 @@ import Velocimeter from "@/features/resume/components/velocimeter";
 import PositionAnnualTrendCard from "@/features/resume/components/position-annual-trend-card";
 
 // ✅ permisos
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 
 export default function ResumenPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
-  const { me } = useAuth();
-
-  // ✅ ¿Puede asignar posiciones? (Position Management -> assign)
-  const canAssignPosition = useMemo(
-    () => !!me && hasAccess(me, "positionManagement", "assign"),
-    [me]
-  );
+  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
 
   // Filtros
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
@@ -52,10 +46,10 @@ export default function ResumenPage() {
 
   // ✅ si NO puede asignar, forzamos siempre la posición del storage
   useEffect(() => {
-    if (!canAssignPosition) {
+    if (!canFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canAssignPosition]);
+  }, [canFilterPosition]);
 
   // Fetch principal: /positions/overview (acepta positionId)
   const { data, isLoading, error } = usePositionsOverview(
@@ -131,7 +125,7 @@ export default function ResumenPage() {
             </div>
 
             {/* ✅ Mostrar el select solo si tiene permiso assign */}
-            {canAssignPosition ? (
+            {canFilterPosition ? (
               <div className="w-full">
                 <FilterField label="Posición">
                   <PositionSelect

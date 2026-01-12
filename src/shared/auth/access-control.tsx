@@ -1,76 +1,125 @@
 import { useMemo } from "react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
-export type PermissionAction =
-  | "access"
-  | "create"
-  | "read"
-  | "update"
-  | "delete"
-  | "export"
-  | "approve"
-  | "assign";
-
-type ModulePerms = Partial<Record<PermissionAction, boolean>>;
-type ModulesMap = Record<string, ModulePerms>;
-
-/** Extrae el mapa de módulos desde me.permissions.modules */
-function getModules(me: any): ModulesMap {
-  return (me?.permissions?.modules ?? {}) as ModulesMap;
+// Interfaz mínima para el usuario (asegúrate de que tu tipo User en el AuthContext coincida)
+export interface UserWithPermissions {
+  isPlatformAdmin: boolean;
+  permissions?: string[] | null;
 }
 
-/** Chequeo puro (fuera de React): ¿tiene acceso a module.action? */
-export function hasAccess(
-  me: any,
-  moduleKey: string,
-  action: PermissionAction = "access"
+/**
+ * Chequeo puro (fuera de React): ¿tiene el usuario este permiso específico?
+ * Útil para loaders, guards de rutas o funciones fuera de componentes.
+ *
+ * @param me Objeto del usuario actual
+ * @param permission String del permiso (ej: 'users.create' o PERMISSIONS.USERS.CREATE)
+ */
+export function hasPermission(
+  me: UserWithPermissions | null | undefined,
+  permission: string
 ): boolean {
-  if (me?.isPlatformAdmin) return true; // bypass total para admin
-  const mod = getModules(me)[moduleKey];
-  if (!mod) return false;
-  return !!mod[action];
+  // 1. Si no hay usuario, no hay permiso
+  if (!me) return false;
+
+  // 2. Si es Admin de Plataforma, tiene acceso total (bypass)
+  if (me.isPlatformAdmin) return true;
+
+  // 3. Validamos que exista el array de permisos
+  const userPermissions = me.permissions;
+  if (!Array.isArray(userPermissions)) {
+    return false; // Si es null o undefined (ej. no ha seleccionado unidad), denegar.
+  }
+
+  // 4. Buscamos el permiso exacto en la lista plana
+  return userPermissions.includes(permission);
 }
 
-/** Hook para componentes React */
-export function useAccess(
-  moduleKey: string,
-  action: PermissionAction = "access"
+/**
+ * Verifica si el usuario tiene AL MENOS UNO de los permisos proporcionados.
+ * Útil para lógica condicional donde varias credenciales permiten el acceso.
+ */
+export function hasAnyPermission(
+  me: UserWithPermissions | null | undefined,
+  permissions: string[]
 ): boolean {
+  if (!me) return false;
+  if (me.isPlatformAdmin) return true;
+
+  const userPermissions = me.permissions;
+  if (!Array.isArray(userPermissions)) return false;
+
+  return permissions.some((p) => userPermissions.includes(p));
+}
+
+/**
+ * Verifica si el usuario tiene TODOS los permisos proporcionados.
+ * Útil para acciones estrictas que requieren múltiples validaciones.
+ */
+export function hasAllPermissions(
+  me: UserWithPermissions | null | undefined,
+  permissions: string[]
+): boolean {
+  if (!me) return false;
+  if (me.isPlatformAdmin) return true;
+
+  const userPermissions = me.permissions;
+  if (!Array.isArray(userPermissions)) return false;
+
+  return permissions.every((p) => userPermissions.includes(p));
+}
+
+/**
+ * Hook para usar dentro de componentes React.
+ * Reactivo a cambios en el usuario (me).
+ */
+export function usePermission(permission: string): boolean {
   const { me } = useAuth();
-  return useMemo(
-    () => hasAccess(me, moduleKey, action),
-    [me, moduleKey, action]
-  );
+  return useMemo(() => hasPermission(me, permission), [me, permission]);
 }
 
-/** Componente declarativo para mostrar/ocultar por permiso */
-export function ShowIfAccess(props: {
-  module: string;
-  action?: PermissionAction;
+/**
+ * Hook para validar si tiene ALGUNO de los permisos listados.
+ */
+export function useAnyPermission(permissions: string[]): boolean {
+  const { me } = useAuth();
+  // Serializamos permissions para evitar re-cálculos si el array cambia de referencia
+  const key = permissions.join(",");
+  return useMemo(
+    () => hasAnyPermission(me, permissions),
+    [me, key, permissions]
+  ); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/**
+ * Componente declarativo para mostrar/ocultar contenido si tiene el permiso específico.
+ */
+export function ShowIfPermission(props: {
+  permission: string;
   fallback?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const ok = useAccess(props.module, props.action ?? "access");
-  if (!ok) return <>{props.fallback ?? null}</>;
+  const canAccess = usePermission(props.permission);
+
+  if (!canAccess) {
+    return <>{props.fallback ?? null}</>;
+  }
+
   return <>{props.children}</>;
 }
 
 /**
- * Como usar en botones o acciones:
-import { ShowIfAccess, useAccess } from "@/features/auth/access-control";
-
-<ShowIfAccess module="objective" action="delete">
-  <Button onClick={onDelete}>Eliminar</Button>
-</ShowIfAccess>
-
-const canExport = useAccess("objective", "export");
-<Button disabled={!canExport}>Exportar</Button>
- *
+ * Componente declarativo para mostrar/ocultar contenido si tiene ALGUNO de los permisos.
  */
+export function ShowIfAnyPermission(props: {
+  permissions: string[];
+  fallback?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const canAccess = useAnyPermission(props.permissions);
 
-/**
- * Como usar en Rutas o pagina completa:
-<ShowIfAccess module="objective" action="access" fallback={<NoAccess />}>
-  <ObjectivesPage />
-</ShowIfAccess>
-*/
+  if (!canAccess) {
+    return <>{props.fallback ?? null}</>;
+  }
+
+  return <>{props.children}</>;
+}

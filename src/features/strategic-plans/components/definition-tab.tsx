@@ -65,8 +65,8 @@ import { CreateStrategicProjectPayload } from "../types/strategicProjects";
 import { CreateObjectivePayload } from "../types/objectives";
 
 // ✅ Permisos
-import { useAuth } from "@/features/auth/context/AuthContext";
-import { hasAccess } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermission } from "@/shared/auth/access-control";
 import {
   exportStrategicPlanDefinitionsPDF,
   StrategicPlanDefinitionsReportPayload,
@@ -84,30 +84,39 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const qc = useQueryClient();
   const year = new Date().getFullYear();
 
-  // Hook auth (siempre en el top para no romper reglas de hooks)
-  const { me } = useAuth();
-
   // ✅ Permisos por módulo/acción
-  const canPlanUpdate = hasAccess(me, "strategicPlan", "update");
+  const canPlanUpdate = usePermission(PERMISSIONS.STRATEGIC_PLANS.UPDATE);
 
-  const canFactorsCreate = hasAccess(me, "strategicSuccessFactor", "create");
-  const canFactorsUpdate = hasAccess(me, "strategicSuccessFactor", "update");
-  const canFactorsDelete = hasAccess(me, "strategicSuccessFactor", "delete");
+  const canFactorsCreate = usePermission(
+    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.CREATE
+  );
+  const canFactorsUpdate = usePermission(
+    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.UPDATE
+  );
+  const canFactorsDelete = usePermission(
+    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.DELETE
+  );
   const canFactorsEdit = canFactorsCreate || canFactorsUpdate;
 
-  const canValuesCreate = hasAccess(me, "strategicValue", "create");
-  const canValuesUpdate = hasAccess(me, "strategicValue", "update");
-  const canValuesDelete = hasAccess(me, "strategicValue", "delete");
+  const canValuesCreate = usePermission(PERMISSIONS.STRATEGIC_VALUES.CREATE);
+  const canValuesUpdate = usePermission(PERMISSIONS.STRATEGIC_VALUES.UPDATE);
+  const canValuesDelete = usePermission(PERMISSIONS.STRATEGIC_VALUES.DELETE);
   const canValuesEdit = canValuesCreate || canValuesUpdate;
 
-  const canObjectivesCreate = hasAccess(me, "objective", "create");
-  const canObjectivesUpdate = hasAccess(me, "objective", "update");
-  const canObjectivesDelete = hasAccess(me, "objective", "delete");
+  const canObjectivesCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
+  const canObjectivesUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
+  const canObjectivesDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
   const canObjectivesEdit = canObjectivesCreate || canObjectivesUpdate;
 
-  const canProjectsCreate = hasAccess(me, "strategicProject", "create");
-  const canProjectsUpdate = hasAccess(me, "strategicProject", "update");
-  const canProjectsDelete = hasAccess(me, "strategicProject", "delete");
+  const canProjectsCreate = usePermission(
+    PERMISSIONS.STRATEGIC_PROJECTS.CREATE
+  );
+  const canProjectsUpdate = usePermission(
+    PERMISSIONS.STRATEGIC_PROJECTS.UPDATE
+  );
+  const canProjectsDelete = usePermission(
+    PERMISSIONS.STRATEGIC_PROJECTS.DELETE
+  );
   const canProjectsEdit = canProjectsCreate || canProjectsUpdate;
 
   // Hover + edición de tarjetas
