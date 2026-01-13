@@ -3,53 +3,70 @@
 
 import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
-
 import { SidebarLayout } from "@/shared/layout";
 import { getBusinessUnitId, getPositionId } from "@/shared/auth/storage"; // ✅ añade getPositionId
-
-// Selects
 import { StrategicPlanSelect } from "@/shared/filters/components/StrategicPlanSelect";
 import { PositionSelect } from "@/shared/filters/components/PositionSelect";
 import { MonthSelect } from "@/shared/filters/components/MonthSelect";
 import { YearSelect } from "@/shared/filters/components/YearSelect";
-
-// Wrapper de etiqueta/descripcion
 import { FilterField } from "@/shared/components/FilterField";
-
 import { Card, CardContent } from "@/components/ui/card";
-
-// Hook de datos (consume /positions/overview)
 import { usePositionsOverview } from "@/features/resume/hooks/use-positions-overview";
-
-// Componentes hijos
 import PerformanceMap from "@/features/resume/components/performance-map";
 import RoleSummaryTable from "@/features/resume/components/role-summary-table";
 import PositionsAssignmentsChart from "@/features/resume/components/positions-assignments-chart";
 import Velocimeter from "@/features/resume/components/velocimeter";
 import PositionAnnualTrendCard from "@/features/resume/components/position-annual-trend-card";
-
-// ✅ permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermission } from "@/shared/auth/access-control";
 
 export default function ResumenPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
-  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
+
+  const showFilterStrategicPlan = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_FILTER_STRATEGIC_PLAN
+  );
+  const showFilterPosition = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_FILTER_POSITION
+  );
+  const showFilterMonth = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_FILTER_MONTH
+  );
+  const showFilterYear = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_FILTER_YEAR
+  );
+  const showICOChart = usePermission(PERMISSIONS.PERFORMANCE.SHOW_ICO_CHART);
+  const showICPChart = usePermission(PERMISSIONS.PERFORMANCE.SHOW_ICP_CHART);
+  const showPerformanceChart = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_CHART
+  );
+  const showAssignmentsChart = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_ASSIGNMENTS_CHART
+  );
+  const showAnnualPerformanceTrendChart = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_ANNUAL_PERFORMANCE_TREND_CHART
+  );
+  const showPerformanceMapChart = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_MAP_CHART
+  );
+  const showPositionSummaryTable = usePermission(
+    PERMISSIONS.PERFORMANCE.SHOW_POSITION_SUMMARY_TABLE
+  );
 
   // Filtros
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
   const [positionId, setPositionId] = useState<string | null>(
     getPositionId() ?? null
-  ); // ✅ arranca con storage
+  );
+
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
-  // ✅ si NO puede asignar, forzamos siempre la posición del storage
   useEffect(() => {
-    if (!canFilterPosition) {
+    if (!showFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canFilterPosition]);
+  }, [showFilterPosition]);
 
   // Fetch principal: /positions/overview (acepta positionId)
   const { data, isLoading, error } = usePositionsOverview(
@@ -60,7 +77,6 @@ export default function ResumenPage() {
     positionId ?? null
   );
 
-  // Hover sync entre mapa y tabla
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // ¿hay posición seleccionada?
@@ -103,7 +119,6 @@ export default function ResumenPage() {
   return (
     <SidebarLayout currentPath="/resume" onNavigate={() => {}}>
       <div className="space-y-6 font-system">
-        {/* Encabezado + Filtros */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 heading-optimized">
@@ -112,27 +127,28 @@ export default function ResumenPage() {
           </div>
 
           <div className="flex gap-3">
-            <div className="w-full">
-              <FilterField label="Plan estratégico">
-                <StrategicPlanSelect
-                  businessUnitId={businessUnitId}
-                  value={strategicPlanId}
-                  onChange={setStrategicPlanId}
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {showFilterStrategicPlan && (
+              <div className="w-full">
+                <FilterField label="Plan estratégico">
+                  <StrategicPlanSelect
+                    businessUnitId={businessUnitId}
+                    value={strategicPlanId}
+                    onChange={setStrategicPlanId}
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            )}
 
-            {/* ✅ Mostrar el select solo si tiene permiso assign */}
-            {canFilterPosition ? (
+            {showFilterPosition ? (
               <div className="w-full">
                 <FilterField label="Posición">
                   <PositionSelect
                     businessUnitId={businessUnitId}
-                    value={positionId} // string | null
-                    onChange={setPositionId} // string | null
-                    defaultFromAuth // auto-selecciona storage en el propio select
+                    value={positionId}
+                    onChange={setPositionId}
+                    defaultFromAuth
                     showOptionAll
                     persist
                     clearOnUnmount
@@ -141,21 +157,24 @@ export default function ResumenPage() {
               </div>
             ) : null}
 
-            <div className="w-full">
-              <FilterField label="Mes">
-                <MonthSelect value={month} onChange={setMonth} />
-              </FilterField>
-            </div>
+            {showFilterMonth && (
+              <div className="w-full">
+                <FilterField label="Mes">
+                  <MonthSelect value={month} onChange={setMonth} />
+                </FilterField>
+              </div>
+            )}
 
-            <div className="w-full">
-              <FilterField label="Año">
-                <YearSelect value={year} onChange={setYear} />
-              </FilterField>
-            </div>
+            {showFilterYear && (
+              <div className="w-full">
+                <FilterField label="Año">
+                  <YearSelect value={year} onChange={setYear} />
+                </FilterField>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Estado de carga / error */}
         {isLoading && (
           <Card>
             <CardContent className="py-8 text-center text-sm text-muted-foreground">
@@ -174,62 +193,68 @@ export default function ResumenPage() {
         {/* === Fila 1: Velocímetros (siempre) === */}
         {data?.listPositions && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Velocimeter
-              value={kpis.ico ?? 0}
-              title={
-                selected ? "ICO (mes) de la posición" : "ICO (mes) promedio"
-              }
-              metricLabel="ICO"
-              thresholds={{
-                criticalMax: 75,
-                acceptableMin: 75,
-                acceptableMax: 98.99,
-                excellentMin: 99,
-              }}
-              labels={{
-                critical: "Crítico",
-                acceptable: "Aceptable",
-                excellent: "Excelente",
-              }}
-            />
-            <Velocimeter
-              value={kpis.icp ?? 0}
-              title={
-                selected ? "ICP (mes) de la posición" : "ICP (mes) promedio"
-              }
-              metricLabel="ICP"
-              thresholds={{
-                criticalMax: 75,
-                acceptableMin: 75,
-                acceptableMax: 98.99,
-                excellentMin: 99,
-              }}
-              labels={{
-                critical: "Crítico",
-                acceptable: "Aceptable",
-                excellent: "Excelente",
-              }}
-            />
-            <Velocimeter
-              value={kpis.performance ?? 0}
-              title={
-                selected
-                  ? "Performance (mes) de la posición"
-                  : "Performance (mes) promedio"
-              }
-              metricLabel="Performance"
-              thresholds={{
-                criticalMax: 75,
-                acceptableMin: 75,
-                acceptableMax: 98.99,
-                excellentMin: 99,
-              }}
-              labels={{
-                critical: "Crítico",
-                acceptable: "Aceptable",
-                excellent: "Excelente",
-              }}
-            />
+            {showICOChart && (
+              <Velocimeter
+                value={kpis.ico ?? 0}
+                title={
+                  selected ? "ICO (mes) de la posición" : "ICO (mes) promedio"
+                }
+                metricLabel="ICO"
+                thresholds={{
+                  criticalMax: 75,
+                  acceptableMin: 75,
+                  acceptableMax: 98.99,
+                  excellentMin: 99,
+                }}
+                labels={{
+                  critical: "Crítico",
+                  acceptable: "Aceptable",
+                  excellent: "Excelente",
+                }}
+              />
+            )}
+            {showICPChart && (
+              <Velocimeter
+                value={kpis.icp ?? 0}
+                title={
+                  selected ? "ICP (mes) de la posición" : "ICP (mes) promedio"
+                }
+                metricLabel="ICP"
+                thresholds={{
+                  criticalMax: 75,
+                  acceptableMin: 75,
+                  acceptableMax: 98.99,
+                  excellentMin: 99,
+                }}
+                labels={{
+                  critical: "Crítico",
+                  acceptable: "Aceptable",
+                  excellent: "Excelente",
+                }}
+              />
+            )}
+            {showPerformanceChart && (
+              <Velocimeter
+                value={kpis.performance ?? 0}
+                title={
+                  selected
+                    ? "Performance (mes) de la posición"
+                    : "Performance (mes) promedio"
+                }
+                metricLabel="Performance"
+                thresholds={{
+                  criticalMax: 75,
+                  acceptableMin: 75,
+                  acceptableMax: 98.99,
+                  excellentMin: 99,
+                }}
+                labels={{
+                  critical: "Crítico",
+                  acceptable: "Aceptable",
+                  excellent: "Excelente",
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -239,44 +264,18 @@ export default function ResumenPage() {
             {selected ? (
               // --- Vista por posición seleccionada ---
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <PositionAnnualTrendCard
-                    className="h-full"
-                    trend={selected.annualTrend}
-                  />
-                </div>
-                <div className="md:col-span-1 min-h-[360px]">
-                  <PerformanceMap
-                    positions={[selected]}
-                    hoveredId={hoveredId}
-                    onHoverIdChange={setHoveredId}
-                    thresholds={{
-                      criticalMax: 75,
-                      acceptableMin: 75,
-                      acceptableMax: 98.99,
-                      excellentMin: 99,
-                    }}
-                    labels={{
-                      critical: "Crítico",
-                      acceptable: "Aceptable",
-                      excellent: "Excelente",
-                    }}
-                  />
-                </div>
-              </div>
-            ) : (
-              // --- Vista general (sin posición seleccionada) ---
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2 min-h-[360px]">
-                    <PositionsAssignmentsChart
+                {showAnnualPerformanceTrendChart && (
+                  <div className="md:col-span-2">
+                    <PositionAnnualTrendCard
                       className="h-full"
-                      positions={data.listPositions}
+                      trend={selected.annualTrend}
                     />
                   </div>
+                )}
+                {showPerformanceMapChart && (
                   <div className="md:col-span-1 min-h-[360px]">
                     <PerformanceMap
-                      positions={data.listPositions}
+                      positions={[selected]}
                       hoveredId={hoveredId}
                       onHoverIdChange={setHoveredId}
                       thresholds={{
@@ -292,14 +291,50 @@ export default function ResumenPage() {
                       }}
                     />
                   </div>
+                )}
+              </div>
+            ) : (
+              // --- Vista general (sin posición seleccionada) ---
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {showAssignmentsChart && (
+                    <div className="md:col-span-2 min-h-[360px]">
+                      <PositionsAssignmentsChart
+                        className="h-full"
+                        positions={data.listPositions}
+                      />
+                    </div>
+                  )}
+                  {showPerformanceMapChart && (
+                    <div className="md:col-span-1 min-h-[360px]">
+                      <PerformanceMap
+                        positions={data.listPositions}
+                        hoveredId={hoveredId}
+                        onHoverIdChange={setHoveredId}
+                        thresholds={{
+                          criticalMax: 75,
+                          acceptableMin: 75,
+                          acceptableMax: 98.99,
+                          excellentMin: 99,
+                        }}
+                        labels={{
+                          critical: "Crítico",
+                          acceptable: "Aceptable",
+                          excellent: "Excelente",
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Tabla a ancho completo */}
-                <RoleSummaryTable
-                  positions={data.listPositions}
-                  hoveredId={hoveredId}
-                  onHoverIdChange={setHoveredId}
-                />
+                {showPositionSummaryTable && (
+                  <RoleSummaryTable
+                    positions={data.listPositions}
+                    hoveredId={hoveredId}
+                    onHoverIdChange={setHoveredId}
+                  />
+                )}
               </>
             )}
           </>
