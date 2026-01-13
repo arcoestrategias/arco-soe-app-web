@@ -18,40 +18,39 @@ import PositionsAssignmentsChart from "@/features/resume/components/positions-as
 import Velocimeter from "@/features/resume/components/velocimeter";
 import PositionAnnualTrendCard from "@/features/resume/components/position-annual-trend-card";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 export default function ResumenPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
-  const showFilterStrategicPlan = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_FILTER_STRATEGIC_PLAN
-  );
-  const showFilterPosition = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_FILTER_POSITION
-  );
-  const showFilterMonth = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_FILTER_MONTH
-  );
-  const showFilterYear = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_FILTER_YEAR
-  );
-  const showICOChart = usePermission(PERMISSIONS.PERFORMANCE.SHOW_ICO_CHART);
-  const showICPChart = usePermission(PERMISSIONS.PERFORMANCE.SHOW_ICP_CHART);
-  const showPerformanceChart = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_CHART
-  );
-  const showAssignmentsChart = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_ASSIGNMENTS_CHART
-  );
-  const showAnnualPerformanceTrendChart = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_ANNUAL_PERFORMANCE_TREND_CHART
-  );
-  const showPerformanceMapChart = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_MAP_CHART
-  );
-  const showPositionSummaryTable = usePermission(
-    PERMISSIONS.PERFORMANCE.SHOW_POSITION_SUMMARY_TABLE
-  );
+  const {
+    showFilterStrategicPlan,
+    showFilterPosition,
+    showFilterMonth,
+    showFilterYear,
+    showICOChart,
+    showICPChart,
+    showPerformanceChart,
+    showAssignmentsChart,
+    showAnnualPerformanceTrendChart,
+    showPerformanceMapChart,
+    showPositionSummaryTable,
+  } = usePermissions({
+    showFilterStrategicPlan: PERMISSIONS.PERFORMANCE.SHOW_FILTER_STRATEGIC_PLAN,
+    showFilterPosition: PERMISSIONS.PERFORMANCE.SHOW_FILTER_POSITION,
+    showFilterMonth: PERMISSIONS.PERFORMANCE.SHOW_FILTER_MONTH,
+    showFilterYear: PERMISSIONS.PERFORMANCE.SHOW_FILTER_YEAR,
+    showICOChart: PERMISSIONS.PERFORMANCE.SHOW_ICO_CHART,
+    showICPChart: PERMISSIONS.PERFORMANCE.SHOW_ICP_CHART,
+    showPerformanceChart: PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_CHART,
+    showAssignmentsChart: PERMISSIONS.PERFORMANCE.SHOW_ASSIGNMENTS_CHART,
+    showAnnualPerformanceTrendChart:
+      PERMISSIONS.PERFORMANCE.SHOW_ANNUAL_PERFORMANCE_TREND_CHART,
+    showPerformanceMapChart:
+      PERMISSIONS.PERFORMANCE.SHOW_PERFORMANCE_MAP_CHART,
+    showPositionSummaryTable:
+      PERMISSIONS.PERFORMANCE.SHOW_POSITION_SUMMARY_TABLE,
+  });
 
   // Filtros
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);

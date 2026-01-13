@@ -78,6 +78,30 @@ export function usePermission(permission: string): boolean {
 }
 
 /**
+ * Hook para validar múltiples permisos a la vez.
+ * Recibe un objeto { key: permissionString } y devuelve { key: boolean }.
+ *
+ * Ejemplo: const { canEdit, canDelete } = usePermissions({ canEdit: '...', canDelete: '...' });
+ */
+export function usePermissions<K extends string>(
+  requests: Record<K, string>
+): Record<K, boolean> {
+  const { me } = useAuth();
+  // Serializamos para evitar recálculos si el objeto se pasa inline
+  const requestsJson = JSON.stringify(requests);
+
+  return useMemo(() => {
+    const result = {} as Record<K, boolean>;
+    for (const key in requests) {
+      if (Object.prototype.hasOwnProperty.call(requests, key)) {
+        result[key] = hasPermission(me, requests[key]);
+      }
+    }
+    return result;
+  }, [me, requestsJson]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/**
  * Hook para validar si tiene ALGUNO de los permisos listados.
  */
 export function useAnyPermission(permissions: string[]): boolean {
