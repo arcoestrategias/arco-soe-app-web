@@ -54,10 +54,6 @@ type Props = {
 
   /** Si se provee, intercepta la eliminación para mostrar modal externa */
   onRequestDelete?: (uiIndex: number, item: DefinitionListItem) => void;
-
-  /** Permisos */
-  canEdit?: boolean;
-  canDelete?: boolean;
 };
 
 export function DefinitionList({
@@ -82,8 +78,6 @@ export function DefinitionList({
   maxLengthCharacter = 100,
   onRequestCreate,
   onRequestDelete,
-  canEdit = true,
-  canDelete = true,
 }: Props) {
   const [localItems, setLocalItems] = useState<DefinitionListItem[]>([]);
   const [creatingNew, setCreatingNew] = useState(false);
@@ -96,6 +90,13 @@ export function DefinitionList({
 
   const reindex = (arr: DefinitionListItem[]) =>
     arr.map((it, idx) => ({ ...it, id: idx + 1 }));
+
+  // ✅ Derivar permisos basados en la existencia de las funciones
+  const canCreate = !!actions?.create || !!onRequestCreate;
+  const canUpdate = !!actions?.update || !!actions?.updateById;
+  const canDelete = !!actions?.remove || !!onRequestDelete;
+  const canReorder = !!actions?.reorder;
+  const isInteractive = canCreate || canUpdate || canDelete || canReorder;
 
   useEffect(() => {
     setLocalItems(reindex(items));
@@ -114,19 +115,19 @@ export function DefinitionList({
 
   // DnD
   const handleDragStart = (dragVisualId: number, e: React.DragEvent) => {
-    if (!canEdit) return;
+    if (!canReorder) return;
     e.dataTransfer.effectAllowed = "move";
     setDragId(dragVisualId);
   };
 
   const handleDragOver = (overId: number, e: React.DragEvent) => {
-    if (!canEdit) return;
+    if (!canReorder) return;
     e.preventDefault();
     setDragOverItem(overId);
   };
 
   const handleDrop = (dropId: number) => {
-    if (!canEdit) return;
+    if (!canReorder) return;
     setDragOverItem(null);
     if (dragId == null) return;
 
@@ -142,7 +143,7 @@ export function DefinitionList({
 
   // Eliminar (inactivar)
   const handleDelete = (uiIndex: number) => {
-    if (!canDelete || !canEdit) return;
+    if (!canDelete) return;
     const item = localItems.find((it) => it.id === uiIndex);
     if (onRequestDelete && item) {
       onRequestDelete(uiIndex, item);
@@ -158,7 +159,7 @@ export function DefinitionList({
 
   // Crear
   const handleCreate = () => {
-    if (!canEdit) return;
+    if (!canCreate) return;
     if (hasReorderChanges) {
       toast.warning(
         "Guarda primero el orden para poder crear nuevos elementos."
@@ -177,7 +178,7 @@ export function DefinitionList({
 
   // Abrir modal de crear (si está provista)
   const openCreate = () => {
-    if (!canEdit) return;
+    if (!canCreate) return;
     if (hasReorderChanges) {
       toast.warning(
         "Guarda primero el orden para poder crear nuevos elementos."
@@ -193,13 +194,13 @@ export function DefinitionList({
 
   // Guardar orden
   const handleSaveAll = () => {
-    if (!canEdit) return;
+    if (!canReorder) return;
     if (!hasReorderChanges) return;
     actions?.reorder?.(localItems);
   };
 
   const startInlineEdit = (metaId?: string, fallbackId?: number) => {
-    if (!canEdit) return;
+    if (!canUpdate) return;
     if (hasReorderChanges) {
       toast.warning("Guarda primero el orden para poder editar.");
       return;
@@ -208,7 +209,7 @@ export function DefinitionList({
   };
 
   const saveInlineEdit = (item: DefinitionListItem, newContent: string) => {
-    if (!canEdit) return;
+    if (!canUpdate) return;
     const value = newContent.trim();
     if (!value) return;
 
@@ -230,7 +231,7 @@ export function DefinitionList({
     setEditingMetaId(null);
   };
 
-  const deleteDisabled = hasReorderChanges || !canDelete || !canEdit;
+  const deleteDisabled = hasReorderChanges || !canDelete;
 
   return (
     <div
@@ -249,7 +250,7 @@ export function DefinitionList({
         </div>
 
         <div className="flex gap-2 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onRequestCreate && canEdit && (
+          {onRequestCreate && (
             <Button
               size="sm"
               variant="ghost"
@@ -267,7 +268,7 @@ export function DefinitionList({
             </Button>
           )}
 
-          {!isEditing && canEdit && (
+          {!isEditing && isInteractive && (
             <Button size="icon" variant="ghost" onClick={onStartEdit}>
               <Edit3 className="w-4 h-4 text-gray-500" />
             </Button>
@@ -279,16 +280,16 @@ export function DefinitionList({
         {isEditing ? (
           <>
             <p className="text-sm text-gray-600 mb-2">
-              {canEdit
+              {canReorder
                 ? "Arrastra los elementos para reordenar"
-                : "Edición deshabilitada"}
+                : "Modo edición"}
             </p>
 
             <div className="space-y-3">
               {localItems.map((item) => (
                 <div
                   key={item.metaId ?? `row-${item.id}`}
-                  draggable={canEdit}
+                  draggable={canReorder}
                   onDragStart={(e) => handleDragStart(item.id, e)}
                   onDragOver={(e) => handleDragOver(item.id, e)}
                   onDrop={() => handleDrop(item.id)}
@@ -297,7 +298,7 @@ export function DefinitionList({
                     dragOverItem === item.id
                       ? "border-2 border-dashed border-primary"
                       : itemBorderColor
-                  } ${!canEdit ? "opacity-60" : ""}`}
+                  } ${!canReorder ? "" : "cursor-move"}`}
                 >
                   <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   <div
@@ -315,7 +316,7 @@ export function DefinitionList({
                       showBadge={false}
                       isEditing={editingMetaId === item.metaId}
                       onEdit={() => startInlineEdit(item.metaId, item.id)}
-                      showEditIcon={canEdit}
+                      showEditIcon={canUpdate}
                       onSave={(newContent) => saveInlineEdit(item, newContent)}
                       onCancel={() => setEditingMetaId(null)}
                     />
@@ -354,8 +355,8 @@ export function DefinitionList({
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
                   placeholder="Nuevo elemento..."
-                  maxLength={100}
-                  disabled={!canEdit || hasReorderChanges || isReordering}
+                  maxLength={maxLengthCharacter}
+                  disabled={!canCreate || hasReorderChanges || isReordering}
                 />
                 <div className="flex justify-end gap-2">
                   <Button
@@ -370,13 +371,13 @@ export function DefinitionList({
                     size="sm"
                     onClick={handleCreate}
                     disabled={
-                      !canEdit ||
+                      !canCreate ||
                       isReordering ||
                       hasReorderChanges ||
                       newItemText.trim().length === 0
                     }
                     title={
-                      !canEdit
+                      !canCreate
                         ? "No tienes permiso para crear."
                         : hasReorderChanges
                         ? "Guarda primero el orden para poder crear."
@@ -403,16 +404,16 @@ export function DefinitionList({
                     );
                     return;
                   }
-                  if (!canEdit) return;
+                  if (!canCreate) return;
                   if (onRequestCreate) {
                     onRequestCreate();
                   } else {
                     setCreatingNew(true);
                   }
                 }}
-                disabled={!canEdit || isReordering}
+                disabled={!canCreate || isReordering}
                 className={hasReorderChanges ? "opacity-60 cursor-pointer" : ""}
-                title={!canEdit ? "No tienes permiso para crear." : undefined}
+                title={!canCreate ? "No tienes permiso para crear." : undefined}
               >
                 <Plus className="w-4 h-4 mr-1" /> Agregar nuevo
               </Button>
@@ -428,9 +429,9 @@ export function DefinitionList({
               </Button>
               <Button
                 onClick={handleSaveAll}
-                disabled={!canEdit || !hasReorderChanges || isReordering}
+                disabled={!canReorder || !hasReorderChanges || isReordering}
                 title={
-                  !canEdit ? "No tienes permiso para reordenar." : undefined
+                  !canReorder ? "No tienes permiso para reordenar." : undefined
                 }
               >
                 {isReordering ? "Guardando…" : "Guardar Orden"}

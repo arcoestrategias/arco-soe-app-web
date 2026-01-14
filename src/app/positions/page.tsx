@@ -14,11 +14,9 @@ import { DefinitionTab } from "@/features/positions/components/definition-tab";
 import { OrganizationChartOverview } from "@/features/resume/components/organization-chart-overview";
 import { getPositionId } from "@/shared/auth/storage";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 export default function PositionsPage() {
-  const canUpdatePosition = usePermission(PERMISSIONS.POSITIONS.UPDATE);
-
   const businessUnitId = getBusinessUnitId() ?? undefined;
   const companyId = getCompanyId() ?? undefined;
 
@@ -30,11 +28,33 @@ export default function PositionsPage() {
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
+  const {
+    showFilterStrategicPlan,
+    showFilterPosition,
+    showFilterMonth,
+    showFilterYear,
+    showDefinitionTab,
+    showOrgChartTab,
+  } = usePermissions({
+    showFilterStrategicPlan: PERMISSIONS.POSITIONS.SHOW_FILTER_STRATEGIC_PLAN,
+    showFilterPosition: PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION,
+    showFilterMonth: PERMISSIONS.POSITIONS.SHOW_FILTER_MONTH,
+    showFilterYear: PERMISSIONS.POSITIONS.SHOW_FILTER_YEAR,
+    showDefinitionTab: PERMISSIONS.POSITIONS.SHOW_DEFINITION_TAB,
+    showOrgChartTab: PERMISSIONS.POSITIONS.SHOW_ORG_CHART_TAB,
+  });
+
+  const defaultTab = showDefinitionTab
+    ? "definition"
+    : showOrgChartTab
+    ? "organigram"
+    : undefined;
+
   React.useEffect(() => {
-    if (!canUpdatePosition) {
+    if (!showFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canUpdatePosition]);
+  }, [showFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/positions" onNavigate={() => {}}>
@@ -50,16 +70,18 @@ export default function PositionsPage() {
           </div>
 
           <div className="flex gap-3">
-            <FilterField label="Plan estratégico">
-              <StrategicPlanSelect
-                businessUnitId={businessUnitId}
-                value={strategicPlanId}
-                onChange={setStrategicPlanId}
-                persist
-                clearOnUnmount
-              />
-            </FilterField>
-            {canUpdatePosition ? (
+            {showFilterStrategicPlan && (
+              <FilterField label="Plan estratégico">
+                <StrategicPlanSelect
+                  businessUnitId={businessUnitId}
+                  value={strategicPlanId}
+                  onChange={setStrategicPlanId}
+                  persist
+                  clearOnUnmount
+                />
+              </FilterField>
+            )}
+            {showFilterPosition ? (
               <FilterField label="Posición">
                 <PositionSelect
                   businessUnitId={businessUnitId}
@@ -72,40 +94,60 @@ export default function PositionsPage() {
                 />
               </FilterField>
             ) : null}
-            <FilterField label="Mes">
-              <MonthSelect value={month} onChange={setMonth} />
-            </FilterField>
+            {showFilterMonth && (
+              <FilterField label="Mes">
+                <MonthSelect value={month} onChange={setMonth} />
+              </FilterField>
+            )}
 
-            <FilterField label="Año">
-              <YearSelect value={year} onChange={setYear} />
-            </FilterField>
+            {showFilterYear && (
+              <FilterField label="Año">
+                <YearSelect value={year} onChange={setYear} />
+              </FilterField>
+            )}
           </div>
         </div>
 
-        <Tabs defaultValue="definition" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
-            <TabsTrigger value="definition">Definición</TabsTrigger>
-            <TabsTrigger value="organigram">Organigrama</TabsTrigger>
-          </TabsList>
+        {defaultTab && (
+          <Tabs defaultValue={defaultTab} className="w-full">
+            <TabsList
+              className={`grid w-full bg-gray-100 p-1 rounded-lg ${
+                showDefinitionTab && showOrgChartTab
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
+              }`}
+            >
+              {showDefinitionTab && (
+                <TabsTrigger value="definition">Definición</TabsTrigger>
+              )}
+              {showOrgChartTab && (
+                <TabsTrigger value="organigram">Organigrama</TabsTrigger>
+              )}
+            </TabsList>
 
-          <TabsContent value="definition" className="mt-6">
-            <DefinitionTab
-              strategicPlanId={strategicPlanId ?? undefined}
-              positionId={positionId ?? undefined}
-              year={year ?? undefined}
-            />
-          </TabsContent>
+            {showDefinitionTab && (
+              <TabsContent value="definition" className="mt-6">
+                <DefinitionTab
+                  strategicPlanId={strategicPlanId ?? undefined}
+                  positionId={positionId ?? undefined}
+                  year={year ?? undefined}
+                />
+              </TabsContent>
+            )}
 
-          <TabsContent value="organigram" className="mt-6">
-            <OrganizationChartOverview
-              businessUnitId={businessUnitId}
-              strategicPlanId={strategicPlanId ?? undefined}
-              month={month}
-              year={year}
-              positionId={positionId ?? undefined}
-            />
-          </TabsContent>
-        </Tabs>
+            {showOrgChartTab && (
+              <TabsContent value="organigram" className="mt-6">
+                <OrganizationChartOverview
+                  businessUnitId={businessUnitId}
+                  strategicPlanId={strategicPlanId ?? undefined}
+                  month={month}
+                  year={year}
+                  positionId={positionId ?? undefined}
+                />
+              </TabsContent>
+            )}
+          </Tabs>
+        )}
       </div>
     </SidebarLayout>
   );

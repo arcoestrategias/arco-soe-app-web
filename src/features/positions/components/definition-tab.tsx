@@ -50,7 +50,7 @@ import {
 
 // ✅ Permisos: hook de auth + función pura
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 import { DefinitionList, DefinitionListItem } from "./definition-list";
 import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
 
@@ -65,34 +65,41 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   const hasPlanAndPos = !!strategicPlanId && !!positionId;
 
   // ✅ Calcula permisos
-  const canPositionUpdate = usePermission(PERMISSIONS.POSITIONS.UPDATE);
-
-  const canObjectivesCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
-  const canObjectivesUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
-  const canObjectivesDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
-  const canObjectivesEdit = canObjectivesCreate || canObjectivesUpdate;
-
-  const canProjectsCreate = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.CREATE);
-  const canProjectsUpdate = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.UPDATE);
-  const canProjectsDelete = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.DELETE);
-  const canProjectsEdit = canProjectsCreate || canProjectsUpdate;
-
-  const canLeversCreate = usePermission(PERMISSIONS.LEVERS.CREATE);
-  const canLeversUpdate = usePermission(PERMISSIONS.LEVERS.UPDATE);
-  const canLeversDelete = usePermission(PERMISSIONS.LEVERS.DELETE);
-  const canLeversEdit = canLeversCreate || canLeversUpdate;
+  const permissions = usePermissions({
+    positionRead: PERMISSIONS.POSITIONS.READ,
+    positionUpdate: PERMISSIONS.POSITIONS.UPDATE,
+    objectivesRead: PERMISSIONS.OBJECTIVES.READ,
+    objectivesCreate: PERMISSIONS.OBJECTIVES.CREATE,
+    objectivesUpdate: PERMISSIONS.OBJECTIVES.UPDATE,
+    objectivesDelete: PERMISSIONS.OBJECTIVES.DELETE,
+    objectivesReorder: PERMISSIONS.OBJECTIVES.REORDER,
+    projectsRead: PERMISSIONS.STRATEGIC_PROJECTS.READ,
+    projectsCreate: PERMISSIONS.STRATEGIC_PROJECTS.CREATE,
+    projectsUpdate: PERMISSIONS.STRATEGIC_PROJECTS.UPDATE,
+    projectsDelete: PERMISSIONS.STRATEGIC_PROJECTS.DELETE,
+    projectsReorder: PERMISSIONS.STRATEGIC_PROJECTS.REORDER,
+    leversRead: PERMISSIONS.LEVERS.READ,
+    leversCreate: PERMISSIONS.LEVERS.CREATE,
+    leversUpdate: PERMISSIONS.LEVERS.UPDATE,
+    leversDelete: PERMISSIONS.LEVERS.DELETE,
+    leversReorder: PERMISSIONS.LEVERS.REORDER,
+  });
 
   // Hover / edición
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [editingKey, setEditingKey] = useState<
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<
     null | "mission" | "vision" | "objectives" | "projects" | "levers"
   >(null);
-  const [editText, setEditText] = useState<string>("");
+  const [temporaryEditText, setTemporaryEditText] = useState<string>("");
 
   // Estado modales Objetivos
-  const [openCreateObj, setOpenCreateObj] = useState(false);
-  const [openBlocked, setOpenBlocked] = useState(false);
-  const [blockedPayload, setBlockedPayload] = useState<{
+  const [isCreateObjectiveModalOpen, setIsCreateObjectiveModalOpen] =
+    useState(false);
+  const [
+    isDeleteObjectiveBlockedModalOpen,
+    setIsDeleteObjectiveBlockedModalOpen,
+  ] = useState(false);
+  const [deleteObjectiveBlockedData, setDeleteObjectiveBlockedData] = useState<{
     message?: string;
     projects?: any[];
     priorities?: any[];
@@ -149,18 +156,18 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   });
 
   // ---- Mutations ----
-  const updatePositionMut = useMutation({
+  const updatePositionMutation = useMutation({
     mutationFn: (payload: { mission?: string; vision?: string }) =>
       updatePosition(positionId!, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QKEY.position(positionId!) });
-      setEditingKey(null);
+      setEditingSection(null);
       toast.success("Información de la posición actualizada");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const updateObjectiveMut = useMutation({
+  const updateObjectiveMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateObjective(id, { name: name.trim() }),
     onSuccess: () => {
@@ -172,7 +179,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const reorderObjectivesMut = useMutation({
+  const reorderObjectivesMutation = useMutation({
     mutationFn: (payload: {
       strategicPlanId: string;
       items: Array<{ id: string; order: number; isActive: boolean }>;
@@ -181,19 +188,19 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
       qc.invalidateQueries({
         queryKey: QKEY.objectives(strategicPlanId!, positionId!, year),
       });
-      setEditingKey(null);
+      setEditingSection(null);
       toast.success("Orden de objetivos guardado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const inactivateMut = useInactivateObjective([
+  const inactivateObjectiveMutation = useInactivateObjective([
     QKEY.objectives(strategicPlanId!, positionId!, year as number),
     QKEY.objectivesUnconfigured(strategicPlanId!, positionId!),
     ["objectives", "ico-board"], // mismo bucket usado en Objectives
   ]);
 
-  const createProjectMut = useMutation({
+  const createProjectMutation = useMutation({
     mutationFn: (name: string) => {
       const payload: CreateStrategicProjectPayload = {
         name: name.trim(),
@@ -211,7 +218,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const updateProjectMut = useMutation({
+  const updateProjectMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateStrategicProject(id, { name: name.trim() }),
     onSuccess: () => {
@@ -223,7 +230,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const reorderProjectsMut = useMutation({
+  const reorderProjectsMutation = useMutation({
     mutationFn: (payload: {
       strategicPlanId: string;
       items: Array<{ id: string; order: number; isActive: boolean }>;
@@ -232,13 +239,13 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
       qc.invalidateQueries({
         queryKey: QKEY.strategicProjects(strategicPlanId!, positionId!),
       });
-      setEditingKey(null);
+      setEditingSection(null);
       toast.success("Orden de proyectos guardado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const createLeverMut = useMutation({
+  const createLeverMutation = useMutation({
     mutationFn: (name: string) =>
       createLever({
         positionId: positionId!,
@@ -251,7 +258,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const updateLeverMut = useMutation({
+  const updateLeverMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateLever(id, { name: name.trim() }),
     onSuccess: () => {
@@ -261,14 +268,14 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const reorderLeversMut = useMutation({
+  const reorderLeversMutation = useMutation({
     mutationFn: (payload: {
       positionId: string;
       items: Array<{ id: string; order: number; isActive: boolean }>;
     }) => reorderLevers(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QKEY.levers(positionId!) });
-      setEditingKey(null);
+      setEditingSection(null);
       toast.success("Orden de palancas guardado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
@@ -278,80 +285,66 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   const mission = position?.mission ?? "";
   const vision = position?.vision ?? "";
 
-  const objectivesOrdered = useMemo(() => {
+  const mappedObjectives = useMemo(() => {
     const arr = Array.isArray(objectives) ? [...objectives] : [];
     arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
+    return arr.map((o: any, idx: number) => ({
+      id: idx + 1,
+      content: o?.name ?? "",
+      metaId: o?.id,
+      isActive: o?.isActive ?? true,
+    }));
   }, [objectives]);
 
-  const objectivesItems: DefinitionListItem[] = useMemo(
-    () =>
-      objectivesOrdered.map((o: any, idx: number) => ({
-        id: idx + 1,
-        content: o?.name ?? "",
-        metaId: o?.id,
-        isActive: o?.isActive ?? true,
-      })),
-    [objectivesOrdered]
-  );
-
-  const projectsOrdered = useMemo(() => {
+  const mappedProjects = useMemo(() => {
     const arr = Array.isArray(projects) ? [...projects] : [];
     arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
+    return arr.map((p: any, idx: number) => ({
+      id: idx + 1,
+      content: p?.name ?? "",
+      metaId: p?.id,
+      isActive: p?.isActive ?? true,
+    }));
   }, [projects]);
 
-  const projectsItems: DefinitionListItem[] = useMemo(
-    () =>
-      projectsOrdered.map((p: any, idx: number) => ({
-        id: idx + 1,
-        content: p?.name ?? "",
-        metaId: p?.id,
-        isActive: p?.isActive ?? true,
-      })),
-    [projectsOrdered]
-  );
-
-  const leversOrdered = useMemo(() => {
+  const mappedLevers = useMemo(() => {
     const arr = Array.isArray(levers) ? [...levers] : [];
     arr.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
-    return arr;
+    return arr.map((lv: any, idx: number) => ({
+      id: idx + 1,
+      content: lv?.name ?? "",
+      metaId: lv?.id,
+      isActive: lv?.isActive ?? true,
+    }));
   }, [levers]);
 
-  const leversItems: DefinitionListItem[] = useMemo(
-    () =>
-      leversOrdered.map((lv: any, idx: number) => ({
-        id: idx + 1,
-        content: lv?.name ?? "",
-        metaId: lv?.id,
-        isActive: lv?.isActive ?? true,
-      })),
-    [leversOrdered]
-  );
-
   // ---- Handlers ----
-  const startEditCard = (key: "mission" | "vision", currentText: string) => {
-    setEditingKey(key);
-    setEditText(currentText ?? "");
+  const handleStartEditCard = (
+    key: "mission" | "vision",
+    currentText: string
+  ) => {
+    setEditingSection(key);
+    setTemporaryEditText(currentText ?? "");
   };
 
-  const cancelEditCard = () => {
-    setEditingKey(null);
-    setEditText("");
+  const handleCancelEditCard = () => {
+    setEditingSection(null);
+    setTemporaryEditText("");
   };
 
-  const saveEditCard = () => {
+  const handleSaveEditCard = () => {
     if (!positionId) return;
     const payload: any = {};
-    if (editingKey === "mission") payload.mission = editText.trim();
-    if (editingKey === "vision") payload.vision = editText.trim();
-    if (Object.keys(payload).length) updatePositionMut.mutate(payload);
-    else setEditingKey(null);
+    if (editingSection === "mission")
+      payload.mission = temporaryEditText.trim();
+    if (editingSection === "vision") payload.vision = temporaryEditText.trim();
+    if (Object.keys(payload).length) updatePositionMutation.mutate(payload);
+    else setEditingSection(null);
   };
 
   const handleObjectivesReorder = (updated: DefinitionListItem[]) => {
     if (!strategicPlanId) return;
-    reorderObjectivesMut.mutate({
+    reorderObjectivesMutation.mutate({
       strategicPlanId,
       items: updated.map((it, idx) => ({
         id: it.metaId!,
@@ -363,7 +356,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
 
   const handleProjectsReorder = (updated: DefinitionListItem[]) => {
     if (!strategicPlanId) return;
-    reorderProjectsMut.mutate({
+    reorderProjectsMutation.mutate({
       strategicPlanId,
       items: updated.map((it, idx) => ({
         id: it.metaId!,
@@ -375,7 +368,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
 
   const handleLeversReorder = (updated: DefinitionListItem[]) => {
     if (!positionId) return;
-    reorderLeversMut.mutate({
+    reorderLeversMutation.mutate({
       positionId,
       items: updated.map((it, idx) => ({
         id: it.metaId!,
@@ -383,6 +376,48 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
         isActive: it.isActive ?? true,
       })),
     });
+  };
+
+  // Handlers para acciones de listas
+  const handleCreateProject = (name: string) => {
+    createProjectMutation.mutate(name);
+  };
+  const handleUpdateProject = (id: string, name: string) => {
+    updateProjectMutation.mutate({ id, name });
+  };
+  const handleDeleteProject = (uiIndex: number) => {
+    const payload = {
+      strategicPlanId: strategicPlanId!,
+      items: mappedProjects.map((it, idx) => ({
+        id: it.metaId!,
+        order: idx + 1,
+        isActive: it.id === uiIndex ? false : it.isActive ?? true,
+      })),
+    };
+    reorderProjectsMutation.mutate(payload);
+  };
+
+  const handleCreateLever = (name: string) => {
+    createLeverMutation.mutate(name);
+  };
+  const handleUpdateLever = (id: string, name: string) => {
+    updateLeverMutation.mutate({ id, name });
+  };
+  const handleDeleteLever = (uiIndex: number) => {
+    if (!positionId) return;
+    const payload = {
+      positionId,
+      items: mappedLevers.map((it, idx) => ({
+        id: it.metaId!,
+        order: idx + 1,
+        isActive: it.id === uiIndex ? false : it.isActive ?? true,
+      })),
+    };
+    reorderLeversMutation.mutate(payload);
+  };
+
+  const handleUpdateObjective = (id: string, name: string) => {
+    updateObjectiveMutation.mutate({ id, name });
   };
 
   // ---- Loading & Error ----
@@ -414,215 +449,190 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   return (
     <div className="grid grid-cols-1 gap-6">
       {/* Misión / Visión de la POSICIÓN */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DefinitionCard
-          sectionKey="mission"
-          title="Misión"
-          content={mission}
-          icon={Target}
-          iconColor="text-orange-600"
-          iconBg="bg-orange-100"
-          cardColor="bg-orange-50"
-          cardBorderColor="border-orange-200"
-          contentColor="bg-white/70"
-          contentBorderColor="border-orange-100"
-          isEditing={editingKey === "mission"}
-          editText={editingKey === "mission" ? editText : ""}
-          hovered={hoveredKey === "mission"}
-          onHover={setHoveredKey}
-          onEditClick={() =>
-            canPositionUpdate && startEditCard("mission", mission)
-          }
-          onChangeText={setEditText}
-          onSave={saveEditCard}
-          onCancel={cancelEditCard}
-          canEdit={canPositionUpdate}
-        />
+      {permissions.positionRead && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <DefinitionCard
+            sectionKey="mission"
+            title="Misión"
+            content={mission}
+            icon={Target}
+            iconColor="text-orange-600"
+            iconBg="bg-orange-100"
+            cardColor="bg-orange-50"
+            cardBorderColor="border-orange-200"
+            contentColor="bg-white/70"
+            contentBorderColor="border-orange-100"
+            isEditing={editingSection === "mission"}
+            editText={editingSection === "mission" ? temporaryEditText : ""}
+            hovered={hoveredSection === "mission"}
+            onHover={setHoveredSection}
+            onEditClick={() => handleStartEditCard("mission", mission)}
+            onChangeText={setTemporaryEditText}
+            onSave={handleSaveEditCard}
+            onCancel={handleCancelEditCard}
+            canEdit={permissions.positionUpdate}
+          />
 
-        <DefinitionCard
-          sectionKey="vision"
-          title="Visión"
-          content={vision}
-          icon={Eye}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-100 p-2"
-          cardColor="bg-blue-50"
-          cardBorderColor="border-blue-200"
-          contentColor="bg-white/70"
-          contentBorderColor="border-blue-100"
-          isEditing={editingKey === "vision"}
-          editText={editingKey === "vision" ? editText : ""}
-          hovered={hoveredKey === "vision"}
-          onHover={setHoveredKey}
-          onEditClick={() =>
-            canPositionUpdate && startEditCard("vision", vision)
-          }
-          onChangeText={setEditText}
-          onSave={saveEditCard}
-          onCancel={cancelEditCard}
-          canEdit={canPositionUpdate}
-        />
-      </div>
+          <DefinitionCard
+            sectionKey="vision"
+            title="Visión"
+            content={vision}
+            icon={Eye}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-100 p-2"
+            cardColor="bg-blue-50"
+            cardBorderColor="border-blue-200"
+            contentColor="bg-white/70"
+            contentBorderColor="border-blue-100"
+            isEditing={editingSection === "vision"}
+            editText={editingSection === "vision" ? temporaryEditText : ""}
+            hovered={hoveredSection === "vision"}
+            onHover={setHoveredSection}
+            onEditClick={() => handleStartEditCard("vision", vision)}
+            onChangeText={setTemporaryEditText}
+            onSave={handleSaveEditCard}
+            onCancel={handleCancelEditCard}
+            canEdit={permissions.positionUpdate}
+          />
+        </div>
+      )}
 
       {/* Objetivos & Proyectos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* OBJETIVOS: con modal */}
-        <DefinitionList
-          sectionKey="objectives"
-          title="Objetivos"
-          items={objectivesItems}
-          icon={Flag}
-          iconColor="text-indigo-600"
-          iconBg="bg-indigo-100"
-          cardColor="bg-indigo-50"
-          cardBorderColor="border-indigo-200"
-          itemColor="bg-indigo-25"
-          itemBorderColor="border-indigo-100"
-          badgeColor="bg-indigo-500"
-          hovered={hoveredKey === "objectives"}
-          isEditing={editingKey === "objectives"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canObjectivesEdit && setEditingKey("objectives")}
-          onCancelEdit={() => setEditingKey(null)}
-          isReordering={(reorderObjectivesMut as any).isPending}
-          maxLengthCharacter={150}
-          canEdit={canObjectivesEdit}
-          canDelete={canObjectivesDelete}
-          // Muestra botón Agregar en header solo si tiene permiso
-          onRequestCreate={
-            canObjectivesCreate ? () => setOpenCreateObj(true) : undefined
-          }
-          onRequestDelete={
-            canObjectivesDelete
-              ? (_uiIndex, item) => {
-                  const objectiveId = item.metaId!;
-                  inactivateMut.mutate(objectiveId, {
-                    onSuccess: (data) => {
-                      if (data?.blocked) {
-                        setBlockedPayload({
-                          message: data.message,
-                          projects: data.associations?.projects ?? [],
-                          priorities: data.associations?.priorities ?? [],
-                        });
-                        setOpenBlocked(true);
-                      }
-                    },
-                  });
-                }
-              : undefined
-          }
-          actions={{
-            updateById: canObjectivesUpdate
-              ? (id, name) => updateObjectiveMut.mutate({ id, name })
-              : undefined,
-            reorder: canObjectivesEdit
-              ? (updated) => handleObjectivesReorder(updated)
-              : undefined,
-          }}
-        />
+        {permissions.objectivesRead && (
+          <DefinitionList
+            sectionKey="objectives"
+            title="Objetivos"
+            items={mappedObjectives}
+            icon={Flag}
+            iconColor="text-indigo-600"
+            iconBg="bg-indigo-100"
+            cardColor="bg-indigo-50"
+            cardBorderColor="border-indigo-200"
+            itemColor="bg-indigo-25"
+            itemBorderColor="border-indigo-100"
+            badgeColor="bg-indigo-500"
+            hovered={hoveredSection === "objectives"}
+            isEditing={editingSection === "objectives"}
+            onHover={setHoveredSection}
+            onStartEdit={() => setEditingSection("objectives")}
+            onCancelEdit={() => setEditingSection(null)}
+            isReordering={(reorderObjectivesMutation as any).isPending}
+            maxLengthCharacter={150}
+            // Muestra botón Agregar en header solo si tiene permiso
+            onRequestCreate={
+              permissions.objectivesCreate
+                ? () => setIsCreateObjectiveModalOpen(true)
+                : undefined
+            }
+            onRequestDelete={
+              permissions.objectivesDelete
+                ? (_uiIndex, item) => {
+                    const objectiveId = item.metaId!;
+                    inactivateObjectiveMutation.mutate(objectiveId, {
+                      onSuccess: (data) => {
+                        if (data?.blocked) {
+                          setDeleteObjectiveBlockedData({
+                            message: data.message,
+                            projects: data.associations?.projects ?? [],
+                            priorities: data.associations?.priorities ?? [],
+                          });
+                          setIsDeleteObjectiveBlockedModalOpen(true);
+                        }
+                      },
+                    });
+                  }
+                : undefined
+            }
+            actions={{
+              updateById: permissions.objectivesUpdate
+                ? handleUpdateObjective
+                : undefined,
+              reorder: permissions.objectivesReorder
+                ? (updated) => handleObjectivesReorder(updated)
+                : undefined,
+            }}
+          />
+        )}
 
         {/* PROYECTOS: inline */}
-        <DefinitionList
-          sectionKey="projects"
-          title="Proyectos Estratégicos"
-          items={projectsItems}
-          icon={FolderKanban}
-          iconColor="text-amber-700"
-          iconBg="bg-amber-100"
-          cardColor="bg-amber-50"
-          cardBorderColor="border-amber-200"
-          itemColor="bg-amber-25"
-          itemBorderColor="border-amber-100"
-          badgeColor="bg-amber-500"
-          hovered={hoveredKey === "projects"}
-          isEditing={editingKey === "projects"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canProjectsEdit && setEditingKey("projects")}
-          onCancelEdit={() => setEditingKey(null)}
-          isReordering={(reorderProjectsMut as any).isPending}
-          maxLengthCharacter={150}
-          canEdit={canProjectsEdit}
-          canDelete={canProjectsDelete}
-          actions={{
-            create: canProjectsCreate
-              ? (name) => createProjectMut.mutate(name)
-              : undefined,
-            updateById: canProjectsUpdate
-              ? (id, name) => updateProjectMut.mutate({ id, name })
-              : undefined,
-            remove: canProjectsDelete
-              ? (uiIndex) => {
-                  const payload = {
-                    strategicPlanId: strategicPlanId!,
-                    items: projectsItems.map((it, idx) => ({
-                      id: it.metaId!,
-                      order: idx + 1,
-                      isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                    })),
-                  };
-                  reorderProjectsMut.mutate(payload);
-                }
-              : undefined,
-            reorder: canProjectsEdit
-              ? (updated) => handleProjectsReorder(updated)
-              : undefined,
-          }}
-        />
+        {permissions.projectsRead && (
+          <DefinitionList
+            sectionKey="projects"
+            title="Proyectos Estratégicos"
+            items={mappedProjects}
+            icon={FolderKanban}
+            iconColor="text-amber-700"
+            iconBg="bg-amber-100"
+            cardColor="bg-amber-50"
+            cardBorderColor="border-amber-200"
+            itemColor="bg-amber-25"
+            itemBorderColor="border-amber-100"
+            badgeColor="bg-amber-500"
+            hovered={hoveredSection === "projects"}
+            isEditing={editingSection === "projects"}
+            onHover={setHoveredSection}
+            onStartEdit={() => setEditingSection("projects")}
+            onCancelEdit={() => setEditingSection(null)}
+            isReordering={(reorderProjectsMutation as any).isPending}
+            maxLengthCharacter={150}
+            actions={{
+              create: permissions.projectsCreate
+                ? handleCreateProject
+                : undefined,
+              updateById: permissions.projectsUpdate
+                ? handleUpdateProject
+                : undefined,
+              remove: permissions.projectsDelete
+                ? handleDeleteProject
+                : undefined,
+              reorder: permissions.projectsReorder
+                ? (updated) => handleProjectsReorder(updated)
+                : undefined,
+            }}
+          />
+        )}
       </div>
 
       {/* PALANCAS */}
-      <DefinitionList
-        sectionKey="levers"
-        title="Palancas"
-        items={leversItems}
-        icon={Zap}
-        iconColor="text-teal-700"
-        iconBg="bg-teal-100"
-        cardColor="bg-teal-50"
-        cardBorderColor="border-teal-200"
-        itemColor="bg-teal-25"
-        itemBorderColor="border-teal-100"
-        badgeColor="bg-teal-500"
-        hovered={hoveredKey === "levers"}
-        isEditing={editingKey === "levers"}
-        onHover={setHoveredKey}
-        onStartEdit={() => canLeversEdit && setEditingKey("levers")}
-        onCancelEdit={() => setEditingKey(null)}
-        isReordering={(reorderLeversMut as any).isPending}
-        maxLengthCharacter={150}
-        canEdit={canLeversEdit}
-        canDelete={canLeversDelete}
-        actions={{
-          create: canLeversCreate
-            ? (name) => createLeverMut.mutate(name)
-            : undefined,
-          updateById: canLeversUpdate
-            ? (id, name) => updateLeverMut.mutate({ id, name })
-            : undefined,
-          remove: canLeversDelete
-            ? (uiIndex) => {
-                if (!positionId) return;
-                const payload = {
-                  positionId,
-                  items: leversItems.map((it, idx) => ({
-                    id: it.metaId!,
-                    order: idx + 1,
-                    isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                  })),
-                };
-                reorderLeversMut.mutate(payload);
-              }
-            : undefined,
-          reorder: canLeversEdit
-            ? (updated) => handleLeversReorder(updated)
-            : undefined,
-        }}
-      />
+      {permissions.leversRead && (
+        <DefinitionList
+          sectionKey="levers"
+          title="Palancas"
+          items={mappedLevers}
+          icon={Zap}
+          iconColor="text-teal-700"
+          iconBg="bg-teal-100"
+          cardColor="bg-teal-50"
+          cardBorderColor="border-teal-200"
+          itemColor="bg-teal-25"
+          itemBorderColor="border-teal-100"
+          badgeColor="bg-teal-500"
+          hovered={hoveredSection === "levers"}
+          isEditing={editingSection === "levers"}
+          onHover={setHoveredSection}
+          onStartEdit={() => setEditingSection("levers")}
+          onCancelEdit={() => setEditingSection(null)}
+          isReordering={(reorderLeversMutation as any).isPending}
+          maxLengthCharacter={150}
+          actions={{
+            create: permissions.leversCreate ? handleCreateLever : undefined,
+            updateById: permissions.leversUpdate
+              ? handleUpdateLever
+              : undefined,
+            remove: permissions.leversDelete ? handleDeleteLever : undefined,
+            reorder: permissions.leversReorder
+              ? (updated) => handleLeversReorder(updated)
+              : undefined,
+          }}
+        />
+      )}
 
       {/* --- MODALES OBJETIVOS --- */}
       <NewObjectiveModal
-        open={openCreateObj}
-        onOpenChange={setOpenCreateObj}
+        open={isCreateObjectiveModalOpen}
+        onOpenChange={setIsCreateObjectiveModalOpen}
         onCreate={(p) => {
           const payload: CreateObjectivePayload = {
             name: (p.objectiveText ?? "").trim(),
@@ -637,18 +647,18 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
                 queryKey: QKEY.objectives(strategicPlanId!, positionId!, year),
               });
               toast.success("Objetivo creado");
-              setOpenCreateObj(false);
+              setIsCreateObjectiveModalOpen(false);
             })
             .catch((e) => toast.error(getHumanErrorMessage(e as any)));
         }}
       />
 
       <ObjectiveInactivateBlockedModal
-        open={openBlocked}
-        message={blockedPayload.message}
-        projects={blockedPayload.projects}
-        priorities={blockedPayload.priorities}
-        onClose={() => setOpenBlocked(false)}
+        open={isDeleteObjectiveBlockedModalOpen}
+        message={deleteObjectiveBlockedData.message}
+        projects={deleteObjectiveBlockedData.projects}
+        priorities={deleteObjectiveBlockedData.priorities}
+        onClose={() => setIsDeleteObjectiveBlockedModalOpen(false)}
       />
     </div>
   );

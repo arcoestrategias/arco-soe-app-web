@@ -9,8 +9,6 @@ import { toast } from "sonner";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { getBusinessUnitId, getCompanyId } from "@/shared/auth/storage";
-
-// Services...
 import {
   getStrategicPlan,
   updateStrategicPlan,
@@ -39,19 +37,12 @@ import {
   updateStrategicProject,
   reorderStrategicProjects,
 } from "@/features/strategic-plans/services/strategicProjectsService";
-
 import { useCeoPositionId } from "@/features/positions/hooks/use-ceo-position";
-
-// UI locales
 import { Button } from "@/components/ui/button";
 import { DefinitionCard } from "./definition-card";
 import { DefinitionList } from "./definition-list";
-
-// Modales de objetivos
 import { NewObjectiveModal } from "@/features/objectives/components/new-objective-modal";
 import { ObjectiveInactivateBlockedModal } from "@/features/objectives/components/objective-inactivate-blocked-modal";
-
-// Iconos
 import {
   Target,
   Eye,
@@ -63,10 +54,8 @@ import {
 } from "lucide-react";
 import { CreateStrategicProjectPayload } from "../types/strategicProjects";
 import { CreateObjectivePayload } from "../types/objectives";
-
-// ✅ Permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 import {
   exportStrategicPlanDefinitionsPDF,
   StrategicPlanDefinitionsReportPayload,
@@ -82,46 +71,37 @@ type Props = {
 export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   const hasPlan = !!strategicPlanId;
   const qc = useQueryClient();
-  const year = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
 
-  // ✅ Permisos por módulo/acción
-  const canPlanUpdate = usePermission(PERMISSIONS.STRATEGIC_PLANS.UPDATE);
-
-  const canFactorsCreate = usePermission(
-    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.CREATE
-  );
-  const canFactorsUpdate = usePermission(
-    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.UPDATE
-  );
-  const canFactorsDelete = usePermission(
-    PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.DELETE
-  );
-  const canFactorsEdit = canFactorsCreate || canFactorsUpdate;
-
-  const canValuesCreate = usePermission(PERMISSIONS.STRATEGIC_VALUES.CREATE);
-  const canValuesUpdate = usePermission(PERMISSIONS.STRATEGIC_VALUES.UPDATE);
-  const canValuesDelete = usePermission(PERMISSIONS.STRATEGIC_VALUES.DELETE);
-  const canValuesEdit = canValuesCreate || canValuesUpdate;
-
-  const canObjectivesCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
-  const canObjectivesUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
-  const canObjectivesDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
-  const canObjectivesEdit = canObjectivesCreate || canObjectivesUpdate;
-
-  const canProjectsCreate = usePermission(
-    PERMISSIONS.STRATEGIC_PROJECTS.CREATE
-  );
-  const canProjectsUpdate = usePermission(
-    PERMISSIONS.STRATEGIC_PROJECTS.UPDATE
-  );
-  const canProjectsDelete = usePermission(
-    PERMISSIONS.STRATEGIC_PROJECTS.DELETE
-  );
-  const canProjectsEdit = canProjectsCreate || canProjectsUpdate;
+  const permissions = usePermissions({
+    planDownloadReportPdf: PERMISSIONS.STRATEGIC_PLANS.DOWNLOAD_REPORT_PDF,
+    planRead: PERMISSIONS.STRATEGIC_PLANS.READ,
+    planUpdate: PERMISSIONS.STRATEGIC_PLANS.UPDATE,
+    factorsRead: PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.READ,
+    factorsCreate: PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.CREATE,
+    factorsUpdate: PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.UPDATE,
+    factorsDelete: PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.DELETE,
+    factorsReorder: PERMISSIONS.STRATEGIC_SUCCESS_FACTORS.REORDER,
+    valuesRead: PERMISSIONS.STRATEGIC_VALUES.READ,
+    valuesCreate: PERMISSIONS.STRATEGIC_VALUES.CREATE,
+    valuesUpdate: PERMISSIONS.STRATEGIC_VALUES.UPDATE,
+    valuesDelete: PERMISSIONS.STRATEGIC_VALUES.DELETE,
+    valuesReorder: PERMISSIONS.STRATEGIC_VALUES.REORDER,
+    objectivesRead: PERMISSIONS.OBJECTIVES.READ,
+    objectivesCreate: PERMISSIONS.OBJECTIVES.CREATE,
+    objectivesUpdate: PERMISSIONS.OBJECTIVES.UPDATE,
+    objectivesDelete: PERMISSIONS.OBJECTIVES.DELETE,
+    objectivesReorder: PERMISSIONS.OBJECTIVES.REORDER,
+    projectsRead: PERMISSIONS.STRATEGIC_PROJECTS.READ,
+    projectsCreate: PERMISSIONS.STRATEGIC_PROJECTS.CREATE,
+    projectsUpdate: PERMISSIONS.STRATEGIC_PROJECTS.UPDATE,
+    projectsDelete: PERMISSIONS.STRATEGIC_PROJECTS.DELETE,
+    projectsReorder: PERMISSIONS.STRATEGIC_PROJECTS.REORDER,
+  });
 
   // Hover + edición de tarjetas
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [editingKey, setEditingKey] = useState<
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<
     | null
     | "mission"
     | "vision"
@@ -131,12 +111,16 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     | "objectives"
     | "projects"
   >(null);
-  const [editText, setEditText] = useState<string>("");
+  const [temporaryEditText, setTemporaryEditText] = useState<string>("");
 
   // Modales Objetivos
-  const [openCreateObj, setOpenCreateObj] = useState(false);
-  const [openBlocked, setOpenBlocked] = useState(false);
-  const [blockedPayload, setBlockedPayload] = useState<{
+  const [isCreateObjectiveModalOpen, setIsCreateObjectiveModalOpen] =
+    useState(false);
+  const [
+    isDeleteObjectiveBlockedModalOpen,
+    setIsDeleteObjectiveBlockedModalOpen,
+  ] = useState(false);
+  const [deleteObjectiveBlockedData, setDeleteObjectiveBlockedData] = useState<{
     message?: string;
     projects?: any[];
     prioritiesByPosition?: Array<{
@@ -213,10 +197,11 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   } = useQuery({
     queryKey:
       hasPlan && !!effectivePositionId
-        ? QKEY.objectives(strategicPlanId!, effectivePositionId!, year)
+        ? QKEY.objectives(strategicPlanId!, effectivePositionId!, currentYear)
         : ["objectives", "disabled"],
-    queryFn: () => getObjectives(strategicPlanId!, effectivePositionId!, year),
-    enabled: hasPlan && !!effectivePositionId && Number.isInteger(year),
+    queryFn: () =>
+      getObjectives(strategicPlanId!, effectivePositionId!, currentYear),
+    enabled: hasPlan && !!effectivePositionId && Number.isInteger(currentYear),
     staleTime: 60_000,
   });
 
@@ -238,8 +223,8 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     staleTime: 60_000,
   });
 
-  // ---- Mutations
-  const updatePlanMut = useMutation({
+  // Mutations
+  const updatePlanMutation = useMutation({
     mutationFn: (payload: any) =>
       updateStrategicPlan(strategicPlanId!, payload),
     onSuccess: () => {
@@ -248,56 +233,48 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     },
   });
 
-  const createObjectiveMut = useMutation({
-    mutationFn: (name: string) => {
-      const payload: CreateObjectivePayload = {
-        name: name.trim(),
-        strategicPlanId: strategicPlanId!,
-        positionId: effectivePositionId!,
-        level: "EST",
-        indicatorName: "Indicador",
-      };
-      return createObjective(payload);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
-      });
-      toast.success("Objetivo creado");
-    },
-    onError: (e) => toast.error(getHumanErrorMessage(e as any)),
-  });
-
-  const updateObjectiveMut = useMutation({
+  const updateObjectiveMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateObjective(id, { name: name.trim() }),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
+        queryKey: QKEY.objectives(
+          strategicPlanId!,
+          effectivePositionId!,
+          currentYear
+        ),
       });
       toast.success("Objetivo actualizado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const reorderObjectivesMut = useMutation({
+  const reorderObjectivesMutation = useMutation({
     mutationFn: (payload: any) => reorderObjectives(payload),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: QKEY.objectives(strategicPlanId!, effectivePositionId!, year),
+        queryKey: QKEY.objectives(
+          strategicPlanId!,
+          effectivePositionId!,
+          currentYear
+        ),
       });
       toast.success("Orden de objetivos guardado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const inactivateMut = useInactivateObjective([
-    QKEY.objectives(strategicPlanId!, effectivePositionId!, year as number),
+  const inactivateObjectiveMutation = useInactivateObjective([
+    QKEY.objectives(
+      strategicPlanId!,
+      effectivePositionId!,
+      currentYear as number
+    ),
     QKEY.objectivesUnconfigured(strategicPlanId!, effectivePositionId!),
     ["objectives", "ico-board"],
   ]);
 
-  const createProjectMut = useMutation({
+  const createProjectMutation = useMutation({
     mutationFn: (name: string) => {
       const payload: CreateStrategicProjectPayload = {
         name: name.trim(),
@@ -318,7 +295,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const updateProjectMut = useMutation({
+  const updateProjectMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateStrategicProject(id, { name: name.trim() }),
     onSuccess: () => {
@@ -333,7 +310,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  const reorderProjectsMut = useMutation({
+  const reorderProjectsMutation = useMutation({
     mutationFn: (payload: {
       strategicPlanId: string;
       items: Array<{ id: string; order: number; isActive: boolean }>;
@@ -345,16 +322,16 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           effectivePositionId!
         ),
       });
-      setEditingKey(null);
+      setEditingSection(null);
       toast.success("Orden de proyectos guardado");
     },
     onError: (e) => toast.error(getHumanErrorMessage(e as any)),
   });
 
-  // GENERAR REPORTE (PDF)
+  // Generar Reporte PDF
   const byOrder = (a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0);
 
-  // 1) arma el payload con los datos de la UI
+  // 1) Arma el payload con los datos de la UI
   const buildPayload = (): StrategicPlanDefinitionsReportPayload => {
     const companyId = getCompanyId() ?? undefined;
     const businessUnitId = getBusinessUnitId() ?? undefined;
@@ -398,13 +375,13 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     };
   };
 
-  // 2) define la mutation SOLO con la función
-  const exportMut = useMutation({
+  // 2) Define la mutation SOLO con la función
+  const exportReportMutation = useMutation({
     mutationFn: (payload: StrategicPlanDefinitionsReportPayload) =>
       exportStrategicPlanDefinitionsPDF(payload),
   });
 
-  // 3) handler del botón
+  // 3) Handler del botón
   const handleGenerateReport = async () => {
     try {
       if (!plan) {
@@ -412,7 +389,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
         return;
       }
       const payload = buildPayload();
-      const buffer = await exportMut.mutateAsync(payload); // <- ya es ArrayBuffer
+      const buffer = await exportReportMutation.mutateAsync(payload); // <- ya es ArrayBuffer
 
       const blob = new Blob([buffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -430,7 +407,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     }
   };
 
-  // ---- Loading & error
+  // Loading & error
   const isLoading =
     planLoading ||
     factorsLoading ||
@@ -450,7 +427,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     ? getHumanErrorMessage(projectsError as any)
     : null;
 
-  // ---- Mapeos
+  // Mapeos
   const mission = plan?.mission ?? "";
   const vision = plan?.vision ?? "";
   const competitiveAdvantage = plan?.competitiveAdvantage ?? "";
@@ -460,7 +437,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       (a, b) => (a?.order ?? 0) - (b?.order ?? 0)
     );
 
-  const factorsItems = useMemo(
+  const mappedFactors = useMemo(
     () =>
       orderBy(factors).map((x: any, idx: number) => ({
         id: idx + 1,
@@ -471,7 +448,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     [factors]
   );
 
-  const valuesItems = useMemo(
+  const mappedValues = useMemo(
     () =>
       orderBy(values).map((x: any, idx: number) => ({
         id: idx + 1,
@@ -482,7 +459,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     [values]
   );
 
-  const objectivesItems = useMemo(
+  const mappedObjectives = useMemo(
     () =>
       orderBy(objectives).map((x: any, idx: number) => ({
         id: idx + 1,
@@ -493,7 +470,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     [objectives]
   );
 
-  const projectsItems = useMemo(
+  const mappedProjects = useMemo(
     () =>
       orderBy(projects).map((x: any, idx: number) => ({
         id: idx + 1,
@@ -504,32 +481,35 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     [projects]
   );
 
-  // ---- Handlers tarjetas
-  const startEditCard = (
+  // Handlers tarjetas
+  const handleStartEditCard = (
     key: "mission" | "vision" | "advantage",
     current: string | undefined
   ) => {
-    setEditingKey(key);
-    setEditText(current ?? "");
+    setEditingSection(key);
+    setTemporaryEditText(current ?? "");
   };
 
-  const cancelEditCard = () => {
-    setEditingKey(null);
-    setEditText("");
+  const handleCancelEditCard = () => {
+    setEditingSection(null);
+    setTemporaryEditText("");
   };
 
-  const saveEditCard = () => {
+  const handleSaveEditCard = () => {
     if (!strategicPlanId) return;
     const payload: any = {};
-    if (editingKey === "mission") payload.mission = editText.trim();
-    if (editingKey === "vision") payload.vision = editText.trim();
-    if (editingKey === "advantage")
-      payload.competitiveAdvantage = editText.trim();
+    if (editingSection === "mission")
+      payload.mission = temporaryEditText.trim();
+    if (editingSection === "vision") payload.vision = temporaryEditText.trim();
+    if (editingSection === "advantage")
+      payload.competitiveAdvantage = temporaryEditText.trim();
 
     if (Object.keys(payload).length) {
-      updatePlanMut.mutate(payload, { onSuccess: () => setEditingKey(null) });
+      updatePlanMutation.mutate(payload, {
+        onSuccess: () => setEditingSection(null),
+      });
     } else {
-      setEditingKey(null);
+      setEditingSection(null);
     }
   };
 
@@ -544,6 +524,160 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       isActive: it.isActive ?? true,
     })),
   });
+
+  // Handlers Listas (Factores, Valores, Objetivos, Proyectos)
+
+  // Factores
+  const handleCreateFactor = async (name: string) => {
+    try {
+      await createStrategicSuccessFactor({
+        name: name.trim(),
+        strategicPlanId: strategicPlanId!,
+      });
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+      });
+      toast.success("Factor creado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleUpdateFactor = async (id: string, name: string) => {
+    try {
+      await updateStrategicSuccessFactor(id, { name: name.trim() });
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+      });
+      toast.success("Factor actualizado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleDeleteFactor = async (uiIndex: number) => {
+    try {
+      const payload = makeReorderPayload(
+        mappedFactors.map((it) => ({
+          metaId: it.metaId,
+          isActive: it.id === uiIndex ? false : it.isActive ?? true,
+        }))
+      );
+      await reorderStrategicSuccessFactors(payload);
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+      });
+      toast.success("Factor eliminado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleReorderFactors = async (updated: any[]) => {
+    try {
+      await reorderStrategicSuccessFactors(makeReorderPayload(updated));
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+      });
+      toast.success("Orden guardado exitosamente");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  // Valores
+  const handleCreateValue = async (name: string) => {
+    try {
+      await createStrategicValue({
+        name: name.trim(),
+        strategicPlanId: strategicPlanId!,
+      });
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicValues(strategicPlanId!),
+      });
+      toast.success("Valor creado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleUpdateValue = async (id: string, name: string) => {
+    try {
+      await updateStrategicValue(id, { name: name.trim() });
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicValues(strategicPlanId!),
+      });
+      toast.success("Valor actualizado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleDeleteValue = async (uiIndex: number) => {
+    try {
+      const payload = makeReorderPayload(
+        mappedValues.map((it) => ({
+          metaId: it.metaId,
+          isActive: it.id === uiIndex ? false : it.isActive ?? true,
+        }))
+      );
+      await reorderStrategicValues(payload);
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicValues(strategicPlanId!),
+      });
+      toast.success("Valor eliminado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  const handleReorderValues = async (updated: any[]) => {
+    try {
+      await reorderStrategicValues(makeReorderPayload(updated));
+      qc.invalidateQueries({
+        queryKey: QKEY.strategicValues(strategicPlanId!),
+      });
+      toast.success("Orden guardado exitosamente");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e as any));
+    }
+  };
+
+  // Proyectos
+  const handleCreateProject = (name: string) => {
+    if (!effectivePositionId) {
+      toast.error("No hay posición efectiva seleccionada.");
+      return;
+    }
+    createProjectMutation.mutate(name);
+  };
+
+  const handleUpdateProject = (id: string, name: string) => {
+    updateProjectMutation.mutate({ id, name });
+  };
+
+  const handleDeleteProject = (uiIndex: number) => {
+    const payload = {
+      strategicPlanId: strategicPlanId!,
+      items: mappedProjects.map((it, idx) => ({
+        id: it.metaId!,
+        order: idx + 1,
+        isActive: it.id === uiIndex ? false : it.isActive ?? true,
+      })),
+    };
+    reorderProjectsMutation.mutate(payload);
+  };
+
+  const handleReorderProjects = (updatedItems: any[]) => {
+    reorderProjectsMutation.mutate({
+      strategicPlanId: strategicPlanId!,
+      items: updatedItems.map((it, idx) => ({
+        id: it.metaId!,
+        order: idx + 1,
+        isActive: it.isActive ?? true,
+      })),
+    });
+  };
 
   if (!hasPlan) {
     return (
@@ -563,95 +697,102 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <div className="flex items-center justify-start">
-        <Button
-          onClick={handleGenerateReport}
-          disabled={exportMut.isPending}
-          className="btn-gradient h-9"
-        >
-          <FileDown className="h-4 w-4 mr-2" />
-          Reporte
-        </Button>
-      </div>
+      {permissions.planDownloadReportPdf && (
+        <div className="flex items-center justify-start">
+          <Button
+            onClick={handleGenerateReport}
+            disabled={exportReportMutation.isPending}
+            className="btn-gradient h-9"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Reporte
+          </Button>
+        </div>
+      )}
       {/* Misión / Visión */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DefinitionCard
-          sectionKey="mission"
-          title="Misión"
-          content={mission}
-          icon={Target}
-          iconColor="text-orange-600"
-          iconBg="bg-orange-100"
-          cardColor="bg-orange-50"
-          cardBorderColor="border-orange-200"
-          contentColor="bg-white/70"
-          contentBorderColor="border-orange-100"
-          isEditing={editingKey === "mission"}
-          editText={editingKey === "mission" ? editText : ""}
-          hovered={hoveredKey === "mission"}
-          onHover={setHoveredKey}
-          onEditClick={() => canPlanUpdate && startEditCard("mission", mission)}
-          onChangeText={setEditText}
-          onSave={saveEditCard}
-          onCancel={cancelEditCard}
-          canEdit={canPlanUpdate}
-        />
+      {permissions.planRead && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <DefinitionCard
+            sectionKey="mission"
+            title="Misión"
+            content={mission}
+            icon={Target}
+            iconColor="text-orange-600"
+            iconBg="bg-orange-100"
+            cardColor="bg-orange-50"
+            cardBorderColor="border-orange-200"
+            contentColor="bg-white/70"
+            contentBorderColor="border-orange-100"
+            isEditing={editingSection === "mission"}
+            editText={editingSection === "mission" ? temporaryEditText : ""}
+            hovered={hoveredSection === "mission"}
+            onHover={setHoveredSection}
+            onEditClick={() => handleStartEditCard("mission", mission)}
+            onChangeText={setTemporaryEditText}
+            onSave={handleSaveEditCard}
+            onCancel={handleCancelEditCard}
+            canEdit={permissions.planUpdate}
+          />
 
-        <DefinitionCard
-          sectionKey="vision"
-          title="Visión"
-          content={vision}
-          icon={Eye}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-100"
-          cardColor="bg-blue-50"
-          cardBorderColor="border-blue-200"
-          contentColor="bg-white/70"
-          contentBorderColor="border-blue-100"
-          isEditing={editingKey === "vision"}
-          editText={editingKey === "vision" ? editText : ""}
-          hovered={hoveredKey === "vision"}
-          onHover={setHoveredKey}
-          onEditClick={() => canPlanUpdate && startEditCard("vision", vision)}
-          onChangeText={setEditText}
-          onSave={saveEditCard}
-          onCancel={cancelEditCard}
-          canEdit={canPlanUpdate}
-        />
-      </div>
+          <DefinitionCard
+            sectionKey="vision"
+            title="Visión"
+            content={vision}
+            icon={Eye}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-100"
+            cardColor="bg-blue-50"
+            cardBorderColor="border-blue-200"
+            contentColor="bg-white/70"
+            contentBorderColor="border-blue-100"
+            isEditing={editingSection === "vision"}
+            editText={editingSection === "vision" ? temporaryEditText : ""}
+            hovered={hoveredSection === "vision"}
+            onHover={setHoveredSection}
+            onEditClick={() => handleStartEditCard("vision", vision)}
+            onChangeText={setTemporaryEditText}
+            onSave={handleSaveEditCard}
+            onCancel={handleCancelEditCard}
+            canEdit={permissions.planUpdate}
+          />
+        </div>
+      )}
 
       {/* Ventaja competitiva */}
-      <DefinitionCard
-        sectionKey="advantage"
-        title="Ventaja Distintiva"
-        content={competitiveAdvantage}
-        icon={Shield}
-        iconColor="text-emerald-600"
-        iconBg="bg-emerald-100"
-        cardColor="bg-emerald-50"
-        cardBorderColor="border-emerald-200"
-        contentColor="bg-white/70"
-        contentBorderColor="border-emerald-100"
-        isEditing={editingKey === "advantage"}
-        editText={editingKey === "advantage" ? editText : ""}
-        hovered={hoveredKey === "advantage"}
-        onHover={setHoveredKey}
-        onEditClick={() =>
-          canPlanUpdate && startEditCard("advantage", competitiveAdvantage)
-        }
-        onChangeText={setEditText}
-        onSave={saveEditCard}
-        onCancel={cancelEditCard}
-        canEdit={canPlanUpdate}
-      />
+      {permissions.planRead && (
+        <DefinitionCard
+          sectionKey="advantage"
+          title="Ventaja Distintiva"
+          content={competitiveAdvantage}
+          icon={Shield}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-100"
+          cardColor="bg-emerald-50"
+          cardBorderColor="border-emerald-200"
+          contentColor="bg-white/70"
+          contentBorderColor="border-emerald-100"
+          isEditing={editingSection === "advantage"}
+          editText={editingSection === "advantage" ? temporaryEditText : ""}
+          hovered={hoveredSection === "advantage"}
+          onHover={setHoveredSection}
+          onEditClick={() =>
+            handleStartEditCard("advantage", competitiveAdvantage)
+          }
+          onChangeText={setTemporaryEditText}
+          onSave={handleSaveEditCard}
+          onCancel={handleCancelEditCard}
+          canEdit={permissions.planUpdate}
+        />
+      )}
 
       {/* Factores / Valores */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Factores Clave de Éxito */}
+        {permissions.factorsRead && (
         <DefinitionList
           sectionKey="factors"
           title="Factores Clave de Éxito"
-          items={factorsItems}
+          items={mappedFactors}
           icon={Award}
           iconColor="text-violet-600"
           iconBg="bg-violet-100"
@@ -660,90 +801,32 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           itemColor="bg-purple-25"
           itemBorderColor="border-purple-100"
           badgeColor="bg-violet-500"
-          hovered={hoveredKey === "factors"}
-          isEditing={editingKey === "factors"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canFactorsEdit && setEditingKey("factors")}
-          onCancelEdit={() => setEditingKey(null)}
+          hovered={hoveredSection === "factors"}
+          isEditing={editingSection === "factors"}
+          onHover={setHoveredSection}
+          onStartEdit={() => setEditingSection("factors")}
+          onCancelEdit={() => setEditingSection(null)}
           isReordering={false}
           maxLengthCharacter={150}
-          canEdit={canFactorsEdit}
-          canDelete={canFactorsDelete}
           actions={{
-            create: canFactorsCreate
-              ? async (name: string): Promise<void> => {
-                  try {
-                    await createStrategicSuccessFactor({
-                      name: name.trim(),
-                      strategicPlanId: strategicPlanId!,
-                    });
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-                    });
-                    toast.success("Factor creado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
+            create: permissions.factorsCreate ? handleCreateFactor : undefined,
+            updateById: permissions.factorsUpdate
+              ? handleUpdateFactor
               : undefined,
-            updateById: canFactorsUpdate
-              ? async (id: string, name: string): Promise<void> => {
-                  try {
-                    await updateStrategicSuccessFactor(id, {
-                      name: name.trim(),
-                    });
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-                    });
-                    toast.success("Factor actualizado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
-              : undefined,
-            remove: canFactorsDelete
-              ? async (uiIndex: number): Promise<void> => {
-                  try {
-                    const payload = makeReorderPayload(
-                      factorsItems.map((it) => ({
-                        metaId: it.metaId,
-                        isActive:
-                          it.id === uiIndex ? false : it.isActive ?? true,
-                      }))
-                    );
-                    await reorderStrategicSuccessFactors(payload);
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-                    });
-                    toast.success("Factor eliminado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
-              : undefined,
-            reorder: canFactorsEdit
-              ? async (updated): Promise<void> => {
-                  try {
-                    await reorderStrategicSuccessFactors(
-                      makeReorderPayload(updated)
-                    );
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-                    });
-                    toast.success("Orden guardado exitosamente");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
+            remove: permissions.factorsDelete ? handleDeleteFactor : undefined,
+            reorder: permissions.factorsReorder
+              ? handleReorderFactors
               : undefined,
           }}
         />
+        )}
 
         {/* Valores Estratégicos */}
+        {permissions.valuesRead && (
         <DefinitionList
           sectionKey="values"
           title="Valores"
-          items={valuesItems}
+          items={mappedValues}
           icon={Sparkles}
           iconColor="text-amber-600"
           iconBg="bg-amber-100"
@@ -752,89 +835,34 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           itemColor="bg-amber-25"
           itemBorderColor="border-amber-100"
           badgeColor="bg-amber-500"
-          hovered={hoveredKey === "values"}
-          isEditing={editingKey === "values"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canValuesEdit && setEditingKey("values")}
-          onCancelEdit={() => setEditingKey(null)}
+          hovered={hoveredSection === "values"}
+          isEditing={editingSection === "values"}
+          onHover={setHoveredSection}
+          onStartEdit={() => setEditingSection("values")}
+          onCancelEdit={() => setEditingSection(null)}
           isReordering={false}
           maxLengthCharacter={150}
-          canEdit={canValuesEdit}
-          canDelete={canValuesDelete}
           actions={{
-            create: canValuesCreate
-              ? async (name: string): Promise<void> => {
-                  try {
-                    await createStrategicValue({
-                      name: name.trim(),
-                      strategicPlanId: strategicPlanId!,
-                    });
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicValues(strategicPlanId!),
-                    });
-                    toast.success("Valor creado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
+            create: permissions.valuesCreate ? handleCreateValue : undefined,
+            updateById: permissions.valuesUpdate
+              ? handleUpdateValue
               : undefined,
-            updateById: canValuesUpdate
-              ? async (id: string, name: string): Promise<void> => {
-                  try {
-                    await updateStrategicValue(id, { name: name.trim() });
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicValues(strategicPlanId!),
-                    });
-                    toast.success("Valor actualizado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
-              : undefined,
-            remove: canValuesDelete
-              ? async (uiIndex: number): Promise<void> => {
-                  try {
-                    const payload = makeReorderPayload(
-                      valuesItems.map((it) => ({
-                        metaId: it.metaId,
-                        isActive:
-                          it.id === uiIndex ? false : it.isActive ?? true,
-                      }))
-                    );
-                    await reorderStrategicValues(payload);
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicValues(strategicPlanId!),
-                    });
-                    toast.success("Valor eliminado");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
-              : undefined,
-            reorder: canValuesEdit
-              ? async (updated): Promise<void> => {
-                  try {
-                    await reorderStrategicValues(makeReorderPayload(updated));
-                    qc.invalidateQueries({
-                      queryKey: QKEY.strategicValues(strategicPlanId!),
-                    });
-                    toast.success("Orden guardado exitosamente");
-                  } catch (e) {
-                    toast.error(getHumanErrorMessage(e as any));
-                  }
-                }
+            remove: permissions.valuesDelete ? handleDeleteValue : undefined,
+            reorder: permissions.valuesReorder
+              ? handleReorderValues
               : undefined,
           }}
         />
+        )}
       </div>
 
       {/* Objetivos + Proyectos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* OBJETIVOS: con modal */}
+        {permissions.objectivesRead && (
         <DefinitionList
           sectionKey="objectives"
           title="Objetivos"
-          items={objectivesItems}
+          items={mappedObjectives}
           icon={Flag}
           iconColor="text-sky-600"
           iconBg="bg-sky-100"
@@ -843,32 +871,32 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           itemColor="bg-sky-25"
           itemBorderColor="border-sky-100"
           badgeColor="bg-sky-500"
-          hovered={hoveredKey === "objectives"}
-          isEditing={editingKey === "objectives"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canObjectivesEdit && setEditingKey("objectives")}
-          onCancelEdit={() => setEditingKey(null)}
-          isReordering={reorderObjectivesMut.isPending}
+          hovered={hoveredSection === "objectives"}
+          isEditing={editingSection === "objectives"}
+          onHover={setHoveredSection}
+          onStartEdit={() => setEditingSection("objectives")}
+          onCancelEdit={() => setEditingSection(null)}
+          isReordering={reorderObjectivesMutation.isPending}
           maxLengthCharacter={150}
-          canEdit={canObjectivesEdit}
-          canDelete={canObjectivesDelete}
           onRequestCreate={
-            canObjectivesCreate ? () => setOpenCreateObj(true) : undefined
+            permissions.objectivesCreate
+              ? () => setIsCreateObjectiveModalOpen(true)
+              : undefined
           }
           onRequestDelete={
-            canObjectivesDelete
+            permissions.objectivesDelete
               ? (_uiIndex, item) => {
                   const objectiveId = item.metaId!;
-                  inactivateMut.mutate(objectiveId, {
+                  inactivateObjectiveMutation.mutate(objectiveId, {
                     onSuccess: (data) => {
                       if (data?.blocked) {
-                        setBlockedPayload({
+                        setDeleteObjectiveBlockedData({
                           message: data.message,
                           projects: data.associations?.projects ?? [],
                           prioritiesByPosition:
                             data.associations?.prioritiesByPosition ?? [],
                         });
-                        setOpenBlocked(true);
+                        setIsDeleteObjectiveBlockedModalOpen(true);
                       }
                     },
                   });
@@ -876,21 +904,23 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
               : undefined
           }
           actions={{
-            updateById: canObjectivesUpdate
-              ? (id, name) => updateObjectiveMut.mutate({ id, name })
+            updateById: permissions.objectivesUpdate
+              ? (id, name) => updateObjectiveMutation.mutate({ id, name })
               : undefined,
-            reorder: canObjectivesEdit
+            reorder: permissions.objectivesReorder
               ? (updated) =>
-                  reorderObjectivesMut.mutate(makeReorderPayload(updated))
+                  reorderObjectivesMutation.mutate(makeReorderPayload(updated))
               : undefined,
           }}
         />
+        )}
 
         {/* Proyectos */}
+        {permissions.projectsRead && (
         <DefinitionList
           sectionKey="projects"
           title="Proyectos Estratégicos"
-          items={projectsItems}
+          items={mappedProjects}
           icon={Shield}
           iconColor="text-emerald-700"
           iconBg="bg-emerald-100"
@@ -899,62 +929,37 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           itemColor="bg-emerald-25"
           itemBorderColor="border-emerald-100"
           badgeColor="bg-emerald-600"
-          hovered={hoveredKey === "projects"}
-          isEditing={editingKey === "projects"}
-          onHover={setHoveredKey}
-          onStartEdit={() => canProjectsEdit && setEditingKey("projects")}
-          onCancelEdit={() => setEditingKey(null)}
-          isReordering={reorderProjectsMut.isPending}
+          hovered={hoveredSection === "projects"}
+          isEditing={editingSection === "projects"}
+          onHover={setHoveredSection}
+          onStartEdit={() => setEditingSection("projects")}
+          onCancelEdit={() => setEditingSection(null)}
+          isReordering={reorderProjectsMutation.isPending}
           maxLengthCharacter={150}
-          canEdit={canProjectsEdit}
-          canDelete={canProjectsDelete}
           actions={{
-            create: canProjectsCreate
-              ? (name) => {
-                  if (!effectivePositionId) {
-                    toast.error("No hay posición efectiva seleccionada.");
-                    return;
-                  }
-                  createProjectMut.mutate(name);
-                }
+            create: permissions.projectsCreate
+              ? handleCreateProject
               : undefined,
-            updateById: canProjectsUpdate
-              ? (id, name) => updateProjectMut.mutate({ id, name })
+            updateById: permissions.projectsUpdate
+              ? handleUpdateProject
               : undefined,
-            remove: canProjectsDelete
-              ? (uiIndex) => {
-                  const payload = {
-                    strategicPlanId: strategicPlanId!,
-                    items: projectsItems.map((it, idx) => ({
-                      id: it.metaId!,
-                      order: idx + 1,
-                      isActive: it.id === uiIndex ? false : it.isActive ?? true,
-                    })),
-                  };
-                  reorderProjectsMut.mutate(payload);
-                }
+            remove: permissions.projectsDelete
+              ? handleDeleteProject
               : undefined,
-            reorder: canProjectsEdit
-              ? (updatedItems) =>
-                  reorderProjectsMut.mutate({
-                    strategicPlanId: strategicPlanId!,
-                    items: updatedItems.map((it, idx) => ({
-                      id: it.metaId!,
-                      order: idx + 1,
-                      isActive: it.isActive ?? true,
-                    })),
-                  })
+            reorder: permissions.projectsReorder
+              ? handleReorderProjects
               : undefined,
           }}
         />
+        )}
       </div>
 
-      {/* MODALES Objetivos */}
+      {/* Modales Objetivos */}
       <NewObjectiveModal
-        open={openCreateObj}
-        onOpenChange={setOpenCreateObj}
+        open={isCreateObjectiveModalOpen}
+        onOpenChange={setIsCreateObjectiveModalOpen}
         onCreate={(p) => {
-          if (!canObjectivesCreate) {
+          if (!permissions.objectivesCreate) {
             toast.error("No tienes permiso para crear objetivos.");
             return;
           }
@@ -971,30 +976,28 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
                 queryKey: QKEY.objectives(
                   strategicPlanId!,
                   effectivePositionId!,
-                  year
+                  currentYear
                 ),
               });
               toast.success("Objetivo creado");
-              setOpenCreateObj(false);
+              setIsCreateObjectiveModalOpen(false);
             })
             .catch((e) => toast.error(getHumanErrorMessage(e as any)));
         }}
       />
 
       <ObjectiveInactivateBlockedModal
-        open={openBlocked}
-        message={blockedPayload.message}
-        projects={blockedPayload.projects}
-        // antes: priorities={blockedPayload.priorities}
-        prioritiesByPosition={blockedPayload.prioritiesByPosition}
-        onClose={() => setOpenBlocked(false)}
+        open={isDeleteObjectiveBlockedModalOpen}
+        message={deleteObjectiveBlockedData.message}
+        projects={deleteObjectiveBlockedData.projects}
+        prioritiesByPosition={deleteObjectiveBlockedData.prioritiesByPosition}
+        onClose={() => setIsDeleteObjectiveBlockedModalOpen(false)}
         strategicPlanId={strategicPlanId}
         positionId={effectivePositionId}
-        year={year}
+        year={currentYear}
         otherPositions={otherPositions}
-        // opcional pero recomendado: sincroniza la lista si se mueven prioridades desde la modal
         onListChanged={(next) =>
-          setBlockedPayload((prev) => ({
+          setDeleteObjectiveBlockedData((prev) => ({
             ...prev,
             projects: next.projects,
             prioritiesByPosition: next.prioritiesByPosition,

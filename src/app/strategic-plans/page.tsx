@@ -11,10 +11,26 @@ import {
   StrategyMapTab,
 } from "@/features/strategic-plans/components";
 import { FilterField } from "@/shared/components/FilterField";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermissions } from "@/shared/auth/access-control";
 
 export default function StrategicPlanPage() {
   const businessUnitId = getBusinessUnitId() ?? undefined;
   const [planId, setPlanId] = useState<string | null>(null);
+
+  const { showFilterStrategicPlan, showDefinitionTab, showStrategicMapTab } =
+    usePermissions({
+      showFilterStrategicPlan:
+        PERMISSIONS.STRATEGIC_PLANS.SHOW_FILTER_STRATEGIC_PLAN,
+      showDefinitionTab: PERMISSIONS.STRATEGIC_PLANS.SHOW_DEFINITION_TAB,
+      showStrategicMapTab: PERMISSIONS.STRATEGIC_PLANS.SHOW_STRATEGIC_MAP_TAB,
+    });
+
+  const defaultTab = showDefinitionTab
+    ? "definition"
+    : showStrategicMapTab
+    ? "map"
+    : undefined;
 
   return (
     <SidebarLayout currentPath="/strategic-plans" onNavigate={() => {}}>
@@ -31,34 +47,52 @@ export default function StrategicPlanPage() {
           </div>
 
           {/* Filtro reutilizable: planes por BU (auto más reciente) */}
-          <div className="w-72">
-            <FilterField label="Plan estratégico">
-              <StrategicPlanSelect
-                businessUnitId={businessUnitId}
-                value={planId}
-                onChange={setPlanId}
-                persist={true}
-                clearOnUnmount={true}
-              />
-            </FilterField>
-          </div>
+          {showFilterStrategicPlan && (
+            <div className="w-72">
+              <FilterField label="Plan estratégico">
+                <StrategicPlanSelect
+                  businessUnitId={businessUnitId}
+                  value={planId}
+                  onChange={setPlanId}
+                  persist={true}
+                  clearOnUnmount={true}
+                />
+              </FilterField>
+            </div>
+          )}
         </div>
 
-        <Tabs defaultValue="definition" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
-            <TabsTrigger value="definition">Definición</TabsTrigger>
-            <TabsTrigger value="map">Mapa Estratégico</TabsTrigger>
-          </TabsList>
+        {defaultTab && (
+          <Tabs defaultValue={defaultTab} className="w-full">
+            <TabsList
+              className={`grid w-full bg-gray-100 p-1 rounded-lg ${
+                showDefinitionTab && showStrategicMapTab
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
+              }`}
+            >
+              {showDefinitionTab && (
+                <TabsTrigger value="definition">Definición</TabsTrigger>
+              )}
+              {showStrategicMapTab && (
+                <TabsTrigger value="map">Mapa Estratégico</TabsTrigger>
+              )}
+            </TabsList>
 
-          <TabsContent value="definition" className="mt-6">
-            {/* Aquí NO pasamos positionId: DefinitionTab usará el CEO por defecto */}
-            <DefinitionTab strategicPlanId={planId ?? undefined} />
-          </TabsContent>
+            {showDefinitionTab && (
+              <TabsContent value="definition" className="mt-6">
+                {/* Aquí NO pasamos positionId: DefinitionTab usará el CEO por defecto */}
+                <DefinitionTab strategicPlanId={planId ?? undefined} />
+              </TabsContent>
+            )}
 
-          <TabsContent value="map" className="mt-6">
-            <StrategyMapTab strategicPlanId={planId ?? undefined} />
-          </TabsContent>
-        </Tabs>
+            {showStrategicMapTab && (
+              <TabsContent value="map" className="mt-6">
+                <StrategyMapTab strategicPlanId={planId ?? undefined} />
+              </TabsContent>
+            )}
+          </Tabs>
+        )}
       </div>
     </SidebarLayout>
   );
