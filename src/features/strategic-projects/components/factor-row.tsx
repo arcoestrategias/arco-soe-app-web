@@ -66,6 +66,18 @@ interface FactorRowProps {
   dragDisabledReason?: string;
   listeners: SyntheticListenerMap;
   attributes: DraggableAttributes;
+  permissions: {
+    factorsRead: boolean;
+    factorsCreate: boolean;
+    factorsUpdate: boolean;
+    factorsDelete: boolean;
+    factorsReorder: boolean;
+    tasksRead: boolean;
+    tasksCreate: boolean;
+    tasksUpdate: boolean;
+    tasksDelete: boolean;
+    tasksReorder: boolean;
+  };
 }
 
 export function FactorRow({
@@ -92,6 +104,7 @@ export function FactorRow({
   dragDisabledReason = "",
   listeners,
   attributes,
+  permissions,
 }: FactorRowProps) {
   const [editedFactor, setEditedFactor] = useState<Factor>({ ...factor });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -284,64 +297,75 @@ export function FactorRow({
               </span>
             </div>
             <div className="col-span-2 flex justify-end items-center gap-1">
-              <Button
-                onClick={onEdit}
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                onClick={onAddTask}
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-blue-500 hover:bg-blue-50"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                onClick={() => setShowConfirm(true)}
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-red-500 hover:bg-red-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {permissions.factorsUpdate && (
+                <Button
+                  onClick={onEdit}
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {permissions.tasksCreate && (
+                <Button
+                  onClick={onAddTask}
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-blue-500 hover:bg-blue-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {permissions.factorsDelete && (
+                <Button
+                  onClick={() => setShowConfirm(true)}
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-red-500 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </>
         )}
       </div>
 
       {/* Tareas del factor */}
-      {isExpanded && (factor.tasks?.length ?? 0) > 0 && (
-        <div className="mt-2 pl-8 bg-gray-50 border-t border-gray-100">
-          <DndContext
-            sensors={taskDnDSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEndTask}
-          >
-            <SortableContext
-              items={(factor.tasks ?? []).map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
+      {isExpanded &&
+        (factor.tasks?.length ?? 0) > 0 &&
+        permissions.tasksRead && (
+          <div className="mt-2 pl-8 bg-gray-50 border-t border-gray-100">
+            <DndContext
+              sensors={taskDnDSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEndTask}
             >
-              {(factor.tasks ?? []).map((task, idx) => (
-                <SortableTask
-                  key={task.id}
-                  task={task}
-                  isEditing={editingTaskId === task.id}
-                  onEdit={() => onEditTask(rowNumber, idx + 1)}
-                  onSave={(t) => onSaveTask(rowNumber, t)}
-                  onCancel={() => onCancelTask(rowNumber, idx + 1, false)}
-                  onDelete={() => onDeleteTask(rowNumber, idx + 1)}
-                  dragDisabled={dragDisabled}
-                  dragDisabledReason={dragDisabledReason}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
+              <SortableContext
+                items={(factor.tasks ?? []).map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {(factor.tasks ?? []).map((task, idx) => (
+                  <SortableTask
+                    key={task.id}
+                    task={task}
+                    isEditing={editingTaskId === task.id}
+                    onEdit={() => onEditTask(rowNumber, idx + 1)}
+                    onSave={(t) => onSaveTask(rowNumber, t)}
+                    onCancel={() => onCancelTask(rowNumber, idx + 1, false)}
+                    onDelete={() => onDeleteTask(rowNumber, idx + 1)}
+                    dragDisabled={dragDisabled}
+                    dragDisabledReason={dragDisabledReason}
+                    canUpdate={permissions.tasksUpdate}
+                    canDelete={permissions.tasksDelete}
+                    canReorder={permissions.tasksReorder}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
 
       {/* Confirmación eliminar factor (inactivar) */}
       <ConfirmModal

@@ -25,6 +25,8 @@ interface TaskRowProps {
   dragDisabledReason?: string;
   listeners: SyntheticListenerMap;
   attributes: DraggableAttributes;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 export function TaskRow({
@@ -39,6 +41,8 @@ export function TaskRow({
   dragDisabledReason = "",
   listeners,
   attributes,
+  canUpdate = false,
+  canDelete = false,
 }: TaskRowProps) {
   const [range, setRange] = useState<DateRange>({
     from: parseYmdOrIsoToLocalDate(task.fromAt),
@@ -82,6 +86,8 @@ export function TaskRow({
           dragDisabledReason={dragDisabledReason}
           listeners={listeners}
           attributes={attributes}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
         />
       )}
 

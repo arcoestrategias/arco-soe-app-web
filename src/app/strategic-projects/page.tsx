@@ -30,11 +30,22 @@ import { createStrategicProject } from "@/features/strategic-plans/services/stra
 // Auth/Permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 export default function StrategicProjectsPage() {
   // Permisos
-  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
-  const canCreateProject = usePermission(PERMISSIONS.STRATEGIC_PROJECTS.CREATE);
+  const {
+    showFilterStrategicPlan,
+    showFilterPosition,
+    projectsCreate,
+    projectsRead,
+  } = usePermissions({
+    showFilterStrategicPlan:
+      PERMISSIONS.STRATEGIC_PROJECTS.SHOW_FILTER_STRATEGIC_PLAN,
+    showFilterPosition: PERMISSIONS.STRATEGIC_PROJECTS.SHOW_FILTER_POSITION,
+    projectsCreate: PERMISSIONS.STRATEGIC_PROJECTS.CREATE,
+    projectsRead: PERMISSIONS.STRATEGIC_PROJECTS.READ,
+  });
 
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
@@ -81,10 +92,10 @@ export default function StrategicProjectsPage() {
   }
 
   React.useEffect(() => {
-    if (!canFilterPosition) {
+    if (!showFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canFilterPosition]);
+  }, [showFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/strategic-projects" onNavigate={() => {}}>
@@ -99,20 +110,22 @@ export default function StrategicProjectsPage() {
 
           <div className="flex gap-3">
             {/* Plan Estratégico */}
-            <div className="w-64">
-              <FilterField label="Plan estratégico">
-                <StrategicPlanSelect
-                  businessUnitId={businessUnitId}
-                  value={planId}
-                  onChange={setPlanId}
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {showFilterStrategicPlan && (
+              <div className="w-64">
+                <FilterField label="Plan estratégico">
+                  <StrategicPlanSelect
+                    businessUnitId={businessUnitId}
+                    value={planId}
+                    onChange={setPlanId}
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            )}
 
             {/* Posición */}
-            {canFilterPosition ? (
+            {showFilterPosition ? (
               <div className="w-64">
                 <FilterField label="Posición">
                   <PositionSelect
@@ -128,7 +141,7 @@ export default function StrategicProjectsPage() {
             ) : null}
 
             {/* Botón: Nuevo Proyecto (solo si tiene permiso) */}
-            {canCreateProject && (
+            {projectsCreate && (
               <div>
                 <FilterField label="Crear un nuevo proyecto">
                   <Button
@@ -153,14 +166,16 @@ export default function StrategicProjectsPage() {
         </div>
 
         {/* Dashboard: recibe los IDs seleccionados desde la página */}
-        <StrategicProjectsDashboard
-          strategicPlanId={planId ?? undefined}
-          positionId={positionId ?? undefined}
-        />
+        {projectsRead && (
+          <StrategicProjectsDashboard
+            strategicPlanId={planId ?? undefined}
+            positionId={positionId ?? undefined}
+          />
+        )}
       </div>
 
       {/* Modal solo si tiene permiso */}
-      {canCreateProject && (
+      {projectsCreate && (
         <ModalStrategicProject
           isOpen={modalOpen}
           modo="crear"
@@ -183,7 +198,7 @@ export default function StrategicProjectsPage() {
       )}
 
       {/* Confirm solo si tiene permiso */}
-      {canCreateProject && (
+      {projectsCreate && (
         <ConfirmModal
           open={!!pendingCreate}
           title="Crear proyecto"

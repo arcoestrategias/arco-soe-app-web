@@ -10,7 +10,10 @@ import { useProjectsDashboard } from "@/features/strategic-plans/hooks/use-proje
 import type { StrategicProjectsDashboardProject } from "@/features/strategic-projects/types/dashboard";
 import { ModalFactorsTasks } from "./modal-factors-tasks";
 import { ModalStrategicProject } from "./modal-strategic-project";
-import { updateStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
+import {
+  updateStrategicProject,
+  reorderStrategicProjects,
+} from "@/features/strategic-plans/services/strategicProjectsService";
 import { toast } from "sonner";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { QKEY } from "@/shared/api/query-keys";
@@ -19,6 +22,8 @@ import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { getBusinessUnitId } from "@/shared/auth/storage";
 import { getStrategicPlan } from "@/features/strategic-plans/services/strategicPlansService";
 import { exportStrategicProjectsPDF } from "@/features/reports/services/reportsService";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermissions } from "@/shared/auth/access-control";
 
 type Props = {
   strategicPlanId?: string;
@@ -53,6 +58,12 @@ export function StrategicProjectsDashboard({
 
   const qc = useQueryClient();
 
+  const permissions = usePermissions({
+    canUpdate: PERMISSIONS.STRATEGIC_PROJECTS.UPDATE,
+    canDelete: PERMISSIONS.STRATEGIC_PROJECTS.DELETE,
+    canDownloadReport: PERMISSIONS.STRATEGIC_PROJECTS.DOWNLOAD_REPORT_PDF,
+  });
+
   // Traer plan (para el payload del reporte)
   const { data: plan } = useQuery({
     queryKey: strategicPlanId
@@ -82,6 +93,9 @@ export function StrategicProjectsDashboard({
       budget?: number | null;
     };
   }>(null);
+
+  // confirmación de eliminación
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   function onEditProject(projectId: string) {
     const raw = (data?.projects ?? []).find((p: any) => p.id === projectId);
@@ -309,6 +323,10 @@ export function StrategicProjectsDashboard({
                 onOpenModal={openModal}
                 onEdit={onEditProject}
                 onReport={(pid, name) => handleExport(pid, name)}
+                onDelete={(pid) => setPendingDeleteId(pid)}
+                canUpdate={permissions.canUpdate}
+                canDelete={permissions.canDelete}
+                canDownloadReport={permissions.canDownloadReport}
                 exporting={exportMut.isPending}
               />
             ))}
@@ -383,6 +401,43 @@ export function StrategicProjectsDashboard({
           }
         }}
         confirmText="Guardar"
+      />
+
+      <ConfirmModal
+        open={!!pendingDeleteId}
+        title="Eliminar proyecto"
+        message="¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer."
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteId || !strategicPlanId || !positionId) return;
+          try {
+            // Usamos reorder para inactivar (soft delete)
+            // Necesitamos la lista actual para reconstruir el payload
+            const currentProjects = data?.projects ?? [];
+            const payload = {
+              strategicPlanId,
+              items: currentProjects.map((p: any, idx: number) => ({
+                id: p.id,
+                order: idx + 1,
+                isActive: p.id === pendingDeleteId ? false : true,
+              })),
+            };
+
+            await reorderStrategicProjects(payload);
+
+            await qc.invalidateQueries({
+              queryKey: QKEY.strategicProjectsDashboard(
+                strategicPlanId,
+                positionId
+              ),
+            });
+            toast.success("Proyecto eliminado correctamente");
+            setPendingDeleteId(null);
+          } catch (err) {
+            toast.error(getHumanErrorMessage(err));
+          }
+        }}
+        confirmText="Eliminar"
       />
     </div>
   );

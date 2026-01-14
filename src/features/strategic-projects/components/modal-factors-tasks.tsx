@@ -43,6 +43,8 @@ import {
 // 🆕 overlay + hook
 import { BlockingProgressOverlay } from "@/shared/components/blocking-progress-overlay";
 import { useBlockingProgress } from "@/shared/hooks/use-blocking-progress";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { usePermissions } from "@/shared/auth/access-control";
 
 interface ModalFactorsTasksProps {
   isOpen: boolean;
@@ -67,6 +69,19 @@ export function ModalFactorsTasks({
   const [editingTaskByFactor, setEditingTaskByFactor] = useState<
     Record<string, string | null>
   >({});
+
+  const permissions = usePermissions({
+    factorsRead: PERMISSIONS.PROJECT_FACTORS.READ,
+    factorsCreate: PERMISSIONS.PROJECT_FACTORS.CREATE,
+    factorsUpdate: PERMISSIONS.PROJECT_FACTORS.UPDATE,
+    factorsDelete: PERMISSIONS.PROJECT_FACTORS.DELETE,
+    factorsReorder: PERMISSIONS.PROJECT_FACTORS.REORDER,
+    tasksRead: PERMISSIONS.PROJECT_TASKS.READ,
+    tasksCreate: PERMISSIONS.PROJECT_TASKS.CREATE,
+    tasksUpdate: PERMISSIONS.PROJECT_TASKS.UPDATE,
+    tasksDelete: PERMISSIONS.PROJECT_TASKS.DELETE,
+    tasksReorder: PERMISSIONS.PROJECT_TASKS.REORDER,
+  });
 
   // Rango del PROYECTO
   const projectFromAt = data?.project?.fromAt ?? null;
@@ -489,13 +504,15 @@ export function ModalFactorsTasks({
   const isAnyTaskEditing = Object.values(editingTaskByFactor).some(Boolean);
   const isAnyFactorEditing = !!editingFactorId;
 
-  const dragDisabled = blocking.open || isAnyFactorEditing || isAnyTaskEditing;
+  const dragDisabled = blocking.open || isAnyFactorEditing || isAnyTaskEditing || !permissions.factorsReorder;
   const dragDisabledReason = blocking.open
     ? blocking.label || "Operación en curso…"
     : isAnyFactorEditing
     ? "No puedes reordenar mientras editas un factor."
     : isAnyTaskEditing
     ? "No puedes reordenar mientras editas o creas una tarea."
+    : !permissions.factorsReorder
+    ? "No tienes permiso para reordenar factores."
     : "";
 
   function invalidateProjectsList() {
@@ -561,13 +578,15 @@ export function ModalFactorsTasks({
                 )}
               </Button>
 
-              <Button
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-                onClick={startCreateFactor}
-                disabled={blocking.open}
-              >
-                + Nuevo Factor
-              </Button>
+              {permissions.factorsCreate && (
+                <Button
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={startCreateFactor}
+                  disabled={blocking.open}
+                >
+                  + Nuevo Factor
+                </Button>
+              )}
             </div>
 
             <PlanRangeProvider
@@ -575,6 +594,7 @@ export function ModalFactorsTasks({
               planUntilAt={projectUntilAt}
             >
               <div className="flex-1 overflow-auto bg-white p-5">
+                {permissions.factorsRead ? (
                 <HierarchicalTable
                   factors={factors}
                   loading={loading}
@@ -626,7 +646,13 @@ export function ModalFactorsTasks({
                   hasItemInCreation={() => false}
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
+                  permissions={permissions}
                 />
+                ) : (
+                  <div className="text-center text-gray-500 py-10">
+                    No tienes permisos para ver los factores.
+                  </div>
+                )}
               </div>
             </PlanRangeProvider>
           </div>

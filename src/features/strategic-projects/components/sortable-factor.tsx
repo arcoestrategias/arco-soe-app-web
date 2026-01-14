@@ -34,6 +34,18 @@ interface SortableFactorProps {
   onReorderTasks: (factorRowNumber: number, newOrder: Task[]) => void;
   dragDisabled?: boolean;
   dragDisabledReason?: string;
+  permissions: {
+    factorsRead: boolean;
+    factorsCreate: boolean;
+    factorsUpdate: boolean;
+    factorsDelete: boolean;
+    factorsReorder: boolean;
+    tasksRead: boolean;
+    tasksCreate: boolean;
+    tasksUpdate: boolean;
+    tasksDelete: boolean;
+    tasksReorder: boolean;
+  };
 }
 
 export function SortableFactor({
@@ -57,6 +69,7 @@ export function SortableFactor({
   onReorderTasks,
   dragDisabled = false,
   dragDisabledReason = "",
+  permissions,
 }: SortableFactorProps) {
   const {
     attributes,
@@ -98,6 +111,7 @@ export function SortableFactor({
         attributes={attributes ?? ({} as DraggableAttributes)}
         dragDisabled={dragDisabled}
         dragDisabledReason={dragDisabledReason}
+        permissions={permissions}
       />
     </div>
   );

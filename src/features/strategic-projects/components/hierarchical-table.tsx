@@ -52,6 +52,19 @@ interface HierarchicalTableProps {
 
   dragDisabled?: boolean;
   dragDisabledReason?: string;
+
+  permissions: {
+    factorsRead: boolean;
+    factorsCreate: boolean;
+    factorsUpdate: boolean;
+    factorsDelete: boolean;
+    factorsReorder: boolean;
+    tasksRead: boolean;
+    tasksCreate: boolean;
+    tasksUpdate: boolean;
+    tasksDelete: boolean;
+    tasksReorder: boolean;
+  };
 }
 
 export function HierarchicalTable({
@@ -76,6 +89,7 @@ export function HierarchicalTable({
   hasItemInCreation,
   dragDisabled = false,
   dragDisabledReason = "",
+  permissions,
 }: HierarchicalTableProps) {
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -166,6 +180,7 @@ export function HierarchicalTable({
                   }
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
+                  permissions={permissions}
                 />
               </div>
             ))}

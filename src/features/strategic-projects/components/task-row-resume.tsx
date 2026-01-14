@@ -37,6 +37,8 @@ interface TaskRowResumeProps {
   dragDisabledReason?: string;
   listeners?: SyntheticListenerMap;
   attributes?: DraggableAttributes;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 export function TaskRowResume({
@@ -51,6 +53,8 @@ export function TaskRowResume({
   dragDisabledReason = "",
   listeners,
   attributes,
+  canUpdate = false,
+  canDelete = false,
 }: TaskRowResumeProps) {
   const isFinished =
     !!task.finishedAt || (task.status ?? "").toUpperCase() === "CLO";
@@ -154,22 +158,34 @@ export function TaskRowResume({
 
       {/* Estado */}
       <div className="col-span-2">
-        <Badge
-          onClick={toggleStatus}
-          className={`text-[10px] cursor-pointer ${
-            isFinished
-              ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
-              : "bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200"
-          }`}
-        >
-          {isFinished ? "Terminado" : "En proceso"}
-        </Badge>
+        {canUpdate ? (
+          <Badge
+            onClick={toggleStatus}
+            className={`text-[10px] cursor-pointer ${
+              isFinished
+                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                : "bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200"
+            }`}
+          >
+            {isFinished ? "Terminado" : "En proceso"}
+          </Badge>
+        ) : (
+          <Badge
+            className={`text-[10px] ${
+              isFinished
+                ? "bg-green-100 text-green-700 border-green-200"
+                : "bg-yellow-100 text-yellow-700 border-yellow-200"
+            }`}
+          >
+            {isFinished ? "Terminado" : "En proceso"}
+          </Badge>
+        )}
       </div>
 
       {/* Fechas + acciones */}
       <div className="col-span-2 flex justify-end items-center gap-1">
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
-          <PopoverTrigger asChild>
+          <PopoverTrigger asChild disabled={!canUpdate}>
             <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] px-3 py-1 cursor-pointer text-center">
               {range.from &&
               isValid(range.from) &&
@@ -182,35 +198,41 @@ export function TaskRowResume({
             </Badge>
           </PopoverTrigger>
 
-          <PopoverContent className="w-auto p-4" align="end">
-            <DateRangePicker
-              date={range}
-              onChange={(newRange) => newRange && setRange(newRange)}
-              showToastOnApply={false}
-              minDate={minDate}
-              maxDate={maxDate}
-              onClose={() => setIsDateOpen(false)}
-              onApply={(r) => {
-                if (!r?.from || !r?.to || !isValid(r.from) || !isValid(r.to))
-                  return;
-                const next: Task = {
-                  ...task,
-                  fromAt: toYmd(r.from)!,
-                  untilAt: toYmd(r.to)!,
-                };
-                onSave(next);
-                setRange({ from: r.from, to: r.to });
-              }}
-            />
-          </PopoverContent>
+          {canUpdate && (
+            <PopoverContent className="w-auto p-4" align="end">
+              <DateRangePicker
+                date={range}
+                onChange={(newRange) => newRange && setRange(newRange)}
+                showToastOnApply={false}
+                minDate={minDate}
+                maxDate={maxDate}
+                onClose={() => setIsDateOpen(false)}
+                onApply={(r) => {
+                  if (!r?.from || !r?.to || !isValid(r.from) || !isValid(r.to))
+                    return;
+                  const next: Task = {
+                    ...task,
+                    fromAt: toYmd(r.from)!,
+                    untilAt: toYmd(r.to)!,
+                  };
+                  onSave(next);
+                  setRange({ from: r.from, to: r.to });
+                }}
+              />
+            </PopoverContent>
+          )}
         </Popover>
 
-        <Button variant="ghost" size="icon" onClick={onEdit}>
-          <Edit className="h-4 w-4 text-gray-500 hover:text-gray-700" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onRequestDelete}>
-          <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
-        </Button>
+        {canUpdate && (
+          <Button variant="ghost" size="icon" onClick={onEdit}>
+            <Edit className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+          </Button>
+        )}
+        {canDelete && (
+          <Button variant="ghost" size="icon" onClick={onRequestDelete}>
+            <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+          </Button>
+        )}
       </div>
     </div>
   );

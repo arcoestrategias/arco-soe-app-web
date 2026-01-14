@@ -14,6 +14,9 @@ interface Props {
   onDelete: () => void;
   dragDisabled?: boolean;
   dragDisabledReason?: string;
+  canUpdate?: boolean;
+  canDelete?: boolean;
+  canReorder?: boolean;
 }
 
 export function SortableTask({
@@ -25,6 +28,9 @@ export function SortableTask({
   onDelete,
   dragDisabled = false,
   dragDisabledReason = "",
+  canUpdate = false,
+  canDelete = false,
+  canReorder = false,
 }: Props) {
   const {
     attributes,
@@ -35,7 +41,7 @@ export function SortableTask({
     isDragging,
   } = useSortable({
     id: task.id,
-    disabled: dragDisabled,
+    disabled: dragDisabled || !canReorder,
   });
 
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -52,8 +58,14 @@ export function SortableTask({
         isDragging={isDragging}
         listeners={listeners ?? {}}
         attributes={attributes ?? {}}
-        dragDisabled={dragDisabled}
-        dragDisabledReason={dragDisabledReason}
+        dragDisabled={dragDisabled || !canReorder}
+        dragDisabledReason={
+          !canReorder
+            ? "No tienes permiso para reordenar tareas."
+            : dragDisabledReason
+        }
+        canUpdate={canUpdate}
+        canDelete={canDelete}
       />
     </div>
   );

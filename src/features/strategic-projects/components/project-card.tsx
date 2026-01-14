@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CheckSquare, FileText, Settings, Target, Edit3 } from "lucide-react";
+import { CheckSquare, FileText, Settings, Target, Edit3, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/shared/utils";
 import { TextWithTooltip } from "@/components/ui/text-with-tooltip";
 import { parseYmdOrIsoToLocalDate } from "@/shared/utils/dateFormatters";
@@ -33,12 +33,17 @@ interface ProjectCardProps {
 
   onEdit?: (projectId: string) => void;
 
+  /** NUEVO: eliminar proyecto */
+  onDelete?: (projectId: string) => void;
+
   /** NUEVO: generar reporte de este proyecto */
   onReport?: (projectId: string, projectName: string) => void;
   /** NUEVO: estado de carga global para deshabilitar botón de reporte */
   exporting?: boolean;
 
-  showEditIcon?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
+  canDownloadReport?: boolean;
 }
 
 const fmtShort = (s?: string) => {
@@ -65,24 +70,39 @@ export function ProjectCard({
   onOpenModal,
   onEdit,
   onReport,
+  onDelete,
   exporting = false,
-  showEditIcon = true,
+  canUpdate = false,
+  canDelete = false,
+  canDownloadReport = false,
 }: ProjectCardProps) {
   return (
     <Card className="relative group border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl bg-white overflow-hidden flex flex-col">
-      {/* Botón de edición (hover top-right) */}
-      {showEditIcon && (
-        <button
-          type="button"
-          onClick={() => onEdit?.(id)}
-          title="Editar proyecto"
-          aria-label="Editar proyecto"
-          className="absolute top-2 right-2 z-10 inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100
-                     opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Edit3 className="w-4 h-4" />
-        </button>
-      )}
+      {/* Botones de acción (hover top-right) */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {canUpdate && (
+          <button
+            type="button"
+            onClick={() => onEdit?.(id)}
+            title="Editar proyecto"
+            aria-label="Editar proyecto"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+          >
+            <Edit3 className="w-4 h-4" />
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete?.(id)}
+            title="Eliminar proyecto"
+            aria-label="Eliminar proyecto"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       <CardContent className="pt-4 flex-1 flex flex-col">
         {/* Header */}
@@ -191,16 +211,18 @@ export function ProjectCard({
             <CheckSquare className="h-3 w-3 mr-1" />
             Tareas ({totalTareas})
           </Badge>
-          <Badge
-            className={`bg-gray-100 text-gray-700 hover:bg-gray-200 text-[10px] flex-1 justify-center cursor-pointer ${
-              exporting ? "opacity-60 pointer-events-none" : ""
-            }`}
-            onClick={() => onReport?.(id, titulo)}
-            title="Generar reporte PDF"
-          >
-            <FileText className="h-3 w-3 mr-1" />
-            Reporte
-          </Badge>
+          {canDownloadReport && (
+            <Badge
+              className={`bg-gray-100 text-gray-700 hover:bg-gray-200 text-[10px] flex-1 justify-center cursor-pointer ${
+                exporting ? "opacity-60 pointer-events-none" : ""
+              }`}
+              onClick={() => onReport?.(id, titulo)}
+              title="Generar reporte PDF"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Reporte
+            </Badge>
+          )}
         </div>
       </CardContent>
     </Card>
