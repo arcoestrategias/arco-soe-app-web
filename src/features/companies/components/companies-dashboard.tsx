@@ -14,6 +14,8 @@ import { useCompanies } from "../hooks/use-companies";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import { ImageUploader } from "@/shared/components/image-uploader";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -40,6 +42,13 @@ type ConfirmState =
 
 export function CompaniesDashboard() {
   const { companies = [], isLoading, create, update, remove } = useCompanies();
+
+  const permissions = usePermissions({
+    create: PERMISSIONS.COMPANIES.CREATE,
+    update: PERMISSIONS.COMPANIES.UPDATE,
+    delete: PERMISSIONS.COMPANIES.DELETE,
+    uploadDocument: PERMISSIONS.COMPANIES.UPLOAD_DOCUMENT,
+  });
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -163,10 +172,12 @@ export function CompaniesDashboard() {
               {companies.length}
             </span>
           </div>
-          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Compañía
-          </Button>
+          {permissions.create && (
+            <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Compañía
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -230,32 +241,38 @@ export function CompaniesDashboard() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => openDocs(company)}
-                        title="Documentos"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={() => openEdit(company)}
-                        title="Editar"
-                        className="btn-gradient"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => askInactivate(company)}
-                        title="Inactivar"
-                        className="btn-cancel-gradient"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
+                      {permissions.uploadDocument && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => openDocs(company)}
+                          title="Documentos"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {permissions.update && (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          onClick={() => openEdit(company)}
+                          title="Editar"
+                          className="btn-gradient"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {permissions.delete && (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => askInactivate(company)}
+                          title="Inactivar"
+                          className="btn-cancel-gradient"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
