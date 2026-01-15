@@ -18,6 +18,8 @@ import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { getCompanyId } from "@/shared/auth/storage";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 import type {
   StrategicPlan,
@@ -62,6 +64,10 @@ function BusinessUnitHeaderCount({
 
 export function StrategicPlansDashboard() {
   const qc = useQueryClient();
+
+  const permissions = usePermissions({
+    create: PERMISSIONS.STRATEGIC_PLANS.CREATE,
+  });
 
   // ========= business units por compañía =========
   const companyId = getCompanyId();
@@ -159,9 +165,11 @@ export function StrategicPlansDashboard() {
             {businessUnits.length}
           </span>
         </div>
-        <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
-          <Plus className="h-4 w-4 mr-1" /> Nuevo Plan
-        </Button>
+        {permissions.create && (
+          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+            <Plus className="h-4 w-4 mr-1" /> Nuevo Plan
+          </Button>
+        )}
       </div>
 
       {isLoadingBUs ? (
@@ -227,6 +235,11 @@ function BusinessUnitPlansSection({
   onEdit: (p: StrategicPlan) => void;
   onInactivate: (p: StrategicPlan) => void;
 }) {
+  const permissions = usePermissions({
+    update: PERMISSIONS.STRATEGIC_PLANS.UPDATE,
+    delete: PERMISSIONS.STRATEGIC_PLANS.DELETE,
+  });
+
   const { data, isPending, error } = useStrategicPlansByBusinessUnit(
     businessUnit.id
   );
@@ -305,16 +318,18 @@ function BusinessUnitPlansSection({
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={() => onEdit(p)}
-                    title="Editar"
-                    className="btn-gradient"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  {p.isActive && (
+                  {permissions.update && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => onEdit(p)}
+                      title="Editar"
+                      className="btn-gradient"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {p.isActive && permissions.delete && (
                     <Button
                       variant="destructive"
                       size="icon"
