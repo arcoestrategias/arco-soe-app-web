@@ -17,11 +17,9 @@ import ObjectivesView from "@/features/objectives/components/objectives-view";
 
 import { getPositionId } from "@/shared/auth/storage";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 export default function ObjectivesPage() {
-  const canUpdatePosition = usePermission(PERMISSIONS.POSITIONS.UPDATE);
-
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
   const [strategicPlanId, setStrategicPlanId] = useState<string | null>(null);
@@ -30,11 +28,19 @@ export default function ObjectivesPage() {
   );
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
+  const { showFilterStrategicPlan, showFilterPosition, showFilterYear } =
+    usePermissions({
+      showFilterStrategicPlan:
+        PERMISSIONS.OBJECTIVES.SHOW_FILTER_STRATEGIC_PLAN,
+      showFilterPosition: PERMISSIONS.OBJECTIVES.SHOW_FILTER_POSITION,
+      showFilterYear: PERMISSIONS.OBJECTIVES.SHOW_FILTER_YEAR,
+    });
+
   React.useEffect(() => {
-    if (!canUpdatePosition) {
+    if (!showFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canUpdatePosition]);
+  }, [showFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/objectives" onNavigate={() => {}}>
@@ -51,19 +57,21 @@ export default function ObjectivesPage() {
           </div>
 
           <div className="flex gap-3">
-            <div className="w-full">
-              <FilterField label="Plan estratégico">
-                <StrategicPlanSelect
-                  businessUnitId={businessUnitId}
-                  value={strategicPlanId}
-                  onChange={setStrategicPlanId}
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {showFilterStrategicPlan && (
+              <div className="w-full">
+                <FilterField label="Plan estratégico">
+                  <StrategicPlanSelect
+                    businessUnitId={businessUnitId}
+                    value={strategicPlanId}
+                    onChange={setStrategicPlanId}
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            )}
 
-            {canUpdatePosition ? (
+            {showFilterPosition ? (
               <div className="w-full">
                 <FilterField label="Posición">
                   <PositionSelect
@@ -78,11 +86,13 @@ export default function ObjectivesPage() {
               </div>
             ) : null}
 
-            <div className="w-full">
-              <FilterField label="Año">
-                <YearSelect value={year} onChange={setYear} />
-              </FilterField>
-            </div>
+            {showFilterYear && (
+              <div className="w-full">
+                <FilterField label="Año">
+                  <YearSelect value={year} onChange={setYear} />
+                </FilterField>
+              </div>
+            )}
           </div>
         </div>
 

@@ -49,7 +49,7 @@ import { QKEY } from "@/shared/api/query-keys";
 
 // 🔐 permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -160,9 +160,15 @@ export default function ObjectivesCompliance({
   year,
 }: ObjectivesComplianceProps) {
   // 🔐 Permisos (usa tu access-control)
-  const canCreate = usePermission(PERMISSIONS.OBJECTIVES.CREATE);
-  const canUpdate = usePermission(PERMISSIONS.OBJECTIVES.UPDATE);
-  const canDelete = usePermission(PERMISSIONS.OBJECTIVES.DELETE);
+  const permissions = usePermissions({
+    read: PERMISSIONS.OBJECTIVES.READ,
+    create: PERMISSIONS.OBJECTIVES.CREATE,
+    update: PERMISSIONS.OBJECTIVES.UPDATE,
+    delete: PERMISSIONS.OBJECTIVES.DELETE,
+    addNote: PERMISSIONS.OBJECTIVES.ADD_NOTE,
+    uploadDocument: PERMISSIONS.OBJECTIVES.UPLOAD_DOCUMENT,
+    updateGoals: PERMISSIONS.OBJECTIVE_GOALS.UPDATE,
+  });
 
   /* --------- configurados / registrables --------- */
   const rows: IcoBoardListItem[] = data?.listObjectives ?? [];
@@ -206,7 +212,7 @@ export default function ObjectivesCompliance({
   ]);
 
   const handleInactivate = (objectiveId: string) => {
-    if (!canDelete) return;
+    if (!permissions.delete) return;
     inactivateMut.mutate(objectiveId, {
       onSuccess: (data) => {
         if (data?.blocked) {
@@ -280,7 +286,7 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "configurados"
   const openConfigureFromConfigured = (objectiveId: string) => {
-    if (!canUpdate) return;
+    if (!permissions.update) return;
     const item = rows.find((it) => it.objective?.id === objectiveId);
     if (!item?.objective) return;
 
@@ -329,7 +335,7 @@ export default function ObjectivesCompliance({
 
   // Configurar desde la tabla de "no configurados"
   const openConfigureFromUnconfigured = (objectiveId: string) => {
-    if (!canUpdate) return;
+    if (!permissions.update) return;
     const u = unconfigured.find((x) => x.id === objectiveId) as any;
     if (!u) return;
 
@@ -380,7 +386,7 @@ export default function ObjectivesCompliance({
       <CardHeader className="flex flex-row items-center justify-between py-3 px-4 border-b">
         <h2 className="text-base font-semibold">Objetivos</h2>
         {/* Ocultar completamente si no tiene permiso */}
-        {canCreate && (
+        {permissions.create && (
           <Button
             size="sm"
             className="h-9 btn-gradient"
@@ -406,7 +412,9 @@ export default function ObjectivesCompliance({
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              {loading ? (
+              {!permissions.read ? (
+                <div className="p-4 text-sm text-muted-foreground">No tienes permisos para ver la lista de objetivos.</div>
+              ) : loading ? (
                 <Skeleton className="h-48 w-full" />
               ) : error ? (
                 <div className="p-4 text-sm text-destructive">
@@ -482,36 +490,42 @@ export default function ObjectivesCompliance({
                           {/* acciones */}
                           <TableCell className="text-center sticky right-0 bg-background z-10 border-l px-2 py-1">
                             <div className="inline-flex items-center gap-1 whitespace-nowrap">
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Cumplimiento"
-                                aria-label="Cumplimiento"
-                                onClick={() => openComplianceFor(r.id)}
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Notas"
-                                aria-label="Notas"
-                                onClick={() => openNotes(r.id)}
-                              >
-                                <StickyNote className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Documentos"
-                                aria-label="Documentos"
-                                onClick={() => openDocs(r.id, r.name)}
-                              >
-                                <Paperclip className="w-4 h-4" />
-                              </Button>
+                              {permissions.updateGoals && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Cumplimiento"
+                                  aria-label="Cumplimiento"
+                                  onClick={() => openComplianceFor(r.id)}
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {permissions.addNote && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Notas"
+                                  aria-label="Notas"
+                                  onClick={() => openNotes(r.id)}
+                                >
+                                  <StickyNote className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {permissions.uploadDocument && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Documentos"
+                                  aria-label="Documentos"
+                                  onClick={() => openDocs(r.id, r.name)}
+                                >
+                                  <Paperclip className="w-4 h-4" />
+                                </Button>
+                              )}
 
                               {/* Mostrar solo si tiene permiso de actualización */}
-                              {canUpdate && (
+                              {permissions.update && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -526,7 +540,7 @@ export default function ObjectivesCompliance({
                               )}
 
                               {/* Mostrar solo si tiene permiso de eliminar/inactivar */}
-                              {canDelete && (
+                              {permissions.delete && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -559,7 +573,9 @@ export default function ObjectivesCompliance({
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              {loadingUnconfigured ? (
+              {!permissions.read ? (
+                <div className="p-4 text-sm text-muted-foreground">No tienes permisos para ver la lista de objetivos.</div>
+              ) : loadingUnconfigured ? (
                 <Skeleton className="h-40 w-full" />
               ) : totalUnconfigured === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">
@@ -631,26 +647,30 @@ export default function ObjectivesCompliance({
                           {/* acciones (notas, docs siempre; config/inactivar según permiso) */}
                           <TableCell className="text-center sticky right-0 bg-background z-10 border-l px-2 py-1">
                             <div className="inline-flex items-center gap-1 whitespace-nowrap">
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Notas"
-                                aria-label="Notas"
-                                onClick={() => openNotes(r.id)}
-                              >
-                                <StickyNote className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                title="Documentos"
-                                aria-label="Documentos"
-                                onClick={() => openDocs(r.id, r.name)}
-                              >
-                                <Paperclip className="w-4 h-4" />
-                              </Button>
+                              {permissions.addNote && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Notas"
+                                  aria-label="Notas"
+                                  onClick={() => openNotes(r.id)}
+                                >
+                                  <StickyNote className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {permissions.uploadDocument && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Documentos"
+                                  aria-label="Documentos"
+                                  onClick={() => openDocs(r.id, r.name)}
+                                >
+                                  <Paperclip className="w-4 h-4" />
+                                </Button>
+                              )}
 
-                              {canUpdate && (
+                              {permissions.update && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -664,7 +684,7 @@ export default function ObjectivesCompliance({
                                 </Button>
                               )}
 
-                              {canDelete && (
+                              {permissions.delete && (
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -691,12 +711,12 @@ export default function ObjectivesCompliance({
       </CardContent>
 
       {/* Modales */}
-      {canCreate && (
+      {permissions.create && (
         <NewObjectiveModal
           open={openCreate}
           onOpenChange={setOpenCreate}
           onCreate={async (payload) => {
-            if (!onCreateObjective || !canCreate) return;
+            if (!onCreateObjective || !permissions.create) return;
             await onCreateObjective(payload);
             setOpenCreate(false);
           }}

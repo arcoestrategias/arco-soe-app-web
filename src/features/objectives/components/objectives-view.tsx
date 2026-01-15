@@ -18,6 +18,8 @@ import type { ObjectiveComplianceChange } from "./objective-compliance-modal";
 import { useObjectives } from "@/features/strategic-plans/hooks/use-objectives";
 import { NewObjectivePayload } from "./new-objective-modal";
 import { useUnconfiguredObjectives } from "@/features/strategic-plans/hooks/use-unconfigured-objectives";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 type ObjectivesViewProps = {
   planId?: string;
@@ -38,6 +40,32 @@ export default function ObjectivesView({
 
   const { items: unconfigured, isLoading: loadingUnconf } =
     useUnconfiguredObjectives(planId, positionId);
+
+  const {
+    showIcoBoardTab,
+    showComplianceTab,
+    showDeploymentMatrixTab,
+    showAnnualIcoTrendChart,
+  } = usePermissions({
+    showIcoBoardTab: PERMISSIONS.OBJECTIVES.SHOW_ICO_BOARD_TAB,
+    showComplianceTab: PERMISSIONS.OBJECTIVES.SHOW_COMPLIANCE_TAB,
+    showDeploymentMatrixTab: PERMISSIONS.OBJECTIVES.SHOW_DEPLOYMENT_MATRIX_TAB,
+    showAnnualIcoTrendChart: PERMISSIONS.OBJECTIVES.SHOW_ANNUAL_ICO_TREND_CHART,
+  });
+
+  const defaultTab = showIcoBoardTab
+    ? "ico"
+    : showComplianceTab
+    ? "compliance"
+    : showDeploymentMatrixTab
+    ? "matrix"
+    : undefined;
+
+  const visibleTabsCount = [
+    showIcoBoardTab,
+    showComplianceTab,
+    showDeploymentMatrixTab,
+  ].filter(Boolean).length;
 
   // --- construir invalidateKeys con el mismo año (from = to = year) ---
   const canQuery = !!planId && !!positionId && !!year;
@@ -108,6 +136,11 @@ export default function ObjectivesView({
       positionId,
     });
   };
+
+  if (!defaultTab) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {isLoading && (
@@ -126,40 +159,54 @@ export default function ObjectivesView({
         </Card>
       )}
 
-      <Tabs defaultValue="ico" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="ico">Tablero ICO</TabsTrigger>
-          <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
-          <TabsTrigger value="matrix">Matriz de Despliegue</TabsTrigger>
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className={`grid w-full grid-cols-${visibleTabsCount}`}>
+          {showIcoBoardTab && (
+            <TabsTrigger value="ico">Tablero ICO</TabsTrigger>
+          )}
+          {showComplianceTab && (
+            <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
+          )}
+          {showDeploymentMatrixTab && (
+            <TabsTrigger value="matrix">Matriz de Despliegue</TabsTrigger>
+          )}
         </TabsList>
 
-        <TabsContent value="ico" className="mt-4">
-          <IcoBoard data={data} year={Number(year)} />
-          <AnnualIcoTrendCard data={data} year={Number(year)} />
-        </TabsContent>
+        {showIcoBoardTab && (
+          <TabsContent value="ico" className="mt-4">
+            <IcoBoard data={data} year={Number(year)} />
+            {showAnnualIcoTrendChart && (
+              <AnnualIcoTrendCard data={data} year={Number(year)} />
+            )}
+          </TabsContent>
+        )}
 
-        <TabsContent value="compliance" className="mt-4">
-          <ObjectivesCompliance
-            data={data}
-            loading={isLoading}
-            onComplianceUpdate={handleComplianceUpdate}
-            onCreateObjective={handleCreateObjective}
-            canCreateObjective={!!planId && !!positionId && !isCreating}
-            unconfigured={unconfigured}
-            loadingUnconfigured={loadingUnconf}
-            strategicPlanId={planId!}
-            positionId={positionId!}
-            year={Number(year)}
-          />
-        </TabsContent>
+        {showComplianceTab && (
+          <TabsContent value="compliance" className="mt-4">
+            <ObjectivesCompliance
+              data={data}
+              loading={isLoading}
+              onComplianceUpdate={handleComplianceUpdate}
+              onCreateObjective={handleCreateObjective}
+              canCreateObjective={!!planId && !!positionId && !isCreating}
+              unconfigured={unconfigured}
+              loadingUnconfigured={loadingUnconf}
+              strategicPlanId={planId!}
+              positionId={positionId!}
+              year={Number(year)}
+            />
+          </TabsContent>
+        )}
 
-        {/* <TabsContent value="matrix" className="mt-4">
-          <DeploymentMatrix
-            planId={planId}
-            positionId={positionId}
-            year={year}
-          />
-        </TabsContent> */}
+        {showDeploymentMatrixTab && (
+          <TabsContent value="matrix" className="mt-4">
+            <DeploymentMatrix
+              planId={planId}
+              positionId={positionId}
+              year={year}
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import type { IcoMonthlyPoint } from "@/features/objectives/types/ico-board";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 /* -------- mapeos etiqueta (unidad, tendencia, frecuencia) -------- */
 const MEASUREMENT_LABEL: Record<string, string> = {
@@ -104,6 +106,11 @@ export function ObjectiveComplianceModal({
   title?: string;
   description?: string;
 }) {
+  const permissions = usePermissions({
+    updateCompliance: PERMISSIONS.OBJECTIVE_GOALS.UPDATE_COMPLIANCE,
+    updateTargetValue: PERMISSIONS.OBJECTIVE_GOALS.UPDATE_TARGET_VALUE,
+  });
+
   // Solo meses medidos
   const rows = useMemo(
     () => (icoMonthly ?? []).filter((p) => p.isMeasured),
@@ -437,6 +444,7 @@ export function ObjectiveComplianceModal({
                         value={realToShow ?? ""}
                         onChange={(e) => handleChangeReal(p, e.target.value)}
                         placeholder="—"
+                        disabled={!permissions.updateCompliance}
                       />
                     </TableCell>
 
@@ -449,6 +457,7 @@ export function ObjectiveComplianceModal({
                         value={goalToShow ?? ""}
                         onChange={(e) => handleChangeGoal(p, e.target.value)}
                         placeholder="—"
+                        disabled={!permissions.updateTargetValue}
                       />
                     </TableCell>
 

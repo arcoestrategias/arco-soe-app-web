@@ -10,6 +10,8 @@ import type {
   IcoBoardMonthlyAverage,
   IcoMonthlyPoint,
 } from "../types/ico-board";
+import { usePermission } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 type IcoBoardProps = {
   data?: IcoBoardData; // ⬅️ ahora opcional para soportar el primer render
@@ -66,11 +68,7 @@ function cellText(point?: IcoMonthlyPoint) {
 }
 
 export default function IcoBoard({ data, year, className }: IcoBoardProps) {
-  // ⛑️ Guard: si aún no hay data o resume, no renderizamos (el padre ya muestra loading)
-  if (!data?.resume) return null;
-
-  const { activeIndicators, generalAverage, lastActiveMonth } = data.resume;
-
+  const canRead = usePermission(PERMISSIONS.OBJECTIVES.READ);
   const [selectedObj, setSelectedObj] = React.useState<any>(null);
   const [showEvolution, setShowEvolution] = React.useState(false);
 
@@ -126,6 +124,19 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
       };
     });
   }, [data, year]);
+
+  // ⛑️ Guard: si aún no hay data o resume, no renderizamos (el padre ya muestra loading)
+  if (!data?.resume) return null;
+
+  if (!canRead) {
+    return (
+      <div className="p-6 text-center text-sm text-muted-foreground border rounded-md bg-gray-50">
+        No tienes permisos para ver el contenido del tablero ICO.
+      </div>
+    );
+  }
+
+  const { activeIndicators, generalAverage, lastActiveMonth } = data.resume;
 
   return (
     <div className={["space-y-6 font-system", className ?? ""].join(" ")}>
