@@ -38,6 +38,7 @@ interface PermissionSelectionModalProps {
   onSave: (updatedPermissionKeys: string[]) => void;
   isSaving?: boolean;
   isLoading?: boolean;
+  readOnly?: boolean;
 }
 
 export function PermissionSelectionModal({
@@ -49,6 +50,7 @@ export function PermissionSelectionModal({
   onSave,
   isSaving = false,
   isLoading = false,
+  readOnly = false,
 }: PermissionSelectionModalProps) {
   // Estado local para la selección
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -167,7 +169,7 @@ export function PermissionSelectionModal({
 
           {/* Acciones */}
           <div className="flex flex-wrap items-center gap-2 justify-end">
-            {totalPermissions > 0 && !isLoading && (
+            {totalPermissions > 0 && !isLoading && !readOnly && (
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="select-all"
@@ -191,19 +193,21 @@ export function PermissionSelectionModal({
               <X className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || isLoading || totalPermissions === 0}
-            >
-              {isSaving ? (
-                "Guardando..."
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Guardar cambios
-                </>
-              )}
-            </Button>
+            {!readOnly && (
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || isLoading || totalPermissions === 0}
+              >
+                {isSaving ? (
+                  "Guardando..."
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Guardar cambios
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -255,6 +259,7 @@ export function PermissionSelectionModal({
                           onCheckedChange={(checked) =>
                             handleToggle(perm.name, checked)
                           }
+                          disabled={readOnly}
                         />
                       </div>
                     </div>

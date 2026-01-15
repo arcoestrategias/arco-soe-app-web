@@ -11,6 +11,8 @@ import {
 } from "../hooks/use-modules";
 import { PermissionSelectionModal } from "./permission-selection-modal";
 import type { Module, Permission } from "../types/types";
+import { usePermission } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 type ModalState = {
   open: boolean;
@@ -20,6 +22,7 @@ type ModalState = {
 
 export function ModulesDashboard() {
   const { data: modules, isLoading } = useModulesQuery();
+  const canSetPermissions = usePermission(PERMISSIONS.MODULES.SET_PERMISSIONS);
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -164,6 +167,7 @@ export function ModulesDashboard() {
           }
           isSaving={syncMutation.isPending}
           isLoading={isLoadingPermissions}
+          readOnly={!canSetPermissions}
         />
       )}
     </div>
