@@ -25,8 +25,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { usePermissions } from "@/shared/auth/access-control";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -75,9 +75,14 @@ export function UsersDashboard() {
   const { groups, total, isLoading, create, update, remove } = useUsers();
 
   // ✅ Permisos por módulo/acción
-  const canRolAccess = usePermission(PERMISSIONS.USERS.SET_ROLES);
-  const canPermissionAssign = usePermission(PERMISSIONS.USERS.SET_PERMISSIONS);
-  const canBusinessUnitManagementAssign = usePermission(PERMISSIONS.USERS.SET_BUSINESS_UNITS);
+  const permissions = usePermissions({
+    create: PERMISSIONS.USERS.CREATE,
+    update: PERMISSIONS.USERS.UPDATE,
+    delete: PERMISSIONS.USERS.DELETE,
+    setRoles: PERMISSIONS.USERS.SET_ROLES,
+    setPermissions: PERMISSIONS.USERS.SET_PERMISSIONS,
+    setBusinessUnits: PERMISSIONS.USERS.SET_BUSINESS_UNITS,
+  });
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -298,10 +303,12 @@ export function UsersDashboard() {
               {total}
             </span>
           </div>
-          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Usuario
-          </Button>
+          {permissions.create && (
+            <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Usuario
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -336,7 +343,7 @@ export function UsersDashboard() {
                           <th className="px-4 py-2 text-left w-[250px]">
                             Correo
                           </th>
-                          {canRolAccess && (
+                          {permissions.setRoles && (
                             <th className="px-4 py-2 text-center w-[180px]">
                               Rol
                             </th>
@@ -379,7 +386,7 @@ export function UsersDashboard() {
                             <td className="px-4 py-2 w-[250px]">{u.email}</td>
 
                             {/* Rol */}
-                            {canRolAccess && (
+                            {permissions.setRoles && (
                               <td className="px-4 py-2 text-center">
                                 {u.roleName ? (
                                   <span>{u.roleName}</span>
@@ -450,7 +457,7 @@ export function UsersDashboard() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               {/* Oculto si no hay permiso */}
-                              {canPermissionAssign && (
+                              {permissions.setPermissions && (
                                 <Button
                                   variant="outline"
                                   size="icon"
@@ -461,23 +468,27 @@ export function UsersDashboard() {
                                   <ShieldCheck className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button
-                                variant="secondary"
-                                size="icon"
-                                onClick={() => openEdit(u, g.businessUnitId)}
-                                title="Editar"
-                                className="btn-gradient"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                onClick={() => askInactivate(u)}
-                                title="Inactivar"
-                              >
-                                <Trash className="h-4 w-4" />
-                              </Button>
+                              {permissions.update && (
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={() => openEdit(u, g.businessUnitId)}
+                                  title="Editar"
+                                  className="btn-gradient"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {permissions.delete && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => askInactivate(u)}
+                                  title="Inactivar"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -499,7 +510,8 @@ export function UsersDashboard() {
         onClose={closeModal}
         onSave={handleSaveFromModal}
         businessUnitId={modal.businessUnitId ?? ""}
-        canBusinessUnitManagementAssign={canBusinessUnitManagementAssign}
+        canSetRoles={permissions.setRoles}
+        canSetBusinessUnits={permissions.setBusinessUnits}
       />
 
       {/* Confirmación (editar / inactivar) */}

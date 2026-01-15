@@ -82,7 +82,8 @@ type Props = {
     payload: any;
   }) => void;
   businessUnitId?: string;
-  canBusinessUnitManagementAssign?: boolean;
+  canSetRoles?: boolean;
+  canSetBusinessUnits?: boolean;
 };
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
@@ -127,11 +128,12 @@ export function ModalUser(props: Props) {
     onClose,
     onSave,
     businessUnitId,
-    canBusinessUnitManagementAssign,
+    canSetRoles = false,
+    canSetBusinessUnits = false,
   } = props;
 
   // Catálogos
-  const rolesQuery = useQuery({ queryKey: QKEY.roles, queryFn: getRoles });
+  const rolesQuery = useQuery({ queryKey: QKEY.roles(), queryFn: () => getRoles() });
   const businessUnitsQuery = useQuery({
     queryKey: QKEY.businessUnits,
     queryFn: getBusinessUnits,
@@ -503,7 +505,7 @@ export function ModalUser(props: Props) {
           </section>
 
           {/* ========== Sección 2: Confirmación de correo (no se muestra en CREAR) ========== */}
-          {modo !== "crear" && canBusinessUnitManagementAssign && (
+          {modo !== "crear" && (
             <>
               <Separator />
               <section className="space-y-4">
@@ -580,7 +582,7 @@ export function ModalUser(props: Props) {
           )}
 
           {/* ========== Sección 3: Configuración en unidad de negocio ========== */}
-          {canBusinessUnitManagementAssign && (
+          {(canSetRoles || canSetBusinessUnits) && (
             <>
               <Separator />
               <section className="space-y-4">
@@ -598,14 +600,14 @@ export function ModalUser(props: Props) {
                       rules={{
                         // solo requerido si se muestra la sección
                         required:
-                          canBusinessUnitManagementAssign && modo !== "ver"
+                          canSetRoles && modo !== "ver"
                             ? "Rol es obligatorio"
                             : false,
                       }}
                       render={({ field }) => (
                         <>
                           <Select
-                            disabled={modo === "ver"}
+                            disabled={modo === "ver" || !canSetRoles}
                             value={field.value ?? ""}
                             onValueChange={(val) =>
                               field.onChange(val || undefined)
@@ -640,14 +642,14 @@ export function ModalUser(props: Props) {
                       name="businessUnitId"
                       rules={{
                         required:
-                          canBusinessUnitManagementAssign && modo !== "ver"
+                          canSetBusinessUnits && modo !== "ver"
                             ? "Unidad de negocio es obligatoria"
                             : false,
                       }}
                       render={({ field }) => (
                         <>
                           <Select
-                            disabled={disabled || filteredBUs.length === 0}
+                            disabled={disabled || filteredBUs.length === 0 || !canSetBusinessUnits}
                             value={field.value ?? ""}
                             onValueChange={(val) =>
                               field.onChange(val || undefined)
@@ -686,7 +688,7 @@ export function ModalUser(props: Props) {
                     <Switch
                       checked={!!watch("addToAnotherBU")}
                       onCheckedChange={(v) => setValue("addToAnotherBU", v)}
-                      disabled={false}
+                      disabled={!canSetBusinessUnits}
                     />
                     <span className="text-sm">
                       Agregar a otra unidad (no mover)
