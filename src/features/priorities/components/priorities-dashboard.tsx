@@ -26,6 +26,8 @@ import {
   // Si tienes el tipo y quieres mantener TS estricto, actualízalo para incluir monthlyClassStyle
   // type PrioritiesReportPayload,
 } from "@/features/reports/services/reportsService";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 export default function PrioritiesDashboard({
   planId,
@@ -43,6 +45,14 @@ export default function PrioritiesDashboard({
   resetSignal?: number;
 }) {
   const enabled = !!positionId && !!month && !!year;
+
+  const permissions = usePermissions({
+    showStatusChart: PERMISSIONS.PRIORITIES.SHOW_STATUS_CHART,
+    showAnnualIcpTrendChart: PERMISSIONS.PRIORITIES.SHOW_ANNUAL_ICP_TREND_CHART,
+    downloadReportPdf: PERMISSIONS.PRIORITIES.DOWNLOAD_REPORT_PDF,
+    create: PERMISSIONS.PRIORITIES.CREATE,
+    read: PERMISSIONS.PRIORITIES.READ,
+  });
 
   // Lista principal
   const page = 1;
@@ -286,15 +296,19 @@ export default function PrioritiesDashboard({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PriorityStatesAndIcpCard
-          loading={isLoading && enabled}
-          statusCounters={statusCounters}
-          icpValue={typeof icp?.icp === "number" ? icp.icp : undefined}
-          totalPlanned={icp?.totalPlanned}
-          totalCompleted={icp?.totalCompleted}
-          breakdown={icp}
-        />
-        <AnnualTrendCard positionId={positionId} year={year} />
+        {permissions.showStatusChart && (
+          <PriorityStatesAndIcpCard
+            loading={isLoading && enabled}
+            statusCounters={statusCounters}
+            icpValue={typeof icp?.icp === "number" ? icp.icp : undefined}
+            totalPlanned={icp?.totalPlanned}
+            totalCompleted={icp?.totalCompleted}
+            breakdown={icp}
+          />
+        )}
+        {permissions.showAnnualIcpTrendChart && (
+          <AnnualTrendCard positionId={positionId} year={year} />
+        )}
       </div>
 
       <Card>
@@ -305,26 +319,30 @@ export default function PrioritiesDashboard({
 
           <div className="flex items-center gap-2">
             {/* Generar Reporte (izquierda) */}
-            <Button
-              onClick={handleExport}
-              size="sm"
-              className="h-8 btn-gradient"
-              disabled={exportMut.isPending || !enabled || !planId}
-              title={!planId ? "Selecciona un plan" : "Generar Reporte"}
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              Reporte
-            </Button>
+            {permissions.downloadReportPdf && (
+              <Button
+                onClick={handleExport}
+                size="sm"
+                className="h-8 btn-gradient"
+                disabled={exportMut.isPending || !enabled || !planId}
+                title={!planId ? "Selecciona un plan" : "Generar Reporte"}
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                Reporte
+              </Button>
+            )}
 
             {/* Nueva Prioridad (existente) */}
-            <Button
-              onClick={() => setShowCreateRow((v) => !v)}
-              size="sm"
-              className="h-8 btn-gradient"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Prioridad
-            </Button>
+            {permissions.create && (
+              <Button
+                onClick={() => setShowCreateRow((v) => !v)}
+                size="sm"
+                className="h-8 btn-gradient"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Prioridad
+              </Button>
+            )}
           </div>
         </CardHeader>
 

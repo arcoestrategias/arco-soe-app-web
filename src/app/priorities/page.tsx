@@ -22,7 +22,7 @@ import { ConfirmModal } from "../../shared/components/confirm-modal";
 
 import { getPositionId } from "@/shared/auth/storage";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 
 type PendingChangeKind = "plan" | "position" | "month" | "year";
 type PendingChange = {
@@ -31,7 +31,13 @@ type PendingChange = {
 };
 
 export default function PrioritiesPage() {
-  const canFilterPosition = usePermission(PERMISSIONS.POSITIONS.SHOW_FILTER_POSITION);
+  const { showFilterStrategicPlan, showFilterPosition, showFilterMonth, showFilterYear, canRead } = usePermissions({
+    showFilterStrategicPlan: PERMISSIONS.PRIORITIES.SHOW_FILTER_STRATEGIC_PLAN,
+    showFilterPosition: PERMISSIONS.PRIORITIES.SHOW_FILTER_POSITION,
+    showFilterMonth: PERMISSIONS.PRIORITIES.SHOW_FILTER_MONTH,
+    showFilterYear: PERMISSIONS.PRIORITIES.SHOW_FILTER_YEAR,
+    canRead: PERMISSIONS.PRIORITIES.READ,
+  });
 
   const businessUnitId = getBusinessUnitId() ?? undefined;
 
@@ -98,10 +104,10 @@ export default function PrioritiesPage() {
   };
 
   React.useEffect(() => {
-    if (!canFilterPosition) {
+    if (!showFilterPosition) {
       setPositionId(getPositionId() ?? null);
     }
-  }, [canFilterPosition]);
+  }, [showFilterPosition]);
 
   return (
     <SidebarLayout currentPath="/priorities">
@@ -116,25 +122,27 @@ export default function PrioritiesPage() {
 
           {/* Filtros */}
           <div className="flex gap-3">
-            <div className="w-full">
-              <FilterField label="Plan estratégico">
-                <StrategicPlanSelect
-                  businessUnitId={businessUnitId}
-                  value={strategicPlanId}
-                  onChange={(val) =>
-                    guardedChange<string | null>(
-                      val,
-                      setStrategicPlanId,
-                      "plan"
-                    )
-                  }
-                  persist
-                  clearOnUnmount
-                />
-              </FilterField>
-            </div>
+            {showFilterStrategicPlan && (
+              <div className="w-full">
+                <FilterField label="Plan estratégico">
+                  <StrategicPlanSelect
+                    businessUnitId={businessUnitId}
+                    value={strategicPlanId}
+                    onChange={(val) =>
+                      guardedChange<string | null>(
+                        val,
+                        setStrategicPlanId,
+                        "plan"
+                      )
+                    }
+                    persist
+                    clearOnUnmount
+                  />
+                </FilterField>
+              </div>
+            )}
 
-            {canFilterPosition ? (
+            {showFilterPosition ? (
               <div className="w-full">
                 <FilterField label="Posición">
                   <PositionSelect
@@ -155,40 +163,46 @@ export default function PrioritiesPage() {
               </div>
             ) : null}
 
-            <div className="w-full">
-              <FilterField label="Mes">
-                <MonthSelect
-                  value={month}
-                  onChange={(val) =>
-                    guardedChange<number>(val, setMonth, "month")
-                  }
-                />
-              </FilterField>
-            </div>
+            {showFilterMonth && (
+              <div className="w-full">
+                <FilterField label="Mes">
+                  <MonthSelect
+                    value={month}
+                    onChange={(val) =>
+                      guardedChange<number>(val, setMonth, "month")
+                    }
+                  />
+                </FilterField>
+              </div>
+            )}
 
-            <div className="w-full">
-              <FilterField label="Año">
-                <YearSelect
-                  value={year}
-                  onChange={(val) =>
-                    guardedChange<number>(val, setYear, "year")
-                  }
-                />
-              </FilterField>
-            </div>
+            {showFilterYear && (
+              <div className="w-full">
+                <FilterField label="Año">
+                  <YearSelect
+                    value={year}
+                    onChange={(val) =>
+                      guardedChange<number>(val, setYear, "year")
+                    }
+                  />
+                </FilterField>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Dashboard */}
-        <PrioritiesDashboard
-          planId={strategicPlanId ?? undefined}
-          positionId={positionId ?? undefined}
-          month={month}
-          year={year}
-          // <<< NUEVO: la tabla informa si está sucia, y recibe señal de reset >>>
-          onDirtyChange={setTableDirty}
-          resetSignal={resetSignal}
-        />
+        {canRead && (
+          <PrioritiesDashboard
+            planId={strategicPlanId ?? undefined}
+            positionId={positionId ?? undefined}
+            month={month}
+            year={year}
+            // <<< NUEVO: la tabla informa si está sucia, y recibe señal de reset >>>
+            onDirtyChange={setTableDirty}
+            resetSignal={resetSignal}
+          />
+        )}
       </div>
 
       {/* Confirmación para descartar cambios */}

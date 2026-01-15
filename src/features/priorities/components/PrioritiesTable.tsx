@@ -45,7 +45,7 @@ import { TextareaWithCounter } from "../../../shared/components/textarea-with-co
 
 import { getPositionId } from "@/shared/auth/storage";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
-import { usePermission } from "@/shared/auth/access-control";
+import { usePermissions } from "@/shared/auth/access-control";
 import NotesModal from "@/shared/components/comments/components/notes-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 
@@ -357,7 +357,14 @@ export default function PrioritiesTable({
   onDirtyChange?: (dirty: boolean) => void;
   resetSignal?: number;
 }) {
-  const canUpdateFinishedAt = usePermission(PERMISSIONS.PRIORITIES.UPDATE_FINISHED_AT);
+  const permissions = usePermissions({
+    update: PERMISSIONS.PRIORITIES.UPDATE,
+    delete: PERMISSIONS.PRIORITIES.DELETE,
+    addNote: PERMISSIONS.PRIORITIES.ADD_NOTE,
+    uploadDocument: PERMISSIONS.PRIORITIES.UPLOAD_DOCUMENT,
+    updateFinishedAt: PERMISSIONS.PRIORITIES.UPDATE_FINISHED_AT,
+    updateDateRange: PERMISSIONS.PRIORITIES.UPDATE_DATE_RANGE,
+  });
 
   const createMut = useCreatePriority(invalidateKey);
   const updateMut = useUpdatePriority(invalidateKey);
@@ -712,7 +719,7 @@ export default function PrioritiesTable({
                               <DatesCell
                                 fromAt={d?.fromAt}
                                 untilAt={d?.untilAt}
-                                editable
+                                editable={permissions.updateDateRange}
                                 onChange={(f, u) =>
                                   setDrafts((ds) => ({
                                     ...ds,
@@ -725,7 +732,7 @@ export default function PrioritiesTable({
                                 }
                               />
                             </div>
-                            {canUpdateFinishedAt ? (
+                            {permissions.updateFinishedAt ? (
                               <div>
                                 <label className="text-xs text-muted-foreground block mb-1">
                                   Fecha Terminado
@@ -733,7 +740,7 @@ export default function PrioritiesTable({
                                 {effectiveStatus === "CLO" ? (
                                   <FinishedDateCell
                                     value={d?.finishedAt}
-                                    editable
+                                    editable={permissions.updateFinishedAt}
                                     onChange={(v) =>
                                       setDrafts((ds) => ({
                                         ...ds,
@@ -845,39 +852,47 @@ export default function PrioritiesTable({
 
                 {/* ACCIONES sticky */}
                 <TableCell className="w-36 whitespace-nowrap text-right space-x-1 align-top sticky right-0 bg-background z-10 border-l">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => startEdit(p)}
-                    disabled={uiBusy}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Notas"
-                    onClick={() => setNotesFor(p.id)}
-                  >
-                    <StickyNote className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Documentos"
-                    onClick={() => openDocs(p.id, p.name)}
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive"
-                    onClick={() => onInactivate?.(p.id)}
-                    disabled={uiBusy || inactivatingId === p.id}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {permissions.update && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => startEdit(p)}
+                      disabled={uiBusy}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {permissions.addNote && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Notas"
+                      onClick={() => setNotesFor(p.id)}
+                    >
+                      <StickyNote className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {permissions.uploadDocument && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Documentos"
+                      onClick={() => openDocs(p.id, p.name)}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {permissions.delete && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={() => onInactivate?.(p.id)}
+                      disabled={uiBusy || inactivatingId === p.id}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             );
