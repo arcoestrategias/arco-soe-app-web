@@ -23,6 +23,8 @@ import { ModalPosition } from "./modal-position";
 import type { Position } from "@/features/positions/types/positions";
 import { type PositionsByCompanyGroupBU } from "../../types/positions";
 import { patchUserBusinessUnit } from "@/features/users/services/userBusinessUnitsService";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 export function PositionsDashboard() {
   // Estado modal / confirma (igual que antes)
@@ -30,6 +32,15 @@ export function PositionsDashboard() {
   const [modo, setModo] = useState<"crear" | "editar" | "ver">("crear");
   const [current, setCurrent] = useState<Position | null>(null);
   const [openConfirm, setOpenConfirm] = useState(false);
+
+  const permissions = usePermissions({
+    create: PERMISSIONS.POSITIONS.CREATE,
+    update: PERMISSIONS.POSITIONS.UPDATE,
+    delete: PERMISSIONS.POSITIONS.DELETE,
+    setBusinessUnits: PERMISSIONS.POSITIONS.SET_BUSINESS_UNITS,
+    setUsers: PERMISSIONS.POSITIONS.SET_USERS,
+    setParentPosition: PERMISSIONS.POSITIONS.SET_PARENT_POSITION,
+  });
 
   const { fullCreatePosition, updatePosition, inactivatePosition } =
     usePositions();
@@ -169,9 +180,11 @@ export function PositionsDashboard() {
               {total}
             </span>
           </div>
-          <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
-            Nueva Posición
-          </Button>
+          {permissions.create && (
+            <Button onClick={openCreate} size="sm" className="h-8 btn-gradient">
+              Nueva Posición
+            </Button>
+          )}
         </div>
 
         {isPending ? (
@@ -245,16 +258,18 @@ export function PositionsDashboard() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="secondary"
-                                size="icon"
-                                onClick={() => openEdit(p)}
-                                title="Editar"
-                                className="btn-gradient"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {p.isActive && (
+                              {permissions.update && (
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={() => openEdit(p)}
+                                  title="Editar"
+                                  className="btn-gradient"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {p.isActive && permissions.delete && (
                                 <Button
                                   variant="destructive"
                                   size="icon"
@@ -284,6 +299,9 @@ export function PositionsDashboard() {
         position={current}
         onClose={() => setOpenModal(false)}
         onSave={handleSave}
+        canSetBusinessUnits={permissions.setBusinessUnits}
+        canSetUsers={permissions.setUsers}
+        canSetParentPosition={permissions.setParentPosition}
       />
 
       {/* Confirm inactivar */}

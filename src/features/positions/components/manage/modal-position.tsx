@@ -51,6 +51,9 @@ type Props = {
     id?: string;
     payload: PositionFormValues;
   }) => void;
+  canSetBusinessUnits?: boolean;
+  canSetUsers?: boolean;
+  canSetParentPosition?: boolean;
 };
 
 const fmtTitle = (m: ModalMode) =>
@@ -66,6 +69,9 @@ export function ModalPosition({
   position,
   onClose,
   onSave,
+  canSetBusinessUnits = false,
+  canSetUsers = false,
+  canSetParentPosition = false,
 }: Props) {
   const readOnly = modo === "ver";
 
@@ -290,7 +296,7 @@ export function ModalPosition({
                   shouldValidate: true,
                 })
               }
-              disabled={readOnly || isSubmitting}
+              disabled={readOnly || isSubmitting || !canSetBusinessUnits}
             >
               <SelectTrigger className="w-full">
                 <SelectValue
@@ -329,7 +335,11 @@ export function ModalPosition({
                 })
               }
               disabled={
-                readOnly || isSubmitting || !buField.value || usersLoading
+                readOnly ||
+                isSubmitting ||
+                !buField.value ||
+                usersLoading ||
+                !canSetUsers
               }
             >
               <SelectTrigger className="w-full">
@@ -379,7 +389,12 @@ export function ModalPosition({
                   { shouldDirty: true, shouldValidate: true }
                 )
               }
-              disabled={!buField.value || readOnly || isSubmitting}
+              disabled={
+                !buField.value ||
+                readOnly ||
+                isSubmitting ||
+                !canSetParentPosition
+              }
             >
               <SelectTrigger className="w-full">
                 <SelectValue
