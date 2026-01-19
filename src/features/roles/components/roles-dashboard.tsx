@@ -21,6 +21,8 @@ import { getHumanErrorMessage } from "@/shared/api/response";
 import type { Role } from "../types/types";
 import { ModalRolePermissions } from "./modal-role-permissions";
 import { ModalRole, type RoleFormData } from "./modal-role";
+import { usePermissions } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 type PermsModalState = {
   open: boolean;
@@ -47,6 +49,13 @@ export function RolesDashboard() {
   const updateMutation = useUpdateRoleMutation();
   const inactivateMutation = useInactivateRoleMutation();
   const reactivateMutation = useReactivateRoleMutation();
+
+  const permissions = usePermissions({
+    create: PERMISSIONS.ROLES.CREATE,
+    update: PERMISSIONS.ROLES.UPDATE,
+    delete: PERMISSIONS.ROLES.DELETE,
+    setPermissions: PERMISSIONS.ROLES.SET_PERMISSIONS,
+  });
 
   const [permsModal, setPermsModal] = useState<PermsModalState>({
     open: false,
@@ -151,14 +160,16 @@ export function RolesDashboard() {
               </Label>
             </div>
           </div>
-          <Button
-            onClick={openCreateModal}
-            size="sm"
-            className="h-8 btn-gradient"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Rol
-          </Button>
+          {permissions.create && (
+            <Button
+              onClick={openCreateModal}
+              size="sm"
+              className="h-8 btn-gradient"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Rol
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -221,34 +232,40 @@ export function RolesDashboard() {
                     <td className="px-4 py-3 flex flex-wrap gap-2 justify-center w-[250px]">
                       {role.isActive ? (
                         <>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            title="Permisos del Rol"
-                            onClick={() => openPermsModal(role)}
-                          >
-                            <ShieldCheck className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            title="Editar"
-                            className="btn-gradient"
-                            onClick={() => openEditModal(role)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            title="Inactivar"
-                            disabled={role.isDefault}
-                            onClick={() => askDelete(role)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                          {permissions.setPermissions && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              title="Permisos del Rol"
+                              onClick={() => openPermsModal(role)}
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {permissions.update && (
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              title="Editar"
+                              className="btn-gradient"
+                              onClick={() => openEditModal(role)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {permissions.delete && (
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              title="Inactivar"
+                              disabled={role.isDefault}
+                              onClick={() => askDelete(role)}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          )}
                         </>
-                      ) : (
+                      ) : permissions.update ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -258,7 +275,7 @@ export function RolesDashboard() {
                           <RotateCcw className="h-4 w-4 mr-2" />
                           Reactivar
                         </Button>
-                      )}
+                      ) : null}
                     </td>
                   </tr>
                 ))}
