@@ -262,6 +262,13 @@ export function UsersDashboard() {
             // 3) Invalidar la lista agrupada por compañía
             await invalidateUsersCompanyList(qc);
 
+            // 4) Invalidar caché de permisos del usuario para reflejar cambios de rol
+            if (businessUnitId) {
+              await qc.invalidateQueries({
+                queryKey: QKEY.userPermissions(businessUnitId, confirm.id!),
+              });
+            }
+
             toast.success("Usuario actualizado");
             setConfirm({ open: false });
             closeModal();
