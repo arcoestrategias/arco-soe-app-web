@@ -14,7 +14,7 @@ export async function getBusinessUnits() {
 }
 
 export async function getBusinessUnitsByCompany(
-  companyId: string
+  companyId: string,
 ): Promise<BusinessUnit[]> {
   const res = await http.get(routes.businessUnits.listByCompany(companyId));
   return unwrapAny<BusinessUnit[]>(res.data ?? res);
@@ -28,7 +28,7 @@ export async function createBusinessUnit(payload: CreateBusinessUnitPayload) {
 
 export async function updateBusinessUnit(
   id: string,
-  payload: UpdateBusinessUnitPayload
+  payload: UpdateBusinessUnitPayload,
 ) {
   const res = await http.patch(routes.businessUnits.update(id), payload);
   return unwrapAny<BusinessUnit>(res);
@@ -42,8 +42,17 @@ export async function inactivateBusinessUnit(id: string) {
 }
 
 export async function getBusinessUnitUsers(
-  businessUnitId: string
+  businessUnitId: string,
 ): Promise<BusinessUnitUser[]> {
   const { data } = await http.get(routes.businessUnits.users(businessUnitId));
+  return unwrapAny<BusinessUnitUser[]>(data);
+}
+
+export async function getBusinessUnitUsersNoPosition(
+  businessUnitId: string,
+): Promise<BusinessUnitUser[]> {
+  const { data } = await http.get(
+    routes.businessUnits.usersNoPosition(businessUnitId),
+  );
   return unwrapAny<BusinessUnitUser[]>(data);
 }

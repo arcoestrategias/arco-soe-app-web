@@ -13,6 +13,9 @@ export const QKEY = {
   businessUnitUsers: (businessUnitId: string) =>
     ["users", "by-business-unit", businessUnitId] as const,
 
+  businessUnitUsersNoPosition: (businessUnitId: string) =>
+    ["users", "by-business-unit", "no-position", businessUnitId] as const,
+
   companyUsersGrouped: (companyId: string) =>
     ["users", "by-company", "grouped-by-business-unit", companyId] as const,
 

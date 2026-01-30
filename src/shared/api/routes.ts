@@ -108,6 +108,8 @@ export const routes = {
       ),
     users: (businessUnitId: string) =>
       `/api/v1/business-units/${businessUnitId}/users`,
+    usersNoPosition: (businessUnitId: string) =>
+      `/api/v1/business-units/${businessUnitId}/users/no-position`,
     resetUserPermissions: (businessUnitId: string, userId: string) =>
       prefixed(
         Modules.BUSINESS_UNITS,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Pencil, Trash } from "lucide-react";
 
 import { QKEY } from "@/shared/api/query-keys";
@@ -27,6 +27,7 @@ import { usePermissions } from "@/shared/auth/access-control";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 export function PositionsDashboard() {
+  const qc = useQueryClient();
   // Estado modal / confirma (igual que antes)
   const [openModal, setOpenModal] = useState(false);
   const [modo, setModo] = useState<"crear" | "editar" | "ver">("crear");
@@ -63,12 +64,12 @@ export function PositionsDashboard() {
 
   const groups = useMemo<PositionsByCompanyGroupBU[]>(
     () => (Array.isArray(data) ? data : []),
-    [data]
+    [data],
   );
 
   const total = useMemo(
     () => groups.reduce((acc, g) => acc + (g.positions?.length ?? 0), 0),
-    [groups]
+    [groups],
   );
 
   // Handlers
@@ -115,10 +116,15 @@ export function PositionsDashboard() {
               await patchUserBusinessUnit(
                 res.payload.userId,
                 res.payload.businessUnitId,
-                { positionId: created.id }
+                { positionId: created.id },
               );
             }
           } finally {
+            await qc.invalidateQueries({
+              queryKey: QKEY.businessUnitUsersNoPosition(
+                res.payload.businessUnitId,
+              ),
+            });
             setOpenModal(false);
             refetch();
           }
@@ -143,21 +149,26 @@ export function PositionsDashboard() {
                   // Asumiendo tu endpoint requiere userId, entonces:
                   current?.userId!, // usuario actual en esa posición
                   positionData.businessUnitId,
-                  { positionId: null } // desasignar
+                  { positionId: null }, // desasignar
                 );
               } else if (userId) {
                 await patchUserBusinessUnit(
                   userId,
                   positionData.businessUnitId,
-                  { positionId: res.id } // asignar
+                  { positionId: res.id }, // asignar
                 );
               }
             } finally {
+              await qc.invalidateQueries({
+                queryKey: QKEY.businessUnitUsersNoPosition(
+                  positionData.businessUnitId,
+                ),
+              });
               setOpenModal(false);
               refetch();
             }
           },
-        }
+        },
       );
     }
   };
@@ -225,7 +236,13 @@ export function PositionsDashboard() {
                           <tr key={p.id} className="border-t">
                             <td className="px-4 py-2">{p.name}</td>
                             <td className="px-4 py-2">
-                              {p.userFullName ?? "—"}
+                              {p.userFullName ? (
+                                p.userFullName
+                              ) : (
+                                <Badge className="bg-red-500 text-white hover:bg-red-600">
+                                  Sin usuario
+                                </Badge>
+                              )}
                             </td>
                             <td className="px-4 py-2 text-center">
                               <Badge

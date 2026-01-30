@@ -25,7 +25,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { QKEY } from "@/shared/api/query-keys";
 import { getBusinessUnits } from "@/features/business-units/services/businessUnitsService";
-import { useBusinessUnitUsers } from "@/features/business-units/hooks/use-business-unit-users";
+import { useBusinessUnitUsersNoPosition } from "@/features/business-units/hooks/use-business-unit-users";
 import { getCompanyId, getBusinessUnitId } from "@/shared/auth/storage";
 import type { Position } from "../../types/positions";
 import { Button } from "@/components/ui/button";
@@ -60,8 +60,8 @@ const fmtTitle = (m: ModalMode) =>
   m === "crear"
     ? "Nueva Posición"
     : m === "editar"
-    ? "Editar Posición"
-    : "Detalle de Posición";
+      ? "Editar Posición"
+      : "Detalle de Posición";
 
 export function ModalPosition({
   isOpen,
@@ -132,8 +132,8 @@ export function ModalPosition({
   });
 
   // Usuarios por BU seleccionada
-  const { users, isLoading: usersLoading } = useBusinessUnitUsers(
-    buField.value
+  const { users, isLoading: usersLoading } = useBusinessUnitUsersNoPosition(
+    buField.value,
   );
 
   // defaults MEMO – evita recrear objeto en cada render
@@ -145,11 +145,11 @@ export function ModalPosition({
     return {
       name: position?.name ?? "",
       businessUnitId:
-        modo === "crear" ? buIdForCreate : position?.businessUnitId ?? "",
+        modo === "crear" ? buIdForCreate : (position?.businessUnitId ?? ""),
       userId: position?.userId ?? "",
       isCeo: !!position?.isCeo,
       positionSuperiorId:
-        modo === "crear" ? "" : (position as any)?.positionSuperiorId ?? "",
+        modo === "crear" ? "" : ((position as any)?.positionSuperiorId ?? ""),
     };
   }, [
     modo,
@@ -197,7 +197,7 @@ export function ModalPosition({
       businessUnitId: values.businessUnitId,
       userId: values.userId || "",
       isCeo: !!values.isCeo,
-      positionSuperiorId: values.positionSuperiorId || "",
+      positionSuperiorId: values.positionSuperiorId || null,
     };
 
     if (modo === "crear") onSave({ mode: "crear", payload });
@@ -215,7 +215,7 @@ export function ModalPosition({
       return [
         {
           id: position.userId,
-          firstName: position.userFullName ?? "", // si tienes userFullName, úsalo
+          firstName: (position as any).userFullName ?? "(Usuario actual)",
           lastName: "",
           email: "", // fallback
         },
@@ -262,8 +262,8 @@ export function ModalPosition({
             {modo === "crear"
               ? "Completa los datos para registrar una nueva posición."
               : modo === "editar"
-              ? "Actualiza los datos de la posición."
-              : "Consulta la información de la posición."}
+                ? "Actualiza los datos de la posición."
+                : "Consulta la información de la posición."}
           </DialogDescription>
         </DialogHeader>
 
@@ -327,9 +327,9 @@ export function ModalPosition({
           <div className="space-y-2">
             <Label>Usuario asignado *</Label>
             <Select
-              value={userField.value || undefined}
+              value={userField.value || NONE_SENTINEL}
               onValueChange={(v) =>
-                setValue("userId", v, {
+                setValue("userId", v === NONE_SENTINEL ? "" : v, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
@@ -348,17 +348,20 @@ export function ModalPosition({
                     !buField.value
                       ? "Selecciona primero la unidad"
                       : usersLoading
-                      ? "Cargando usuarios…"
-                      : "Selecciona un usuario"
+                        ? "Cargando usuarios…"
+                        : "Selecciona un usuario"
                   }
                 />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={NONE_SENTINEL}>- Sin usuario -</SelectItem>
                 {usersForSelect.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.firstName && u.lastName
                       ? `${u.firstName} ${u.lastName}`
-                      : u.email}
+                      : u.firstName
+                        ? u.firstName
+                        : u.email}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -379,14 +382,14 @@ export function ModalPosition({
                 !buField.value
                   ? undefined
                   : superiorField.value && superiorField.value !== ""
-                  ? superiorField.value
-                  : NONE_SENTINEL
+                    ? superiorField.value
+                    : NONE_SENTINEL
               }
               onValueChange={(v) =>
                 setValue(
                   "positionSuperiorId",
                   v === NONE_SENTINEL ? "" : v, // Mapear de UI → form
-                  { shouldDirty: true, shouldValidate: true }
+                  { shouldDirty: true, shouldValidate: true },
                 )
               }
               disabled={
@@ -402,8 +405,8 @@ export function ModalPosition({
                     !buField.value
                       ? "Selecciona primero la unidad"
                       : positionsLoading
-                      ? "Cargando posiciones…"
-                      : "Selecciona una posición superior"
+                        ? "Cargando posiciones…"
+                        : "Selecciona una posición superior"
                   }
                 />
               </SelectTrigger>
