@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Pencil, Trash } from "lucide-react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Eye, Pencil, Trash, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 
 import { QKEY } from "@/shared/api/query-keys";
+import http from "@/shared/api/http";
+import { routes } from "@/shared/api/routes";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +46,7 @@ export function PositionsDashboard() {
     setParentPosition: PERMISSIONS.POSITIONS.SET_PARENT_POSITION,
   });
 
-  const { fullCreatePosition, updatePosition, inactivatePosition } =
-    usePositions();
+  const { fullCreatePosition, updatePosition } = usePositions();
 
   // ⚠️ Nuevo: leemos companyId del storage y usamos el endpoint agrupado
   const companyId = getCompanyId() ?? "";
@@ -72,6 +74,21 @@ export function PositionsDashboard() {
     [groups],
   );
 
+  // Mutación para activar/inactivar (toggle)
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { data } = await http.patch(routes.positions.toggleActive(id), {
+        isActive,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Estado de la posición actualizado");
+      refetch();
+    },
+    onError: (err) => toast.error(getHumanErrorMessage(err)),
+  });
+
   // Handlers
   const openCreate = () => {
     setModo("crear");
@@ -94,12 +111,17 @@ export function PositionsDashboard() {
   };
   const handleInactivate = () => {
     if (!current?.id) return;
-    inactivatePosition.mutate(current.id, {
-      onSuccess: () => {
-        setOpenConfirm(false);
-        refetch();
+    toggleActiveMutation.mutate(
+      { id: current.id, isActive: false },
+      {
+        onSuccess: () => {
+          setOpenConfirm(false);
+        },
       },
-    });
+    );
+  };
+  const handleReactivate = (pos: Position) => {
+    toggleActiveMutation.mutate({ id: pos.id, isActive: true });
   };
   const handleSave = (res: {
     mode: "crear" | "editar";
@@ -286,16 +308,27 @@ export function PositionsDashboard() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {p.isActive && permissions.delete && (
+                              {p.isActive ? (
+                                permissions.delete && (
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => askInactivate(p)}
+                                    title="Inactivar"
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                )
+                              ) : permissions.update ? (
                                 <Button
-                                  variant="destructive"
+                                  variant="outline"
                                   size="icon"
-                                  onClick={() => askInactivate(p)}
-                                  title="Inactivar"
+                                  onClick={() => handleReactivate(p)}
+                                  title="Reactivar"
                                 >
-                                  <Trash className="h-4 w-4" />
+                                  <RotateCcw className="h-4 w-4" />
                                 </Button>
-                              )}
+                              ) : null}
                             </td>
                           </tr>
                         ))}

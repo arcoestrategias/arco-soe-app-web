@@ -145,6 +145,8 @@ export const routes = {
     byId: (positionId: string) => prefixed(Modules.POSITIONS, positionId),
     create: () => prefixed(Modules.POSITIONS),
     update: (positionId: string) => prefixed(Modules.POSITIONS, positionId),
+    toggleActive: (positionId: string) =>
+      prefixed(Modules.POSITIONS, positionId, "active"),
     overview: () => prefixed(Modules.POSITIONS, "overview"),
     orgChartOverview: () => prefixed(Modules.POSITIONS, "org-chart-overview"),
   },
