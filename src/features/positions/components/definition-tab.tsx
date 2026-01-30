@@ -321,7 +321,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   // ---- Handlers ----
   const handleStartEditCard = (
     key: "mission" | "vision",
-    currentText: string
+    currentText: string,
   ) => {
     setEditingSection(key);
     setTemporaryEditText(currentText ?? "");
@@ -391,7 +391,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
       items: mappedProjects.map((it, idx) => ({
         id: it.metaId!,
         order: idx + 1,
-        isActive: it.id === uiIndex ? false : it.isActive ?? true,
+        isActive: it.id === uiIndex ? false : (it.isActive ?? true),
       })),
     };
     reorderProjectsMutation.mutate(payload);
@@ -410,7 +410,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
       items: mappedLevers.map((it, idx) => ({
         id: it.metaId!,
         order: idx + 1,
-        isActive: it.id === uiIndex ? false : it.isActive ?? true,
+        isActive: it.id === uiIndex ? false : (it.isActive ?? true),
       })),
     };
     reorderLeversMutation.mutate(payload);
@@ -615,7 +615,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
           onStartEdit={() => setEditingSection("levers")}
           onCancelEdit={() => setEditingSection(null)}
           isReordering={(reorderLeversMutation as any).isPending}
-          maxLengthCharacter={150}
+          maxLengthCharacter={500}
           actions={{
             create: permissions.leversCreate ? handleCreateLever : undefined,
             updateById: permissions.leversUpdate
