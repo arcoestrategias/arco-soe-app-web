@@ -16,10 +16,10 @@ import { Target, Eye, Flag, FolderKanban, Zap } from "lucide-react";
 
 // Services (Objectives / Projects)
 import {
-  getObjectives,
   createObjective,
   updateObjective,
   reorderObjectives,
+  getObjectivesAllStatus,
 } from "@/features/strategic-plans/services/objectivesService";
 import {
   getStrategicProjectsByPlanPosition,
@@ -125,7 +125,7 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     queryKey: hasPlanAndPos
       ? QKEY.objectives(strategicPlanId!, positionId!, year)
       : ["objectives", "disabled"],
-    queryFn: () => getObjectives(strategicPlanId!, positionId!, year),
+    queryFn: () => getObjectivesAllStatus(strategicPlanId!, positionId!, year),
     enabled: hasPlanAndPos && Number.isInteger(year),
     staleTime: 60_000,
   });

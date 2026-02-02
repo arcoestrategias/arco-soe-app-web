@@ -173,6 +173,7 @@ export const routes = {
   objectives: {
     listByPlan: () => prefixed(Modules.OBJECTIVES),
     create: () => prefixed(Modules.OBJECTIVES),
+    listAllStatus: () => prefixed(Modules.OBJECTIVES, "all-status"),
     update: (objectiveId: string) => prefixed(Modules.OBJECTIVES, objectiveId),
     inactivate: (id: string) => prefixed("objectives", id, "inactivate"),
     reorder: () => prefixed(Modules.OBJECTIVES, "reorder"),

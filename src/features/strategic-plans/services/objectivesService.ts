@@ -24,6 +24,17 @@ export async function getObjectives(
   return unwrapAny<Objective[]>(res.data);
 }
 
+export async function getObjectivesAllStatus(
+  strategicPlanId: string,
+  positionId: string,
+  year: number
+): Promise<Objective[]> {
+  const res = await http.get(routes.objectives.listAllStatus(), {
+    params: { strategicPlanId, positionId, year },
+  });
+  return unwrapAny<Objective[]>(res.data);
+}
+
 export async function getUnconfiguredObjectives(
   strategicPlanId: string,
   positionId: string

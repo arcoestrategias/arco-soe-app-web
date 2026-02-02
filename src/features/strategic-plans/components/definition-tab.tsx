@@ -26,7 +26,7 @@ import {
   reorderStrategicValues,
 } from "@/features/strategic-plans/services/strategicValuesService";
 import {
-  getObjectives,
+  getObjectivesAllStatus,
   createObjective,
   updateObjective,
   reorderObjectives,
@@ -200,7 +200,7 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
         ? QKEY.objectives(strategicPlanId!, effectivePositionId!, currentYear)
         : ["objectives", "disabled"],
     queryFn: () =>
-      getObjectives(strategicPlanId!, effectivePositionId!, currentYear),
+      getObjectivesAllStatus(strategicPlanId!, effectivePositionId!, currentYear),
     enabled: hasPlan && !!effectivePositionId && Number.isInteger(currentYear),
     staleTime: 60_000,
   });
