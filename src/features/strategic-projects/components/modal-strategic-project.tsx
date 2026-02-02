@@ -20,13 +20,21 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/shared/components/single-date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SingleDatePicker } from "@/shared/components/single-date-picker";
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
 import ObjectiveSelect from "@/shared/components/objective-select";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import * as FiltersStorage from "@/shared/filters/storage";
 import { toast } from "sonner";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // -------------------- Tipos --------------------
 export type ModalMode = "crear" | "editar" | "ver";
@@ -38,6 +46,7 @@ export type StrategicProjectFormValues = {
   fromAt?: string; // YYYY-MM-DD
   untilAt?: string; // YYYY-MM-DD
   budget?: number | null;
+  status?: "OPE" | "IPR" | "CLO" | null;
 };
 
 export type ModalStrategicProjectProps = {
@@ -61,6 +70,7 @@ export type ModalStrategicProjectProps = {
       objectiveId?: string | null;
       positionId: string;
       budget?: number | null;
+      status?: "OPE" | "IPR" | "CLO" | null;
     };
   }) => void;
 };
@@ -76,7 +86,7 @@ const parseYmdOrIso = (s?: string | null) => {
 const toYmd = (d?: Date) =>
   d
     ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
+        d.getDate(),
       ).padStart(2, "0")}`
     : undefined;
 
@@ -86,12 +96,12 @@ function formatCurrencyDisplay(n?: number | null) {
   if (n === null || n === undefined || Number.isNaN(n)) return "";
   try {
     return new Intl.NumberFormat("es-EC", {
-      style: "currency",
-      currency: "USD",
+      style: "decimal",
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(n);
   } catch {
-    return `$ ${Number(n).toFixed(2)}`;
+    return Number(n).toFixed(2);
   }
 }
 function parseCurrencyInput(text: string): number | null {
@@ -135,15 +145,13 @@ export function ModalStrategicProject({
       fromAt: initial?.fromAt ?? undefined,
       untilAt: initial?.untilAt ?? undefined,
       budget: initial?.budget ?? null,
+      status: initial?.status ?? "OPE",
     },
   });
 
-  // Estado visual del picker (no persiste al form hasta "Aplicar")
-  const [range, setRange] = useState<DateRange>({
-    from: undefined,
-    to: undefined,
-  });
-  const [isDateOpen, setIsDateOpen] = useState(false);
+  // Estados para los popovers de fecha
+  const [isFromOpen, setIsFromOpen] = useState(false);
+  const [isUntilOpen, setIsUntilOpen] = useState(false);
 
   // Rehidrata SOLO al abrir/cambiar initial
   useEffect(() => {
@@ -156,19 +164,22 @@ export function ModalStrategicProject({
       fromAt: initial?.fromAt ?? undefined,
       untilAt: initial?.untilAt ?? undefined,
       budget: initial?.budget ?? null,
+      status: initial?.status ?? "OPE",
     };
 
     reset(defaults, { keepDirty: false });
-
-    setRange({
-      from: parseYmdOrIso(defaults.fromAt),
-      to: parseYmdOrIso(defaults.untilAt),
-    });
   }, [isOpen, initial, reset]);
+
+  // Registrar validación para budget
+  useEffect(() => {
+    register("budget", {
+      min: { value: 0, message: "El presupuesto no puede ser negativo" },
+    });
+  }, [register]);
 
   // Budget con máscara
   const [budgetDisplay, setBudgetDisplay] = useState<string>(
-    formatCurrencyDisplay(initial?.budget ?? null)
+    formatCurrencyDisplay(initial?.budget ?? null),
   );
   useEffect(() => {
     setBudgetDisplay(formatCurrencyDisplay(initial?.budget ?? null));
@@ -177,12 +188,16 @@ export function ModalStrategicProject({
   const onBudgetChange = (txt: string) => {
     setBudgetDisplay(txt);
     const n = parseCurrencyInput(txt);
-    setValue("budget", n, { shouldDirty: true });
+    setValue("budget", n, { shouldDirty: true, shouldValidate: true });
   };
   const onBudgetBlur = () => {
     const n = parseCurrencyInput(budgetDisplay);
     setBudgetDisplay(formatCurrencyDisplay(n));
-    setValue("budget", n, { shouldDirty: true, shouldTouch: true });
+    setValue("budget", n, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
   };
 
   // Mostrar SIEMPRE lo que hay en el form (no el state del picker)
@@ -214,6 +229,11 @@ export function ModalStrategicProject({
       return;
     }
 
+    if (values.status === "CLO" && !values.untilAt) {
+      toast.error("La fecha de fin es obligatoria si el estado es Cerrado.");
+      return;
+    }
+
     // ✅ Sin límite de fechas: solo comprobamos coherencia del rango
     const f = parseYmdOrIso(values.fromAt);
     const u = parseYmdOrIso(values.untilAt);
@@ -232,6 +252,7 @@ export function ModalStrategicProject({
       objectiveId: values.objectiveId ?? null,
       positionId: resolvedPositionId,
       budget: values.budget ?? null,
+      status: values.status ?? "OPE",
     };
 
     if (modo === "crear") {
@@ -243,30 +264,30 @@ export function ModalStrategicProject({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {modo === "crear"
               ? "Nuevo Proyecto Estratégico"
               : modo === "editar"
-              ? "Editar Proyecto Estratégico"
-              : "Detalle del Proyecto"}
+                ? "Editar Proyecto Estratégico"
+                : "Detalle del Proyecto"}
           </DialogTitle>
           <DialogDescription>
             {modo === "crear"
               ? "Completa los datos para registrar un proyecto."
               : modo === "editar"
-              ? "Actualiza los datos del proyecto."
-              : "Consulta la información del proyecto."}
+                ? "Actualiza los datos del proyecto."
+                : "Consulta la información del proyecto."}
           </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={handleSubmit(submit)}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="grid grid-cols-1 md:grid-cols-12 gap-4"
         >
           {/* Nombre */}
-          <div className="space-y-2 md:col-span-1">
+          <div className="space-y-2 md:col-span-12">
             <Label>Nombre *</Label>
             <Controller
               name="name"
@@ -281,6 +302,7 @@ export function ModalStrategicProject({
                   value={field.value || ""}
                   onChange={field.onChange}
                   maxLength={500}
+                  rows={3}
                   // disabled={readOnly}
                 />
               )}
@@ -291,7 +313,7 @@ export function ModalStrategicProject({
           </div>
 
           {/* Propósito */}
-          <div className="space-y-2 md:col-span-1">
+          <div className="space-y-2 md:col-span-12">
             <Label>Propósito</Label>
             <Controller
               name="description"
@@ -304,6 +326,7 @@ export function ModalStrategicProject({
                   value={field.value || ""}
                   onChange={field.onChange}
                   maxLength={1000}
+                  rows={5}
                   // disabled={readOnly}
                 />
               )}
@@ -316,7 +339,7 @@ export function ModalStrategicProject({
           </div>
 
           {/* Meta estratégica (objetivo) */}
-          <div className="space-y-2 md:col-span-1">
+          <div className="space-y-2 md:col-span-8">
             <Label>Meta Estratégica</Label>
             <Controller
               name="objectiveId"
@@ -338,69 +361,127 @@ export function ModalStrategicProject({
           </div>
 
           {/* Presupuesto total */}
-          <div className="space-y-2 md:col-span-1">
+          <div className="space-y-2 md:col-span-4">
             <Label>Presupuesto Total</Label>
-            <Input
-              inputMode="decimal"
-              placeholder="$ 0,00"
-              value={budgetDisplay}
-              onChange={(e) => onBudgetChange(e.target.value)}
-              onBlur={onBudgetBlur}
-              disabled={readOnly}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Monto en USD. Se formátea automáticamente.
-            </p>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                $
+              </span>
+              <Input
+                inputMode="decimal"
+                placeholder="0,00"
+                value={budgetDisplay}
+                onChange={(e) => onBudgetChange(e.target.value)}
+                onBlur={onBudgetBlur}
+                disabled={readOnly}
+                className={cn(
+                  "pl-7",
+                  errors.budget && "border-red-500 focus-visible:ring-red-500",
+                )}
+              />
+            </div>
+            {errors.budget && (
+              <p className="text-xs text-red-600">{errors.budget.message}</p>
+            )}
           </div>
 
-          {/* Fechas (sin límites) */}
-          <div className="space-y-2 md:col-span-2">
-            <Label>Fechas</Label>
-            <div className="flex items-center gap-2">
-              <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
+          {/* Fila: Fecha Desde, Fecha Hasta, Estado */}
+          <div className="md:col-span-12 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              {/* Fecha Inicio */}
+              <Label>Desde</Label>
+              <Popover open={isFromOpen} onOpenChange={setIsFromOpen}>
                 <PopoverTrigger asChild>
-                  <Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-[11px] px-3 py-1 cursor-pointer">
-                    {dFrom && dTo
-                      ? `${fmtShort.format(dFrom)} - ${fmtShort.format(dTo)}`
-                      : "Seleccionar fechas"}
-                  </Badge>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dFrom && "text-muted-foreground",
+                    )}
+                    disabled={readOnly}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dFrom ? fmtShort.format(dFrom) : "Fecha inicio"}
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-4" align="start">
-                  <DateRangePicker
-                    date={range}
-                    onChange={(r) => r && setRange(r)} // solo UI
-                    // 👇 sin minDate ni maxDate = sin límites
-                    onClose={() => setIsDateOpen(false)}
-                    onApply={(r) => {
-                      if (!r?.from || !r?.to) return;
-                      setRange({ from: r.from, to: r.to });
-                      setValue("fromAt", toYmd(r.from)!, { shouldDirty: true });
-                      setValue("untilAt", toYmd(r.to)!, { shouldDirty: true });
+                  <SingleDatePicker
+                    date={dFrom}
+                    onClose={() => setIsFromOpen(false)}
+                    onApply={(d) => {
+                      setValue("fromAt", toYmd(d), { shouldDirty: true });
+                      // Si la fecha fin es menor a la nueva fecha inicio, limpiarla
+                      if (dTo && d && d > dTo) {
+                        setValue("untilAt", undefined, { shouldDirty: true });
+                      }
+                      // Abrir automáticamente fecha fin si se seleccionó fecha inicio
+                      if (d) {
+                        setIsUntilOpen(true);
+                      }
                     }}
                   />
                 </PopoverContent>
               </Popover>
+            </div>
 
-              <Input
-                className="max-w-[180px]"
-                value={dFrom ? fmtShort.format(dFrom) : ""}
-                readOnly
-                placeholder="Inicio"
-              />
-              <span className="text-muted-foreground text-xs">→</span>
-              <Input
-                className="max-w-[180px]"
-                value={dTo ? fmtShort.format(dTo) : ""}
-                readOnly
-                placeholder="Fin"
+            <div className="space-y-2">
+              {/* Fecha Fin */}
+              <Label>Hasta</Label>
+              <Popover open={isUntilOpen} onOpenChange={setIsUntilOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dTo && "text-muted-foreground",
+                    )}
+                    disabled={readOnly || !dFrom}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dTo ? fmtShort.format(dTo) : "Fecha fin"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4" align="start">
+                  <SingleDatePicker
+                    date={dTo}
+                    minDate={dFrom}
+                    disabled={!dFrom}
+                    onClose={() => setIsUntilOpen(false)}
+                    onApply={(d) => {
+                      setValue("untilAt", toYmd(d), { shouldDirty: true });
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Estado */}
+            <div className="space-y-2">
+              <Label>Estado</Label>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "OPE"}
+                    onValueChange={field.onChange}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="OPE">Abierto</SelectItem>
+                      <SelectItem value="IPR">En progreso</SelectItem>
+                      <SelectItem value="CLO">Cerrado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               />
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Puedes elegir cualquier rango de fechas.
-            </p>
           </div>
 
-          <DialogFooter className="md:col-span-2 mt-4">
+          <DialogFooter className="md:col-span-12 mt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               {readOnly ? "Cerrar" : "Cancelar"}
             </Button>

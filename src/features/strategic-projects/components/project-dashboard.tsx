@@ -53,7 +53,7 @@ export function StrategicProjectsDashboard({
 }: Props) {
   const { data, isLoading, enabled } = useProjectsDashboard(
     strategicPlanId,
-    positionId
+    positionId,
   );
 
   const qc = useQueryClient();
@@ -91,6 +91,7 @@ export function StrategicProjectsDashboard({
       objectiveId?: string | null;
       positionId: string;
       budget?: number | null;
+      status?: "OPE" | "IPR" | "CLO" | null;
     };
   }>(null);
 
@@ -152,7 +153,7 @@ export function StrategicProjectsDashboard({
   const openModal = (
     type: "factors" | "tasks",
     projectId: string,
-    projectName: string
+    projectName: string,
   ) => {
     setModalType(type);
     setSelectedProject({ id: projectId, name: projectName });
@@ -261,7 +262,9 @@ export function StrategicProjectsDashboard({
                 <CheckSquare className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="text-xs text-green-600">Promedio Cumplimiento</p>
+                <p className="text-xs text-green-600">
+                  Promedio de Proyectos en Progreso
+                </p>
                 <p className="text-xl font-bold text-green-700">
                   {isLoading ? "…" : `${avgProgress}%`}
                 </p>
@@ -365,6 +368,7 @@ export function StrategicProjectsDashboard({
             fromAt: editing.fromAt ?? undefined,
             untilAt: editing.untilAt ?? undefined,
             budget: editing.budget ?? null,
+            status: editing.status ?? "OPE",
           }}
         />
       )}
@@ -379,7 +383,7 @@ export function StrategicProjectsDashboard({
           try {
             await updateStrategicProject(
               pendingUpdate.id,
-              pendingUpdate.payload
+              pendingUpdate.payload,
             );
 
             // Invalida el dashboard actual
@@ -387,7 +391,7 @@ export function StrategicProjectsDashboard({
               await qc.invalidateQueries({
                 queryKey: QKEY.strategicProjectsDashboard(
                   strategicPlanId,
-                  positionId
+                  positionId,
                 ),
               });
             }
@@ -428,7 +432,7 @@ export function StrategicProjectsDashboard({
             await qc.invalidateQueries({
               queryKey: QKEY.strategicProjectsDashboard(
                 strategicPlanId,
-                positionId
+                positionId,
               ),
             });
             toast.success("Proyecto eliminado correctamente");

@@ -148,3 +148,97 @@ export function DateRangePicker({
     </div>
   );
 }
+
+interface SingleDatePickerProps {
+  date?: Date;
+  onChange?: (date: Date | undefined) => void;
+  onClose?: () => void;
+  onApply?: (date: Date | undefined) => void;
+  showToastOnApply?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  disablePast?: boolean;
+  disabled?: boolean;
+}
+
+export function SingleDatePicker({
+  date,
+  onChange,
+  onClose,
+  onApply,
+  showToastOnApply = false,
+  minDate,
+  maxDate,
+  disablePast = false,
+  disabled = false,
+}: SingleDatePickerProps) {
+  const [selected, setSelected] = React.useState<Date | undefined>(date);
+
+  React.useEffect(() => {
+    setSelected(date);
+  }, [date]);
+
+  const disabledDays = React.useMemo(() => {
+    const rules: any[] = [];
+    if (disablePast) {
+      rules.push({ before: startOfDay(new Date()) });
+    }
+    if (minDate) rules.push({ before: startOfDay(minDate) });
+    if (maxDate) rules.push({ after: endOfDay(maxDate) });
+    return rules.length ? rules : undefined;
+  }, [minDate, maxDate, disablePast]);
+
+  const handleSelect = (d: Date | undefined) => {
+    if (disabled) return;
+    setSelected(d);
+  };
+
+  const handleCancel = () => {
+    onChange?.(date);
+    onClose?.();
+  };
+
+  const handleApply = () => {
+    if (disabled) return;
+    onChange?.(selected);
+    onApply?.(selected);
+    if (showToastOnApply) {
+      toast.success("Fecha actualizada correctamente");
+    }
+    onClose?.();
+  };
+
+  return (
+    <div className="flex flex-col gap-3 w-auto">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-medium">Seleccionar fecha</h3>
+        <span className="text-xs text-muted-foreground">
+          {selected ? selected.toLocaleDateString("es-EC") : "Sin fecha"}
+        </span>
+      </div>
+
+      <Calendar
+        mode="single"
+        selected={selected}
+        onSelect={handleSelect}
+        locale={es}
+        disabled={disabled || disabledDays}
+        initialFocus
+      />
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="ghost" size="sm" onClick={handleCancel}>
+          Cancelar
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleApply}
+          className="bg-orange-600 hover:bg-orange-700"
+          disabled={disabled}
+        >
+          Aplicar
+        </Button>
+      </div>
+    </div>
+  );
+}
