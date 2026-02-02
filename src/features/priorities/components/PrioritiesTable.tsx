@@ -16,6 +16,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Priority } from "@/features/priorities/types/priority";
@@ -23,8 +30,6 @@ import {
   useCreatePriority,
   useUpdatePriority,
 } from "@/features/priorities/hooks/use-priorities";
-import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/shared/components/single-date-picker";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { toast } from "sonner";
 import {
@@ -37,7 +42,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import ObjectiveSelect from "@/shared/components/objective-select";
-import { SingleDatePicker } from "@/shared/components/date-single-picker";
+import { SingleDatePicker } from "@/shared/components/single-date-picker";
 import { QueryKey, useQueryClient } from "@tanstack/react-query";
 
 import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
@@ -48,6 +53,8 @@ import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermissions } from "@/shared/auth/access-control";
 import NotesModal from "@/shared/components/comments/components/notes-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 /* ------------------------------------------------------------
    Tipos y utilidades base
@@ -60,7 +67,7 @@ type Draft = {
   status?: Status;
   fromAt?: string; // YYYY-MM-DD
   untilAt?: string; // YYYY-MM-DD
-  objectiveId?: string;
+  objectiveId?: string; // undefined = sin selección
   finishedAt?: string; // YYYY-MM-DD
 };
 
@@ -70,7 +77,7 @@ const EMPTY_DRAFT: Draft = {
   status: "OPE",
   fromAt: undefined,
   untilAt: undefined,
-  objectiveId: "",
+  objectiveId: undefined,
   finishedAt: undefined,
 };
 
@@ -93,6 +100,13 @@ function formatDateBadge(s?: string | null) {
   const ymd = s ? (s.includes("T") ? s.slice(0, 10) : s) : undefined;
   return ymd ? dayjs(ymd).format("DD/MM/YYYY") : "-";
 }
+
+const toYmd = (d?: Date) =>
+  d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`
+    : undefined;
 
 /* ------------------------------------------------------------
    Badges de estado (solo para edición/creación)
@@ -178,7 +192,7 @@ const MONTHLY_LABEL_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 function resolveMonthlyStyle(
-  mc?: string
+  mc?: string,
 ): { backgroundColor: string; color: string } | undefined {
   const label = resolveMonthlyLabel(mc);
   if (!label) return;
@@ -223,101 +237,58 @@ function renderClosureBadge(p: Priority) {
 /* ------------------------------------------------------------
    Celdas de fechas (edición)
 ------------------------------------------------------------ */
-function DatesCell({
-  fromAt,
-  untilAt,
-  onChange,
-  editable,
-}: {
-  fromAt?: string;
-  untilAt?: string;
-  onChange?: (f?: string, u?: string) => void;
-  editable?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const range: DateRange | undefined = useMemo(() => {
-    if (!fromAt && !untilAt) return undefined;
-    return {
-      from: parseYmdOrIsoToLocalDate(fromAt),
-      to: parseYmdOrIsoToLocalDate(untilAt),
-    };
-  }, [fromAt, untilAt]);
-
-  return (
-    <div className="flex items-center gap-2">
-      <Badge variant="outline">{formatDateBadge(fromAt)}</Badge>
-      <Badge variant="outline">{formatDateBadge(untilAt)}</Badge>
-
-      {editable && (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <CalendarIcon className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="end">
-            <DateRangePicker
-              date={range}
-              onChange={(next) => {
-                const f = next?.from
-                  ? dayjs(next.from).format("YYYY-MM-DD")
-                  : undefined;
-                const u = next?.to
-                  ? dayjs(next.to).format("YYYY-MM-DD")
-                  : undefined;
-                onChange?.(f, u);
-              }}
-              showToastOnApply={false}
-              onClose={() => setOpen(false)}
-            />
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
-  );
-}
-
-function FinishedDateCell({
+function DateEditor({
   value,
   onChange,
-  editable,
+  minDate,
+  maxDate,
+  disabled,
+  placeholder = "Seleccionar",
+  open,
+  onOpenChange,
 }: {
-  value?: string; // YYYY-MM-DD
-  onChange?: (v?: string) => void;
-  editable?: boolean;
+  value?: string;
+  onChange: (val?: string) => void;
+  minDate?: Date;
+  maxDate?: Date;
+  disabled?: boolean;
+  placeholder?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const localDate = value ? parseYmdOrIsoToLocalDate(value) : undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const date = parseYmdOrIsoToLocalDate(value);
+
+  const isControlled = open !== undefined;
+  const effectiveOpen = isControlled ? open : internalOpen;
+  const effectiveOnOpenChange =
+    isControlled && onOpenChange ? onOpenChange : setInternalOpen;
 
   return (
-    <div className="flex items-center gap-2 justify-center">
-      <Badge variant="outline">{formatDateBadge(value)}</Badge>
-
-      {editable && (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Cambiar fecha de terminado"
-            >
-              <CalendarIcon className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="end">
-            <SingleDatePicker
-              date={localDate}
-              onChange={(date) => {
-                const ymd = date ? dayjs(date).format("YYYY-MM-DD") : undefined;
-                onChange?.(ymd);
-              }}
-              onClose={() => setOpen(false)}
-            />
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
+    <Popover open={effectiveOpen} onOpenChange={effectiveOnOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal px-3",
+            !value && "text-muted-foreground",
+          )}
+          disabled={disabled}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value ? formatDateBadge(value) : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-4" align="start">
+        <SingleDatePicker
+          date={date}
+          minDate={minDate}
+          maxDate={maxDate}
+          onClose={() => effectiveOnOpenChange(false)}
+          onApply={(d) => onChange(toYmd(d))}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -365,6 +336,11 @@ export default function PrioritiesTable({
     updateFinishedAt: PERMISSIONS.PRIORITIES.UPDATE_FINISHED_AT,
     updateDateRange: PERMISSIONS.PRIORITIES.UPDATE_DATE_RANGE,
   });
+
+  const [editFromOpen, setEditFromOpen] = useState(false);
+  const [editUntilOpen, setEditUntilOpen] = useState(false);
+  const [createFromOpen, setCreateFromOpen] = useState(false);
+  const [createUntilOpen, setCreateUntilOpen] = useState(false);
 
   const createMut = useCreatePriority(invalidateKey);
   const updateMut = useUpdatePriority(invalidateKey);
@@ -414,7 +390,7 @@ export default function PrioritiesTable({
       ...(invalidateKey ? [invalidateKey] : []),
     ];
     keys.forEach((k) =>
-      qc.invalidateQueries({ queryKey: k, refetchType: "active" })
+      qc.invalidateQueries({ queryKey: k, refetchType: "active" }),
     );
   };
 
@@ -426,6 +402,16 @@ export default function PrioritiesTable({
         block: "start",
       });
     }
+  }, [showCreateRow]);
+
+  useEffect(() => {
+    setEditFromOpen(false);
+    setEditUntilOpen(false);
+  }, [editingId]);
+
+  useEffect(() => {
+    setCreateFromOpen(false);
+    setCreateUntilOpen(false);
   }, [showCreateRow]);
 
   useEffect(() => {
@@ -464,7 +450,7 @@ export default function PrioritiesTable({
         status: p.status,
         fromAt: p.fromAt ? p.fromAt.slice(0, 10) : undefined,
         untilAt: p.untilAt ? p.untilAt.slice(0, 10) : undefined,
-        objectiveId: p.objectiveId ?? "",
+        objectiveId: p.objectiveId || undefined,
         finishedAt: p.finishedAt ? p.finishedAt.slice(0, 10) : undefined,
       },
     }));
@@ -503,7 +489,7 @@ export default function PrioritiesTable({
           cancelEdit(id);
         },
         onError: (e) => toast.error(getHumanErrorMessage(e)),
-      }
+      },
     );
   };
 
@@ -512,8 +498,12 @@ export default function PrioritiesTable({
       toast.error("Selecciona una posición para crear una prioridad");
       return;
     }
-    if (!newDraft.name || !newDraft.fromAt || !newDraft.untilAt) {
-      toast.error("Nombre y fechas son requeridos");
+    if (!newDraft.name) {
+      toast.error("El nombre es requerido");
+      return;
+    }
+    if (!newDraft.fromAt || !newDraft.untilAt) {
+      toast.error("Las fechas de inicio y fin son requeridas");
       return;
     }
 
@@ -526,6 +516,7 @@ export default function PrioritiesTable({
         untilAt: ymdToIsoUtc(newDraft.untilAt)!,
         positionId,
         objectiveId: newDraft.objectiveId || undefined,
+        finishedAt: ymdToIsoUtc(newDraft.finishedAt),
       },
       {
         onSuccess: () => {
@@ -535,7 +526,7 @@ export default function PrioritiesTable({
           onCloseCreateRow?.();
         },
         onError: (e) => toast.error(getHumanErrorMessage(e)),
-      }
+      },
     );
   };
 
@@ -600,10 +591,10 @@ export default function PrioritiesTable({
 
             const effectiveStatus: Status = (d?.status ?? p.status) as Status;
 
-            const objectiveName = p.objectiveName ?? "—";
-            const deliverableText = p.description ?? "—";
+            const objectiveName = p.objectiveName ?? "-";
+            const deliverableText = p.description ?? "-";
 
-            if (isEditing) {
+            if (isEditing && d) {
               // --- Fila en EDICIÓN (editor en una sola celda + acciones sticky) ---
               return (
                 <TableRow key={p.id}>
@@ -617,11 +608,11 @@ export default function PrioritiesTable({
                       </div>
 
                       {/* Fila 1: Nombre, Entregable */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <div className="md:col-span-4">
+                          <Label className="text-xs text-muted-foreground block mb-1">
                             Nombre
-                          </label>
+                          </Label>
                           <TextareaWithCounter
                             value={d?.name ?? ""}
                             onChange={(e) =>
@@ -633,17 +624,17 @@ export default function PrioritiesTable({
                                 },
                               }))
                             }
-                            maxLength={120}
+                            maxLength={500}
                             rows={2}
                             placeholder="Nombre de la prioridad"
                             className="w-full"
                           />
                         </div>
 
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
+                        <div className="md:col-span-8">
+                          <Label className="text-xs text-muted-foreground block mb-1">
                             Entregable
-                          </label>
+                          </Label>
                           <TextareaWithCounter
                             value={d?.description ?? ""}
                             onChange={(e) =>
@@ -655,26 +646,23 @@ export default function PrioritiesTable({
                                 },
                               }))
                             }
-                            maxLength={500}
+                            maxLength={1000}
                             rows={3}
                             placeholder="Describe el entregable…"
                             className="w-full"
                           />
                         </div>
-                      </div>
 
-                      {/* Fila 2: Izquierda = Objetivo (mitad). Derecha = Estado / Fechas (mitad) */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Izquierda: Objetivo ocupa toda la mitad (igual ancho que “Nombre”) */}
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
+                        {/* Fila 2: Objetivo, Estado, Fechas */}
+                        <div className="md:col-span-4">
+                          <Label className="text-xs text-muted-foreground block mb-1">
                             Objetivo
-                          </label>
+                          </Label>
                           <ObjectiveSelect
                             planId={planId}
                             positionId={positionId}
                             year={year}
-                            value={d?.objectiveId}
+                            value={d.objectiveId}
                             onChange={(val) =>
                               setDrafts((ds) => ({
                                 ...ds,
@@ -685,81 +673,110 @@ export default function PrioritiesTable({
                               }))
                             }
                             otherPositions={otherPositions}
+                            stacked
                           />
                         </div>
 
-                        {/* Derecha: Estado | Fecha inicio/fin | Fecha Terminado */}
-                        <div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="text-xs text-muted-foreground block mb-1">
-                                Estado
-                              </label>
-                              <div className="h-9 flex items-center">
-                                <StatusBadge
-                                  value={(d?.status as Status) ?? "OPE"}
-                                  editable
-                                  onChange={(v) =>
-                                    setDrafts((ds) => ({
-                                      ...ds,
-                                      [p.id]: {
-                                        ...(ds[p.id] ?? EMPTY_DRAFT),
-                                        status: v,
-                                      },
-                                    }))
-                                  }
-                                />
-                              </div>
-                            </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-xs text-muted-foreground block mb-1">
+                            Estado
+                          </Label>
+                          <Select
+                            value={effectiveStatus}
+                            onValueChange={(v) =>
+                              setDrafts((ds) => {
+                                const s = v as Status;
+                                const current = ds[p.id] ?? EMPTY_DRAFT;
+                                let finishedAt = current.finishedAt;
+                                if (s === "CLO" && !finishedAt) {
+                                  finishedAt = dayjs().format("YYYY-MM-DD");
+                                }
+                                return {
+                                  ...ds,
+                                  [p.id]: {
+                                    ...current,
+                                    status: s,
+                                    finishedAt,
+                                  },
+                                };
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue placeholder="Estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="OPE">En proceso</SelectItem>
+                              <SelectItem value="CLO">Terminado</SelectItem>
+                              <SelectItem value="CAN">Anulado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                            <div>
-                              <label className="text-xs text-muted-foreground block mb-1">
-                                Fecha inicio / fin
-                              </label>
-                              <DatesCell
-                                fromAt={d?.fromAt}
-                                untilAt={d?.untilAt}
-                                editable={permissions.updateDateRange}
-                                onChange={(f, u) =>
+                        <div className="md:col-span-2">
+                          <Label className="text-xs text-muted-foreground block mb-1">
+                            Desde
+                          </Label>
+                          <DateEditor
+                            value={d?.fromAt}
+                            disabled={!permissions.updateDateRange}
+                            open={editFromOpen}
+                            onOpenChange={setEditFromOpen}
+                            onChange={(val) => {
+                              setDrafts((ds) => ({
+                                ...ds,
+                                [p.id]: {
+                                  ...(ds[p.id] ?? EMPTY_DRAFT),
+                                  fromAt: val,
+                                },
+                              }));
+                              if (val) setEditUntilOpen(true);
+                            }}
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <Label className="text-xs text-muted-foreground block mb-1">
+                            Hasta
+                          </Label>
+                          <DateEditor
+                            value={d?.untilAt}
+                            minDate={parseYmdOrIsoToLocalDate(d?.fromAt)}
+                            disabled={!permissions.updateDateRange}
+                            open={editUntilOpen}
+                            onOpenChange={setEditUntilOpen}
+                            onChange={(val) =>
+                              setDrafts((ds) => ({
+                                ...ds,
+                                [p.id]: {
+                                  ...(ds[p.id] ?? EMPTY_DRAFT),
+                                  untilAt: val,
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+
+                        {permissions.updateFinishedAt &&
+                          effectiveStatus === "CLO" && (
+                            <div className="md:col-span-2">
+                              <Label className="text-xs text-muted-foreground block mb-1">
+                                Terminado
+                              </Label>
+                              <DateEditor
+                                value={d?.finishedAt}
+                                onChange={(val) =>
                                   setDrafts((ds) => ({
                                     ...ds,
                                     [p.id]: {
                                       ...(ds[p.id] ?? EMPTY_DRAFT),
-                                      fromAt: f,
-                                      untilAt: u,
+                                      finishedAt: val,
                                     },
                                   }))
                                 }
                               />
                             </div>
-                            {permissions.updateFinishedAt ? (
-                              <div>
-                                <label className="text-xs text-muted-foreground block mb-1">
-                                  Fecha Terminado
-                                </label>
-                                {effectiveStatus === "CLO" ? (
-                                  <FinishedDateCell
-                                    value={d?.finishedAt}
-                                    editable={permissions.updateFinishedAt}
-                                    onChange={(v) =>
-                                      setDrafts((ds) => ({
-                                        ...ds,
-                                        [p.id]: {
-                                          ...(ds[p.id] ?? EMPTY_DRAFT),
-                                          finishedAt: v,
-                                        },
-                                      }))
-                                    }
-                                  />
-                                ) : (
-                                  <div className="h-9 flex items-center">
-                                    {renderClosureBadge(p)}
-                                  </div>
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
+                          )}
                       </div>
                     </div>
                   </TableCell>
@@ -815,7 +832,7 @@ export default function PrioritiesTable({
                 {!hasEditing && (
                   <TableCell className="align-top">
                     <div className="text-sm break-words whitespace-pre-wrap">
-                      {p.objectiveName ?? "—"}
+                      {p.objectiveName ?? "-"}
                     </div>
                   </TableCell>
                 )}
@@ -868,6 +885,7 @@ export default function PrioritiesTable({
                       size="icon"
                       title="Notas"
                       onClick={() => setNotesFor(p.id)}
+                      disabled={uiBusy}
                     >
                       <StickyNote className="h-4 w-4" />
                     </Button>
@@ -878,6 +896,7 @@ export default function PrioritiesTable({
                       size="icon"
                       title="Documentos"
                       onClick={() => openDocs(p.id, p.name)}
+                      disabled={uiBusy}
                     >
                       <Paperclip className="h-4 w-4" />
                     </Button>
@@ -908,27 +927,27 @@ export default function PrioritiesTable({
                   </div>
 
                   {/* Fila 1: Nombre, Entregable */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-4">
+                      <Label className="text-xs text-muted-foreground block mb-1">
                         Nombre
-                      </label>
+                      </Label>
                       <TextareaWithCounter
                         value={newDraft.name ?? ""}
                         onChange={(e) =>
                           setNewDraft((d) => ({ ...d, name: e.target.value }))
                         }
-                        maxLength={120}
+                        maxLength={500}
                         rows={2}
                         placeholder="Nombre de la prioridad"
                         className="w-full"
                       />
                     </div>
 
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">
+                    <div className="md:col-span-8">
+                      <Label className="text-xs text-muted-foreground block mb-1">
                         Entregable
-                      </label>
+                      </Label>
                       <TextareaWithCounter
                         value={newDraft.description ?? ""}
                         onChange={(e) =>
@@ -937,21 +956,17 @@ export default function PrioritiesTable({
                             description: e.target.value,
                           }))
                         }
-                        maxLength={500}
+                        maxLength={1000}
                         rows={3}
                         placeholder="Describe el entregable…"
                       />
                     </div>
-                  </div>
 
-                  {/* Fila 2: Objetivo, Estado, Fecha inicio, Fecha Terminado */}
-                  {/* Fila 2: Izquierda = Objetivo (mitad). Derecha = Estado / Fechas (mitad) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Izquierda: Objetivo ocupa toda la mitad (igual ancho que “Nombre”) */}
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">
+                    {/* Fila 2: Objetivo, Estado, Fechas */}
+                    <div className="md:col-span-4">
+                      <Label className="text-xs text-muted-foreground block mb-1">
                         Objetivo
-                      </label>
+                      </Label>
                       <ObjectiveSelect
                         planId={planId}
                         positionId={positionId}
@@ -961,60 +976,81 @@ export default function PrioritiesTable({
                           setNewDraft((d) => ({ ...d, objectiveId: val }))
                         }
                         otherPositions={otherPositions}
-                        // stacked={false} (por defecto): el switch queda al lado del select
+                        stacked
                       />
                     </div>
 
-                    {/* Derecha: Estado | Fecha inicio/fin | Fecha Terminado (distribuidos en 3 columnas dentro de esta mitad) */}
-                    <div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
-                            Estado
-                          </label>
-                          <div className="h-9 flex items-center">
-                            <StatusBadge
-                              value={(newDraft.status as Status) ?? "OPE"}
-                              editable
-                              onChange={(v) =>
-                                setNewDraft((d) => ({ ...d, status: v }))
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
-                            Fecha inicio / fin
-                          </label>
-                          <DatesCell
-                            fromAt={newDraft.fromAt}
-                            untilAt={newDraft.untilAt}
-                            editable
-                            onChange={(f, u) =>
-                              setNewDraft((d) => ({
-                                ...d,
-                                fromAt: f,
-                                untilAt: u,
-                              }))
+                    <div className="md:col-span-2">
+                      <Label className="text-xs text-muted-foreground block mb-1">
+                        Estado
+                      </Label>
+                      <Select
+                        value={newDraft.status ?? "OPE"}
+                        onValueChange={(v) =>
+                          setNewDraft((d) => {
+                            const s = v as Status;
+                            let finishedAt = d.finishedAt;
+                            if (s === "CLO" && !finishedAt) {
+                              finishedAt = dayjs().format("YYYY-MM-DD");
                             }
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground block mb-1">
-                            Fecha Terminado
-                          </label>
-                          <FinishedDateCell
-                            value={newDraft.finishedAt}
-                            editable
-                            onChange={(v) =>
-                              setNewDraft((d) => ({ ...d, finishedAt: v }))
-                            }
-                          />
-                        </div>
-                      </div>
+                            return { ...d, status: s, finishedAt };
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full h-9">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="OPE">En proceso</SelectItem>
+                          <SelectItem value="CLO">Terminado</SelectItem>
+                          <SelectItem value="CAN">Anulado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    <div className="md:col-span-2">
+                      <Label className="text-xs text-muted-foreground block mb-1">
+                        Desde
+                      </Label>
+                      <DateEditor
+                        value={newDraft.fromAt}
+                        open={createFromOpen}
+                        onOpenChange={setCreateFromOpen}
+                        onChange={(val) => {
+                          setNewDraft((d) => ({ ...d, fromAt: val }));
+                          if (val) setCreateUntilOpen(true);
+                        }}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label className="text-xs text-muted-foreground block mb-1">
+                        Hasta
+                      </Label>
+                      <DateEditor
+                        value={newDraft.untilAt}
+                        minDate={parseYmdOrIsoToLocalDate(newDraft.fromAt)}
+                        open={createUntilOpen}
+                        onOpenChange={setCreateUntilOpen}
+                        onChange={(val) =>
+                          setNewDraft((d) => ({ ...d, untilAt: val }))
+                        }
+                      />
+                    </div>
+
+                    {permissions.updateFinishedAt && newDraft.status === "CLO" && (
+                      <div className="md:col-span-2">
+                        <Label className="text-xs text-muted-foreground block mb-1">
+                          Terminado
+                        </Label>
+                        <DateEditor
+                          value={newDraft.finishedAt}
+                          onChange={(val) =>
+                            setNewDraft((d) => ({ ...d, finishedAt: val }))
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </TableCell>

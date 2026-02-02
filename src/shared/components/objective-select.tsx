@@ -50,7 +50,7 @@ export default function ObjectiveSelect({
   year?: number;
 }) {
   const [allowThirdParty, setAllowThirdParty] = useState(
-    defaultAllowThirdParty
+    defaultAllowThirdParty,
   );
   const [query, setQuery] = useState("");
   const switchId = useId();
@@ -58,7 +58,7 @@ export default function ObjectiveSelect({
   const { objectives: ownObjectives, isLoading: loadingOwn } = useObjectives(
     planId!,
     positionId!,
-    year
+    year,
   );
 
   const ownOpts: ObjectiveOpt[] = useMemo(
@@ -67,21 +67,29 @@ export default function ObjectiveSelect({
         id: o.id,
         name: o.name ?? o.title ?? o.nombre ?? `Obj ${o.id}`,
       })),
-    [ownObjectives]
+    [ownObjectives],
   );
 
   const selectedInOwn = useMemo(
     () => !!value && ownOpts.some((o) => o.id === value),
-    [value, ownOpts]
+    [value, ownOpts],
   );
 
   useEffect(() => {
     if (!value) return;
+    if (loadingOwn) return;
     if (selectedInOwn) return;
     if (!hideSwitch && !allowThirdParty && otherPositions?.length) {
       setAllowThirdParty(true);
     }
-  }, [value, selectedInOwn, allowThirdParty, otherPositions, hideSwitch]);
+  }, [
+    value,
+    selectedInOwn,
+    allowThirdParty,
+    otherPositions,
+    hideSwitch,
+    loadingOwn,
+  ]);
 
   useEffect(() => {
     if (hideSwitch && allowThirdParty) setAllowThirdParty(false);
@@ -128,7 +136,7 @@ export default function ObjectiveSelect({
 
   const filteredOwn = useMemo(
     () => (query ? ownOpts.filter((o) => match(o.name, query)) : ownOpts),
-    [ownOpts, query]
+    [ownOpts, query],
   );
 
   const filteredThird: Record<string, ObjectiveOpt[]> = useMemo(() => {
