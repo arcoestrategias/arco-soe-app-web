@@ -36,7 +36,7 @@ type Props = {
 // --- Funciones de Mapeo ---
 
 const mapPerspective = (
-  p: StrategyMapObjective["perspective"]
+  p: StrategyMapObjective["perspective"],
 ): MappedPerspective => {
   const mapping: Record<
     StrategyMapObjective["perspective"],
@@ -51,7 +51,7 @@ const mapPerspective = (
 };
 
 const mapStatus = (
-  objective: StrategyMapObjective
+  objective: StrategyMapObjective,
 ): MappedObjective["estado"] => {
   // La API devuelve un solo elemento en icoMonthly con la data relevante.
   const currentMonthData = objective.icoMonthly[0];
@@ -413,7 +413,7 @@ export function StrategyMapTab({ strategicPlanId }: Props) {
     // 2. Agrupar por perspectiva
     const groupedByPerspective: Record<MappedPerspective, MappedObjective[]> = {
       financiera: mappedObjectives.filter(
-        (o) => o.perspectiva === "financiera"
+        (o) => o.perspectiva === "financiera",
       ),
       cliente: mappedObjectives.filter((o) => o.perspectiva === "cliente"),
       procesos: mappedObjectives.filter((o) => o.perspectiva === "procesos"),
@@ -432,9 +432,9 @@ export function StrategyMapTab({ strategicPlanId }: Props) {
           width: getPerspectiveWidth(
             Math.max(
               ...Object.values(groupedByPerspective).map(
-                (lista) => lista.length
-              )
-            )
+                (lista) => lista.length,
+              ),
+            ),
           ),
           height: 180,
         },
@@ -459,7 +459,7 @@ export function StrategyMapTab({ strategicPlanId }: Props) {
           draggable: false,
           selectable: false,
           zIndex: 10,
-        }))
+        })),
     );
 
     // 5. Crear las conexiones (edges)
@@ -549,15 +549,15 @@ export function StrategyMapTab({ strategicPlanId }: Props) {
           <div className="font-semibold">Estados</div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-green-100 border border-green-500 rounded" />
-            <span>Cumplido</span>
+            <span>Aceptable</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-yellow-100 border border-yellow-500 rounded" />
-            <span>En Proceso</span>
+            <span>Esperado</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-100 border border-red-500 rounded" />
-            <span>No Cumplido</span>
+            <span>Inaceptable</span>
           </div>
         </div>
 
