@@ -58,6 +58,7 @@ type ObjectiveSeed = {
   positionId?: string | null;
   strategicPlanId?: string | null;
   goalValue?: number | null;
+  baseValue?: number | null;
   status?: string | null;
 };
 
@@ -194,6 +195,8 @@ export default function ObjectiveConfigureModal({
     const changed: string[] = [];
     if (isDiffVal(data.objective?.goalValue, objective?.goalValue))
       changed.push("meta (goalValue)");
+    if (isDiffVal(data.objective?.baseValue, objective?.baseValue))
+      changed.push("línea base (baseValue)");
     if (isDiffVal(data.indicator?.tendence, indicator?.tendence))
       changed.push("tendencia");
     if (isDiffVal(data.indicator?.measurement, indicator?.measurement))
@@ -252,8 +255,18 @@ export default function ObjectiveConfigureModal({
       const payload: Omit<ConfigureObjectiveDto, "objectiveId"> = {};
 
       const objectiveDiff = diff(data.objective || {}, objective || {});
-      if (Object.keys(objectiveDiff).length > 0)
-        payload.objective = objectiveDiff as any;
+
+      // Si es configuración nueva, forzamos el envío de Meta y Línea Base para asegurar que se guarden
+      if (data.isNew) {
+        if (objective.goalValue !== null && objective.goalValue !== undefined) {
+          (objectiveDiff as any).goalValue = objective.goalValue;
+        }
+        if (objective.baseValue !== null && objective.baseValue !== undefined) {
+          (objectiveDiff as any).baseValue = objective.baseValue;
+        }
+      }
+
+      if (Object.keys(objectiveDiff).length > 0) payload.objective = objectiveDiff as any;
 
       const indicatorDiff = diff(data.indicator || {}, indicator || {});
       if (Object.keys(indicatorDiff).length > 0)
@@ -366,6 +379,26 @@ export default function ObjectiveConfigureModal({
       }
       doConfigure();
       return;
+    }
+
+    // VALIDACIÓN LÍNEA BASE vs META (según tendencia)
+    const tendence = indicator?.tendence;
+    const goal = objective.goalValue;
+    const base = objective.baseValue;
+
+    if (tendence && typeof goal === "number" && typeof base === "number") {
+      if (tendence === "POS" && base > goal) {
+        toast.error(
+          "Para tendencia Creciente, la Línea Base debe ser MENOR o IGUAL que la Meta."
+        );
+        return;
+      }
+      if (tendence === "NEG" && base < goal) {
+        toast.error(
+          "Para tendencia Decreciente, la Línea Base debe ser MAYOR o IGUAL que la Meta."
+        );
+        return;
+      }
     }
 
     // 3) Objetivo ya configurado: sólo confirmación si hay cambios críticos
@@ -809,6 +842,26 @@ export default function ObjectiveConfigureModal({
                   }))
                 }
                 placeholder="Ej.: 7"
+              />
+            </div>
+
+            {/* Línea Base (baseValue) */}
+            <div className="md:col-span-4 min-w-0">
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Línea Base (Tolerancia)
+              </label>
+              <Input
+                className="w-full"
+                type="number"
+                value={objective.baseValue ?? ""}
+                onChange={(e) =>
+                  setObjective((s) => ({
+                    ...s,
+                    baseValue:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                placeholder="Ej.: 5"
               />
             </div>
 

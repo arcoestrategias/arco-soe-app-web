@@ -35,7 +35,7 @@ export default function ObjectivesView({
   const { data, isLoading, error } = useObjectivesIcoBoard(
     planId,
     positionId,
-    year
+    year,
   );
 
   const { items: unconfigured, isLoading: loadingUnconf } =
@@ -56,10 +56,10 @@ export default function ObjectivesView({
   const defaultTab = showIcoBoardTab
     ? "ico"
     : showComplianceTab
-    ? "compliance"
-    : showDeploymentMatrixTab
-    ? "matrix"
-    : undefined;
+      ? "compliance"
+      : showDeploymentMatrixTab
+        ? "matrix"
+        : undefined;
 
   const visibleTabsCount = [
     showIcoBoardTab,
@@ -76,7 +76,7 @@ export default function ObjectivesView({
           String(planId),
           String(positionId),
           String(year!),
-          String(year!)
+          String(year!),
         ),
       ]
     : [];
@@ -86,7 +86,7 @@ export default function ObjectivesView({
 
   // --- handler que recibirá los "changes" desde la modal ---
   const handleComplianceUpdate = async (
-    changes: ObjectiveComplianceChange[]
+    changes: ObjectiveComplianceChange[],
   ) => {
     const effective = changes.filter((c) => !!c.id);
     if (effective.length === 0) return;
@@ -98,9 +98,10 @@ export default function ObjectivesView({
             id: c.id!, // id del registro mensual
             realValue: c.realValue, // puede venir sin cambios
             newGoalValue: c.newGoalValue, // meta ajustada
+            baseValue: c.baseValue,
             observation: c.observation, // requerida si cambió la meta
-          })
-        )
+          }),
+        ),
       );
       toast.success("Cumplimiento actualizado");
     } catch (e) {
@@ -110,7 +111,7 @@ export default function ObjectivesView({
 
   const { createObjective: createObjectiveMut, isCreating } = useObjectives(
     planId,
-    positionId
+    positionId,
   );
 
   // Handler que usará el modal del botón "+ Nuevo Objetivo"

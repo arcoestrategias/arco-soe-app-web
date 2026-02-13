@@ -7,8 +7,9 @@ export async function patchObjectiveGoal(
   payload: {
     realValue?: number | null;
     goalValue?: number | null;
+    baseValue?: number | null;
     observation?: string | null;
-  }
+  },
 ) {
   const url = routes.objectiveGoals.update(goalId);
   const resp = await http.patch(url, payload);

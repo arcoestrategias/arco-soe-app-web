@@ -307,6 +307,7 @@ export default function ObjectivesCompliance({
         positionId: o.positionId ?? null,
         strategicPlanId: o.strategicPlanId ?? null,
         goalValue: o.goalValue ?? null,
+        baseValue: o.baseValue ?? ind.baseValue ?? null,
         status: o.status ?? null,
       },
       indicator: {
@@ -353,6 +354,7 @@ export default function ObjectivesCompliance({
         positionId: u.positionId ?? null,
         strategicPlanId: u.strategicPlanId ?? null,
         goalValue: u.goalValue ?? null,
+        baseValue: u.baseValue ?? ind.baseValue ?? null,
         status: u.status ?? null,
       },
       indicator: {

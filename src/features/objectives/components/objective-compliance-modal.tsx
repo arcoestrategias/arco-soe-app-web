@@ -74,6 +74,7 @@ export type ObjectiveComplianceChange = {
   year: number;
   realValue: number | null;
   newGoalValue?: number | null;
+  baseValue?: number | null;
   observation?: string | null;
   variationPct?: number | null; // expresado en %
 };
@@ -114,12 +115,13 @@ export function ObjectiveComplianceModal({
   // Solo meses medidos
   const rows = useMemo(
     () => (icoMonthly ?? []).filter((p) => p.isMeasured),
-    [icoMonthly]
+    [icoMonthly],
   );
 
   // ===== Estado local
   const [draftReal, setDraftReal] = useState<Record<string, number | null>>({});
   const [draftGoal, setDraftGoal] = useState<Record<string, number | null>>({});
+  const [draftBase, setDraftBase] = useState<Record<string, number | null>>({});
   const [draftObs, setDraftObs] = useState<Record<string, string>>({});
 
   const keyOf = (p: IcoMonthlyPoint) => p.id ?? `${p.year}-${p.month}`;
@@ -144,6 +146,12 @@ export function ObjectiveComplianceModal({
     setDraftGoal((d) => ({ ...d, [keyOf(p)]: num }));
   };
 
+  const handleChangeBase = (p: IcoMonthlyPoint, val: string) => {
+    const num = val === "" ? null : Number(val);
+    if (val !== "" && Number.isNaN(num)) return;
+    setDraftBase((d) => ({ ...d, [keyOf(p)]: num }));
+  };
+
   const handleChangeObs = (p: IcoMonthlyPoint, val: string) => {
     setDraftObs((d) => ({ ...d, [keyOf(p)]: val }));
   };
@@ -163,6 +171,16 @@ export function ObjectiveComplianceModal({
     return typeof p.goalValue === "number" ? p.goalValue : null;
   };
 
+  /** Línea Base visible (ajustada) */
+  const adjustedBaseOf = (p: IcoMonthlyPoint): number | null => {
+    const k = keyOf(p);
+    if (Object.prototype.hasOwnProperty.call(draftBase, k)) {
+      return draftBase[k] ?? null;
+    }
+    // El backend envía baseValue en el punto mensual
+    return typeof p.baseValue === "number" ? p.baseValue : null;
+  };
+
   /** ¿la meta mensual cambió respecto a su base (p.goalValue)? */
   const goalChanged = (p: IcoMonthlyPoint) => {
     const base = typeof p.goalValue === "number" ? p.goalValue : null;
@@ -170,17 +188,25 @@ export function ObjectiveComplianceModal({
     return (adj ?? null) !== (base ?? null);
   };
 
+  /** ¿la línea base mensual cambió? */
+  const baseChanged = (p: IcoMonthlyPoint) => {
+    const original = typeof p.baseValue === "number" ? p.baseValue : null;
+    const current = adjustedBaseOf(p);
+    return (current ?? null) !== (original ?? null);
+  };
+
   // Filas que requieren observación (meta cambiada sin texto)
   const rowsMissingObs = rows.filter(
-    (p) => goalChanged(p) && !getDraftObs(p).trim()
+    (p) => goalChanged(p) && !getDraftObs(p).trim(),
   );
 
-  // ¿hay algún cambio en resultado o meta?
+  // ¿hay algún cambio en resultado, meta o base?
   const hasAnyRealChange = rows.some((p) =>
-    Object.prototype.hasOwnProperty.call(draftReal, keyOf(p))
+    Object.prototype.hasOwnProperty.call(draftReal, keyOf(p)),
   );
   const hasAnyGoalChange = rows.some(goalChanged);
-  const hasChanges = hasAnyRealChange || hasAnyGoalChange;
+  const hasAnyBaseChange = rows.some(baseChanged);
+  const hasChanges = hasAnyRealChange || hasAnyGoalChange || hasAnyBaseChange;
 
   // Payload de cambios (incluye variación calculada con objective.goalValue)
   const changes: ObjectiveComplianceChange[] = useMemo(() => {
@@ -192,13 +218,15 @@ export function ObjectiveComplianceModal({
       const k = keyOf(p);
       const realTouched = Object.prototype.hasOwnProperty.call(draftReal, k);
       const metaTouched = goalChanged(p);
-      if (!realTouched && !metaTouched) continue;
+      const baseTouched = baseChanged(p);
+      if (!realTouched && !metaTouched && !baseTouched) continue;
 
       const finalReal = realTouched
-        ? draftReal[k] ?? null
-        : p.realValue ?? null;
+        ? (draftReal[k] ?? null)
+        : (p.realValue ?? null);
 
       const shownGoal = adjustedGoalOf(p);
+      const shownBase = adjustedBaseOf(p);
 
       // Variación % = (Meta del Objetivo - Valor Esperado visible) / Meta del Objetivo * 100
       const varPct =
@@ -214,13 +242,14 @@ export function ObjectiveComplianceModal({
         year: p.year,
         realValue: finalReal,
         newGoalValue: metaTouched ? (shownGoal as number | null) : undefined,
+        baseValue: baseTouched ? (shownBase as number | null) : undefined,
         observation: metaTouched ? getDraftObs(p) : undefined,
         variationPct: varPct,
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, draftReal, draftGoal, draftObs, objective?.goalValue]);
+  }, [rows, draftReal, draftGoal, draftBase, draftObs, objective?.goalValue]);
 
   const handleCancel = () => {
     setDraftReal({});
@@ -235,13 +264,44 @@ export function ObjectiveComplianceModal({
         .map((p) => `${monthName(p.month)}-${p.year}`)
         .join(", ");
       toast.error(
-        `Debes ingresar una observación para el cambio de meta en: ${faltantes}`
+        `Debes ingresar una observación para el cambio de meta en: ${faltantes}`,
       );
       return;
     }
+
+    // VALIDACIÓN DE CONSISTENCIA (Base vs Meta)
+    const tendence = objective?.indicator?.tendence;
+    if (tendence === "POS" || tendence === "NEG") {
+      for (const p of rows) {
+        // Validamos si se está modificando meta o base, o si ya existen valores que causen conflicto
+        const goal = adjustedGoalOf(p);
+        const base = adjustedBaseOf(p);
+
+        if (typeof goal === "number" && typeof base === "number") {
+          if (tendence === "POS" && base > goal) {
+            toast.error(
+              `Mes ${monthName(
+                p.month
+              )}: Para tendencia Creciente, la Línea Base (${base}) debe ser MENOR o IGUAL que la Meta (${goal}).`
+            );
+            return;
+          }
+          if (tendence === "NEG" && base < goal) {
+            toast.error(
+              `Mes ${monthName(
+                p.month
+              )}: Para tendencia Decreciente, la Línea Base (${base}) debe ser MAYOR o IGUAL que la Meta (${goal}).`
+            );
+            return;
+          }
+        }
+      }
+    }
+
     if (hasChanges) onUpdate?.(changes);
     setDraftReal({});
     setDraftGoal({});
+    setDraftBase({});
     setDraftObs({});
     onOpenChange(false);
   };
@@ -373,6 +433,9 @@ export function ObjectiveComplianceModal({
                 <TableHead className="w-44 text-center whitespace-nowrap">
                   Valor esperado
                 </TableHead>
+                <TableHead className="w-32 text-center whitespace-nowrap">
+                  Línea Base
+                </TableHead>
                 <TableHead className="w-44 text-center whitespace-nowrap">
                   Variación %
                 </TableHead>
@@ -396,11 +459,14 @@ export function ObjectiveComplianceModal({
                   editedReal !== undefined
                     ? editedReal
                     : typeof p.realValue === "number"
-                    ? p.realValue
-                    : null;
+                      ? p.realValue
+                      : null;
 
                 // Valor esperado visible (ajustado)
                 const goalToShow = adjustedGoalOf(p);
+
+                // Línea Base visible (ajustada)
+                const baseToShow = adjustedBaseOf(p);
 
                 // Variación % = (Meta del Objetivo - Valor Esperado visible) / Meta del Objetivo * 100
                 const varPct =
@@ -461,6 +527,19 @@ export function ObjectiveComplianceModal({
                       />
                     </TableCell>
 
+                    {/* Línea Base (editable) */}
+                    <TableCell className="text-center align-middle">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        className="h-8 text-center"
+                        value={baseToShow ?? ""}
+                        onChange={(e) => handleChangeBase(p, e.target.value)}
+                        placeholder="—"
+                        disabled={!permissions.updateTargetValue}
+                      />
+                    </TableCell>
+
                     {/* Variación % */}
                     <TableCell className="text-center align-middle">
                       {varLabel}
@@ -501,7 +580,7 @@ export function ObjectiveComplianceModal({
               {rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center text-sm text-muted-foreground"
                   >
                     No hay meses medidos para este objetivo.
