@@ -278,11 +278,11 @@ export function ObjectiveComplianceModal({
         const base = adjustedBaseOf(p);
 
         if (typeof goal === "number" && typeof base === "number") {
-          if (tendence === "POS" && base > goal) {
+          if (tendence === "POS" && base >= goal) {
             toast.error(
               `Mes ${monthName(
                 p.month
-              )}: Para tendencia Creciente, la Línea Base (${base}) debe ser MENOR o IGUAL que la Meta (${goal}).`
+              )}: En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`
             );
             return;
           }
@@ -290,7 +290,7 @@ export function ObjectiveComplianceModal({
             toast.error(
               `Mes ${monthName(
                 p.month
-              )}: Para tendencia Decreciente, la Línea Base (${base}) debe ser MAYOR o IGUAL que la Meta (${goal}).`
+              )}: En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`
             );
             return;
           }

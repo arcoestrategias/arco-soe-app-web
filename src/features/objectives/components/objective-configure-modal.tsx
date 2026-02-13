@@ -245,6 +245,30 @@ export default function ObjectiveConfigureModal({
     setMonthsSelected(sanitizeMonths(derived));
   }, [indicator?.periodStart, indicator?.periodEnd, indicator?.frequency]);
 
+  // Autocalcular fechas inicio/fin si es PER (basado en meses seleccionados)
+  useEffect(() => {
+    if (indicator?.frequency !== "PER") return;
+
+    const selected = Array.isArray(monthsSelected) ? monthsSelected : [];
+    if (selected.length === 0) return;
+
+    const sorted = [...selected].sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const newStart = ymToStr(first.year, first.month);
+    const newEnd = ymToStr(last.year, last.month);
+
+    setIndicator((prev) => {
+      if (prev.periodStart === newStart && prev.periodEnd === newEnd) return prev;
+      return { ...prev, periodStart: newStart, periodEnd: newEnd };
+    });
+  }, [monthsSelected, indicator?.frequency]);
+
   const toggleMonth = useCallback((m: ConfigureObjectiveMonths) => {
     setMonthsSelected((prev) => toggleMonthIn(sanitizeMonths(prev), m));
   }, []);
@@ -387,15 +411,15 @@ export default function ObjectiveConfigureModal({
     const base = objective.baseValue;
 
     if (tendence && typeof goal === "number" && typeof base === "number") {
-      if (tendence === "POS" && base > goal) {
+      if (tendence === "POS" && base >= goal) {
         toast.error(
-          "Para tendencia Creciente, la Línea Base debe ser MENOR o IGUAL que la Meta."
+          `En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`
         );
         return;
       }
       if (tendence === "NEG" && base < goal) {
         toast.error(
-          "Para tendencia Decreciente, la Línea Base debe ser MAYOR o IGUAL que la Meta."
+          `En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`
         );
         return;
       }
