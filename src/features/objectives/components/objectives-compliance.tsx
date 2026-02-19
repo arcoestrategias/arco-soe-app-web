@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 import type {
   IcoBoardData,
@@ -46,10 +48,13 @@ import ObjectiveConfigureModal, {
 import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
 import { ObjectiveInactivateBlockedModal } from "./objective-inactivate-blocked-modal";
 import { QKEY } from "@/shared/api/query-keys";
+import { getBusinessUnitId } from "@/shared/auth/storage";
+import { getPositionsByBusinessUnit } from "@/features/positions/services/positionsService";
 
 // 🔐 permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermissions } from "@/shared/auth/access-control";
+import { toast } from "sonner";
 
 /* --------------------- utils --------------------- */
 const LEVEL_LABEL: Record<string, string> = {
@@ -59,10 +64,10 @@ const LEVEL_LABEL: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = { RES: "Resultado", GES: "Gestión" };
 
 function normalizeLevel(v?: string | null) {
-  return v ? LEVEL_LABEL[(v as string).toUpperCase()] ?? v : "—";
+  return v ? (LEVEL_LABEL[(v as string).toUpperCase()] ?? v) : "—";
 }
 function normalizeType(v?: string | null) {
-  return v ? TYPE_LABEL[(v as string).toUpperCase()] ?? v : "—";
+  return v ? (TYPE_LABEL[(v as string).toUpperCase()] ?? v) : "—";
 }
 
 function textColorForBg(hex?: string | null): string | undefined {
@@ -131,7 +136,7 @@ function monthsFromIcoMonthly(icoMonthly: any[] = []) {
         Number.isInteger(m.month) &&
         m.month >= 1 &&
         m.month <= 12 &&
-        Number.isInteger(m.year)
+        Number.isInteger(m.year),
     );
 }
 
@@ -140,7 +145,7 @@ function firstWithRanges(icoMonthly: any[] = []) {
   return icoMonthly.find(
     (p) =>
       p &&
-      (p.rangeExceptional !== undefined || p.rangeInacceptable !== undefined)
+      (p.rangeExceptional !== undefined || p.rangeInacceptable !== undefined),
   );
 }
 
@@ -179,7 +184,7 @@ export default function ObjectivesCompliance({
   const [configureData, setConfigureData] =
     useState<ObjectiveConfigureData | null>(null);
   const [notesForObjective, setNotesForObjective] = useState<string | null>(
-    null
+    null,
   );
   const openNotes = (objectiveId: string) => setNotesForObjective(objectiveId);
   const closeNotes = () => setNotesForObjective(null);
@@ -203,7 +208,14 @@ export default function ObjectivesCompliance({
     message?: string;
     projects?: any[];
     priorities?: any[];
+    prioritiesByPosition?: any[];
   }>({ open: false });
+
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: "", onConfirm: () => {} });
 
   const inactivateMut = useInactivateObjective([
     QKEY.objectives(strategicPlanId, positionId),
@@ -213,19 +225,51 @@ export default function ObjectivesCompliance({
 
   const handleInactivate = (objectiveId: string) => {
     if (!permissions.delete) return;
-    inactivateMut.mutate(objectiveId, {
-      onSuccess: (data) => {
-        if (data?.blocked) {
-          setBlockedInfo({
-            open: true,
-            message: data.message,
-            projects: data.associations?.projects ?? [],
-            priorities: data.associations?.priorities ?? [],
-          });
-        }
+    const obj = rows.find((r) => r.objective?.id === objectiveId)?.objective;
+    const name = obj?.name ?? "este objetivo";
+
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar el objetivo "${name}"?`,
+      onConfirm: () => {
+        inactivateMut.mutate(objectiveId, {
+          onSuccess: (data) => {
+            if (data?.blocked) {
+              setBlockedInfo({
+                open: true,
+                message: data.message,
+                projects: data.associations?.projects ?? [],
+                priorities: (
+                  data.associations?.prioritiesByPosition ?? []
+                ).flatMap((g: any) => g.priorities ?? []),
+                prioritiesByPosition:
+                  data.associations?.prioritiesByPosition ?? [],
+              });
+            } else {
+              toast.success("Objetivo inactivado");
+            }
+          },
+        });
       },
     });
   };
+
+  // ---- Positions (para reasignación en modal de bloqueo) ----
+  const buId = getBusinessUnitId();
+  const { data: positions = [] } = useQuery({
+    queryKey: buId ? QKEY.positionsByBU(buId) : ["positions", "disabled"],
+    queryFn: () => getPositionsByBusinessUnit(buId!),
+    enabled: !!buId,
+    staleTime: 60_000,
+  });
+
+  const otherPositions = useMemo(
+    () =>
+      (positions as Array<{ id: string; name: string }>)
+        .filter((p) => p.id !== positionId)
+        .map((p) => ({ id: p.id, name: p.name })),
+    [positions, positionId],
+  );
 
   const openComplianceFor = (objectiveId: string) => {
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
@@ -258,7 +302,7 @@ export default function ObjectivesCompliance({
           statusFg: fg,
         };
       }),
-    [rows]
+    [rows],
   );
 
   /* --------- no configurados --------- */
@@ -278,7 +322,7 @@ export default function ObjectivesCompliance({
           statusFg: "#111827",
         };
       }),
-    [unconfigured]
+    [unconfigured],
   );
 
   const totalConfigured = configuredRows.length;
@@ -415,7 +459,9 @@ export default function ObjectivesCompliance({
             </AccordionTrigger>
             <AccordionContent>
               {!permissions.read ? (
-                <div className="p-4 text-sm text-muted-foreground">No tienes permisos para ver la lista de objetivos.</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  No tienes permisos para ver la lista de objetivos.
+                </div>
               ) : loading ? (
                 <Skeleton className="h-48 w-full" />
               ) : error ? (
@@ -576,7 +622,9 @@ export default function ObjectivesCompliance({
             </AccordionTrigger>
             <AccordionContent>
               {!permissions.read ? (
-                <div className="p-4 text-sm text-muted-foreground">No tienes permisos para ver la lista de objetivos.</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  No tienes permisos para ver la lista de objetivos.
+                </div>
               ) : loadingUnconfigured ? (
                 <Skeleton className="h-40 w-full" />
               ) : totalUnconfigured === 0 ? (
@@ -759,7 +807,30 @@ export default function ObjectivesCompliance({
         message={blockedInfo.message}
         projects={blockedInfo.projects}
         priorities={blockedInfo.priorities}
+        prioritiesByPosition={blockedInfo.prioritiesByPosition}
         onClose={() => setBlockedInfo({ open: false })}
+        strategicPlanId={strategicPlanId}
+        positionId={positionId}
+        year={year}
+        otherPositions={otherPositions}
+        onListChanged={(next) =>
+          setBlockedInfo((prev) => ({
+            ...prev,
+            projects: next.projects,
+            prioritiesByPosition: next.prioritiesByPosition,
+          }))
+        }
+      />
+
+      <ConfirmModal
+        open={confirm.open}
+        title="Confirmar eliminación"
+        message={confirm.message}
+        onConfirm={() => {
+          setConfirm((prev) => ({ ...prev, open: false }));
+          confirm.onConfirm();
+        }}
+        onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
       />
     </Card>
   );

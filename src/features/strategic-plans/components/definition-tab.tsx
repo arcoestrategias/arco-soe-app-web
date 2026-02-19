@@ -43,6 +43,7 @@ import { DefinitionCard } from "./definition-card";
 import { DefinitionList } from "./definition-list";
 import { NewObjectiveModal } from "@/features/objectives/components/new-objective-modal";
 import { ObjectiveInactivateBlockedModal } from "@/features/objectives/components/objective-inactivate-blocked-modal";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 import {
   Target,
   Eye,
@@ -129,6 +130,12 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
       priorities: Array<{ id: string; name: string }>;
     }>;
   }>({});
+
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: "", onConfirm: () => {} });
 
   // Posición efectiva (para objetivos/proyectos)
   const businessUnitId = getBusinessUnitId() ?? undefined;
@@ -555,22 +562,29 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     }
   };
 
-  const handleDeleteFactor = async (uiIndex: number) => {
-    try {
-      const payload = makeReorderPayload(
-        mappedFactors.map((it) => ({
-          metaId: it.metaId,
-          isActive: it.id === uiIndex ? false : it.isActive ?? true,
-        }))
-      );
-      await reorderStrategicSuccessFactors(payload);
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
-      });
-      toast.success("Factor eliminado");
-    } catch (e) {
-      toast.error(getHumanErrorMessage(e as any));
-    }
+  const handleDeleteFactor = (uiIndex: number) => {
+    const item = mappedFactors.find((f) => f.id === uiIndex);
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar el factor "${item?.content}"?`,
+      onConfirm: async () => {
+        try {
+          const payload = makeReorderPayload(
+            mappedFactors.map((it) => ({
+              metaId: it.metaId,
+              isActive: it.id === uiIndex ? false : it.isActive ?? true,
+            }))
+          );
+          await reorderStrategicSuccessFactors(payload);
+          qc.invalidateQueries({
+            queryKey: QKEY.strategicSuccessFactors(strategicPlanId!),
+          });
+          toast.success("Factor eliminado");
+        } catch (e) {
+          toast.error(getHumanErrorMessage(e as any));
+        }
+      },
+    });
   };
 
   const handleReorderFactors = async (updated: any[]) => {
@@ -613,22 +627,29 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
     }
   };
 
-  const handleDeleteValue = async (uiIndex: number) => {
-    try {
-      const payload = makeReorderPayload(
-        mappedValues.map((it) => ({
-          metaId: it.metaId,
-          isActive: it.id === uiIndex ? false : it.isActive ?? true,
-        }))
-      );
-      await reorderStrategicValues(payload);
-      qc.invalidateQueries({
-        queryKey: QKEY.strategicValues(strategicPlanId!),
-      });
-      toast.success("Valor eliminado");
-    } catch (e) {
-      toast.error(getHumanErrorMessage(e as any));
-    }
+  const handleDeleteValue = (uiIndex: number) => {
+    const item = mappedValues.find((v) => v.id === uiIndex);
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar el valor "${item?.content}"?`,
+      onConfirm: async () => {
+        try {
+          const payload = makeReorderPayload(
+            mappedValues.map((it) => ({
+              metaId: it.metaId,
+              isActive: it.id === uiIndex ? false : it.isActive ?? true,
+            }))
+          );
+          await reorderStrategicValues(payload);
+          qc.invalidateQueries({
+            queryKey: QKEY.strategicValues(strategicPlanId!),
+          });
+          toast.success("Valor eliminado");
+        } catch (e) {
+          toast.error(getHumanErrorMessage(e as any));
+        }
+      },
+    });
   };
 
   const handleReorderValues = async (updated: any[]) => {
@@ -657,15 +678,22 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
   };
 
   const handleDeleteProject = (uiIndex: number) => {
-    const payload = {
-      strategicPlanId: strategicPlanId!,
-      items: mappedProjects.map((it, idx) => ({
-        id: it.metaId!,
-        order: idx + 1,
-        isActive: it.id === uiIndex ? false : it.isActive ?? true,
-      })),
-    };
-    reorderProjectsMutation.mutate(payload);
+    const item = mappedProjects.find((p) => p.id === uiIndex);
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar el proyecto "${item?.content}"?`,
+      onConfirm: () => {
+        const payload = {
+          strategicPlanId: strategicPlanId!,
+          items: mappedProjects.map((it, idx) => ({
+            id: it.metaId!,
+            order: idx + 1,
+            isActive: it.id === uiIndex ? false : (it.isActive ?? true),
+          })),
+        };
+        reorderProjectsMutation.mutate(payload);
+      },
+    });
   };
 
   const handleReorderProjects = (updatedItems: any[]) => {
@@ -886,18 +914,26 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
           onRequestDelete={
             permissions.objectivesDelete
               ? (_uiIndex, item) => {
-                  const objectiveId = item.metaId!;
-                  inactivateObjectiveMutation.mutate(objectiveId, {
-                    onSuccess: (data) => {
-                      if (data?.blocked) {
-                        setDeleteObjectiveBlockedData({
-                          message: data.message,
-                          projects: data.associations?.projects ?? [],
-                          prioritiesByPosition:
-                            data.associations?.prioritiesByPosition ?? [],
-                        });
-                        setIsDeleteObjectiveBlockedModalOpen(true);
-                      }
+                  setConfirm({
+                    open: true,
+                    message: `¿Estás seguro de que deseas eliminar el objetivo "${item.content}"?`,
+                    onConfirm: () => {
+                      const objectiveId = item.metaId!;
+                      inactivateObjectiveMutation.mutate(objectiveId, {
+                        onSuccess: (data) => {
+                          if (data?.blocked) {
+                            setDeleteObjectiveBlockedData({
+                              message: data.message,
+                              projects: data.associations?.projects ?? [],
+                              prioritiesByPosition:
+                                data.associations?.prioritiesByPosition ?? [],
+                            });
+                            setIsDeleteObjectiveBlockedModalOpen(true);
+                          } else {
+                            toast.success("Objetivo inactivado");
+                          }
+                        },
+                      });
                     },
                   });
                 }
@@ -1003,6 +1039,17 @@ export function DefinitionTab({ strategicPlanId, positionId }: Props) {
             prioritiesByPosition: next.prioritiesByPosition,
           }))
         }
+      />
+
+      <ConfirmModal
+        open={confirm.open}
+        title="Confirmar eliminación"
+        message={confirm.message}
+        onConfirm={() => {
+          setConfirm((prev) => ({ ...prev, open: false }));
+          confirm.onConfirm();
+        }}
+        onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

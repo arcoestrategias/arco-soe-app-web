@@ -6,6 +6,8 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
+  DialogHeader,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,12 +18,13 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, X, AlertTriangle, FolderKanban, ListTodo } from "lucide-react";
 
 import ObjectiveSelect from "@/shared/components/objective-select";
 import { useUpdatePriority } from "@/features/priorities/hooks/use-priorities";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { updateStrategicProject } from "@/features/strategic-plans/services/strategicProjectsService";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 /* ====== types ====== */
 type AssocItem = { id: string; name: string };
@@ -112,6 +115,12 @@ export function ObjectiveInactivateBlockedModal({
   const [projectRows, setProjectRows] = useState<PriorityRow[]>([]);
   const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
 
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: "", onConfirm: () => {} });
+
   useEffect(() => {
     if (!open) return;
     const next = normalizeToGroups(prioritiesByPosition, priorities);
@@ -135,7 +144,7 @@ export function ObjectiveInactivateBlockedModal({
   const totalPriorities = groups.reduce((acc, g) => acc + g.items.length, 0);
 
   // ====== PRIORIDADES: confirmar / cancelar ======
-  const confirmChange = (groupIdx: number, row: PriorityRow) => {
+  const executeChange = (groupIdx: number, row: PriorityRow) => {
     if (!canUseSelector)
       return toast.error("Faltan parámetros de contexto (plan/posición).");
     if (!row.draftObjectiveId) return;
@@ -153,19 +162,30 @@ export function ObjectiveInactivateBlockedModal({
               (it) => it.id !== row.id
             );
             const cleaned = copy.filter((g) => g.items.length > 0);
-            onListChanged?.({
-              projects: (projectRows ?? []).map(({ id, name }) => ({
-                id,
-                name,
-              })),
-              prioritiesByPosition: toGroupedPayload(cleaned),
-            });
+            // Diferir el efecto secundario para evitar error de actualización durante render
+            setTimeout(() => {
+              onListChanged?.({
+                projects: (projectRows ?? []).map(({ id, name }) => ({
+                  id,
+                  name,
+                })),
+                prioritiesByPosition: toGroupedPayload(cleaned),
+              });
+            }, 0);
             return cleaned;
           });
         },
         onError: (e) => toast.error(getHumanErrorMessage(e)),
       }
     );
+  };
+
+  const confirmChange = (groupIdx: number, row: PriorityRow) => {
+    setConfirm({
+      open: true,
+      message: `¿Confirmas reasignar la prioridad "${row.name}" al nuevo objetivo?`,
+      onConfirm: () => executeChange(groupIdx, row),
+    });
   };
 
   const cancelChange = (groupIdx: number, rowId: string) => {
@@ -184,7 +204,7 @@ export function ObjectiveInactivateBlockedModal({
   };
 
   // ====== PROYECTOS: confirmar / cancelar ======
-  const confirmChangeProject = (row: PriorityRow) => {
+  const executeChangeProject = (row: PriorityRow) => {
     if (!canUseSelector)
       return toast.error("Faltan parámetros de contexto (plan/posición).");
     if (!row.draftObjectiveId) return;
@@ -198,15 +218,25 @@ export function ObjectiveInactivateBlockedModal({
         toast.success("Proyecto actualizado");
         setProjectRows((prev) => {
           const next = prev.filter((p) => p.id !== row.id);
-          onListChanged?.({
-            projects: next.map(({ id, name }) => ({ id, name })),
-            prioritiesByPosition: toGroupedPayload(groups),
-          });
+          setTimeout(() => {
+            onListChanged?.({
+              projects: next.map(({ id, name }) => ({ id, name })),
+              prioritiesByPosition: toGroupedPayload(groups),
+            });
+          }, 0);
           return next;
         });
       })
       .catch((e) => toast.error(getHumanErrorMessage(e)))
       .finally(() => setSavingProjectId(null));
+  };
+
+  const confirmChangeProject = (row: PriorityRow) => {
+    setConfirm({
+      open: true,
+      message: `¿Confirmas reasignar el proyecto "${row.name}" al nuevo objetivo?`,
+      onConfirm: () => executeChangeProject(row),
+    });
   };
 
   const cancelChangeProject = (rowId: string) => {
@@ -221,40 +251,55 @@ export function ObjectiveInactivateBlockedModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         className="
-    w-full
-    max-w-[96vw] sm:max-w-[96vw] md:max-w-[90vw] lg:max-w-[80vw] xl:max-w-[1100px]
-    max-h-[85vh]
-    overflow-y-auto overflow-x-hidden
-    box-border
-  "
+          w-full
+          max-w-[96vw] sm:max-w-[96vw] md:max-w-[90vw] lg:max-w-[80vw] xl:max-w-[1000px]
+          max-h-[90vh]
+          overflow-y-auto overflow-x-hidden
+          box-border
+          p-0 gap-0
+        "
       >
-        <DialogTitle>Asociaciones bloqueantes</DialogTitle>
-        <DialogDescription>
-          {message ?? "Este objetivo tiene asociaciones activas."}
-        </DialogDescription>
+        <DialogHeader className="p-6 pb-4 border-b bg-muted/10 flex-row items-start gap-4 space-y-0">
+          <div className="p-2 bg-red-100 rounded-full shrink-0 text-red-600 mt-1">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <DialogTitle className="text-lg font-semibold">
+              Acción requerida: Reasignar dependencias
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              {message ??
+                "Este objetivo no se puede inactivar porque tiene elementos asociados. Para continuar, reasigna los proyectos y prioridades a otro objetivo."}
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
-        <Accordion type="multiple" className="mt-4 space-y-4">
+        <div className="p-6 space-y-6">
+          <Accordion type="multiple" className="space-y-4" defaultValue={["projects", "priorities"]}>
           {/* === PROYECTOS === */}
           <AccordionItem
             value="projects"
-            className="rounded-md border overflow-hidden bg-background shadow-sm"
+            className="rounded-lg border overflow-hidden bg-card shadow-sm"
           >
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex w-full items-center justify-between text-sm font-medium">
-                <span>Proyectos asociados</span>
+            <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/5">
+              <div className="flex w-full items-center gap-3 text-sm font-medium">
+                <div className="p-1.5 bg-blue-100 text-blue-700 rounded-md">
+                  <FolderKanban className="w-4 h-4" />
+                </div>
+                <span className="flex-1 text-left">Proyectos Estratégicos</span>
                 <Badge variant="secondary">{projects?.length ?? 0}</Badge>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-0 pb-4">
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/40">
+                  <thead className="bg-muted/30 text-muted-foreground text-xs uppercase tracking-wider font-medium border-b">
                     <tr>
-                      <th className="px-4 py-2 text-left w-[70%]">Proyecto</th>
-                      <th className="px-4 py-2 text-left w-[30%]">Acciones</th>
+                      <th className="px-5 py-3 text-left w-[60%]">Nombre del Proyecto</th>
+                      <th className="px-5 py-3 text-left w-[40%]">Reasignar a</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y">
                     {(projects?.length ?? 0) > 0 ? (
                       projects!.map((p) => {
                         const current = projectRows.find((x) => x.id === p.id);
@@ -262,13 +307,16 @@ export function ObjectiveInactivateBlockedModal({
                         const disabled = savingProjectId === p.id;
 
                         return (
-                          <tr key={p.id} className="border-t align-top">
-                            <td className="px-4 py-2 whitespace-normal break-words">
-                              {p.name}
+                          <tr key={p.id} className="group hover:bg-muted/20 transition-colors">
+                            <td className="px-5 py-3 align-top">
+                              <div className="font-medium text-foreground break-words leading-snug">
+                                {p.name}
+                              </div>
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-5 py-3 align-top">
                               {/* Selector + acciones (solo objetivos de la posición) */}
-                              <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
                                 <ObjectiveSelect
                                   planId={strategicPlanId}
                                   positionId={positionId}
@@ -292,14 +340,15 @@ export function ObjectiveInactivateBlockedModal({
                                     })
                                   }
                                   hideSwitch // sin terceros en proyectos
-                                  triggerClassName="w-full"
+                                  triggerClassName="w-full h-9 text-sm"
                                   disabled={disabled}
                                 />
+                                </div>
                                 {hasSelection && (
                                   <div className="flex items-center gap-1">
                                     <Button
                                       size="icon"
-                                      className="h-8 w-8 text-green-600"
+                                      className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                                       variant="ghost"
                                       title="Aplicar cambio"
                                       onClick={() =>
@@ -311,7 +360,7 @@ export function ObjectiveInactivateBlockedModal({
                                     </Button>
                                     <Button
                                       size="icon"
-                                      className="h-8 w-8 text-red-600"
+                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                       variant="ghost"
                                       title="Cancelar selección"
                                       onClick={() => cancelChangeProject(p.id)}
@@ -329,7 +378,7 @@ export function ObjectiveInactivateBlockedModal({
                     ) : (
                       <tr>
                         <td
-                          className="px-4 py-3 text-muted-foreground"
+                          className="px-5 py-6 text-center text-muted-foreground italic"
                           colSpan={2}
                         >
                           Sin proyectos asociados.
@@ -345,11 +394,14 @@ export function ObjectiveInactivateBlockedModal({
           {/* === PRIORIDADES (Nivel 1) === */}
           <AccordionItem
             value="priorities"
-            className="rounded-md border overflow-hidden bg-background shadow-sm"
+            className="rounded-lg border overflow-hidden bg-card shadow-sm"
           >
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex w-full items-center justify-between text-sm font-medium">
-                <span>Prioridades asociadas</span>
+            <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/5">
+              <div className="flex w-full items-center gap-3 text-sm font-medium">
+                <div className="p-1.5 bg-amber-100 text-amber-700 rounded-md">
+                  <ListTodo className="w-4 h-4" />
+                </div>
+                <span className="flex-1 text-left">Prioridades asociadas</span>
                 <Badge variant="secondary">{totalPriorities}</Badge>
               </div>
             </AccordionTrigger>
@@ -363,7 +415,7 @@ export function ObjectiveInactivateBlockedModal({
                       value={g.positionId}
                       className="border-0"
                     >
-                      <AccordionTrigger className="px-4 py-3 bg-muted/30 hover:no-underline">
+                      <AccordionTrigger className="px-4 py-2 bg-muted/20 hover:bg-muted/30 hover:no-underline text-sm">
                         <div className="flex w-full items-center justify-between text-sm font-medium">
                           <span>{g.positionName}</span>
                           <Badge variant="secondary">{g.items.length}</Badge>
@@ -372,34 +424,34 @@ export function ObjectiveInactivateBlockedModal({
                       <AccordionContent className="px-0 pb-4">
                         <div className="overflow-x-auto">
                           <table className="w-full table-fixed text-sm">
-                            <thead className="bg-muted/40">
+                            <thead className="bg-muted/10 text-muted-foreground text-xs uppercase tracking-wider font-medium border-b">
                               <tr>
-                                <th className="px-4 py-2 text-left w-[40%]">
-                                  Prioridad
+                                <th className="px-5 py-2 text-left w-[50%]">
+                                  Nombre de la Prioridad
                                 </th>
-                                <th className="px-4 py-2 text-left w-[60%]">
-                                  Acciones
+                                <th className="px-5 py-2 text-left w-[50%]">
+                                  Reasignar a
                                 </th>
                               </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="divide-y">
                               {g.items.map((row) => {
                                 const hasSelection = !!row.draftObjectiveId;
                                 return (
                                   <tr
                                     key={row.id}
-                                    className="border-t align-top"
+                                    className="group hover:bg-muted/20 transition-colors"
                                   >
-                                    <td className="px-4 py-2">
-                                      <div className="whitespace-normal break-words">
-                                        <div className="font-mono">
+                                    <td className="px-5 py-3 align-top">
+                                      <div className="whitespace-normal break-words leading-snug">
+                                        <div className="font-medium text-foreground">
                                           {row.name}
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-4 py-2">
-                                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-center gap-2">
-                                        <div className="min-w-0">
+                                    <td className="px-5 py-3 align-top">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex-1 min-w-0">
                                           <ObjectiveSelect
                                             planId={strategicPlanId}
                                             positionId={positionId}
@@ -429,14 +481,14 @@ export function ObjectiveInactivateBlockedModal({
                                             }
                                             otherPositions={otherPositions}
                                             defaultAllowThirdParty={false}
-                                            triggerClassName="w-full"
+                                            triggerClassName="w-full h-9 text-sm"
                                           />
                                         </div>
                                         {hasSelection && (
                                           <div className="flex items-center gap-1">
                                             <Button
                                               size="icon"
-                                              className="h-8 w-8 text-green-600"
+                                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                                               variant="ghost"
                                               title="Aplicar cambio"
                                               onClick={() =>
@@ -448,7 +500,7 @@ export function ObjectiveInactivateBlockedModal({
                                             </Button>
                                             <Button
                                               size="icon"
-                                              className="h-8 w-8 text-red-600"
+                                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                               variant="ghost"
                                               title="Cancelar selección"
                                               onClick={() =>
@@ -472,7 +524,7 @@ export function ObjectiveInactivateBlockedModal({
                     </AccordionItem>
                   ))
                 ) : (
-                  <div className="p-4 text-sm text-muted-foreground">
+                  <div className="p-6 text-center text-sm text-muted-foreground italic">
                     Sin prioridades asociadas.
                   </div>
                 )}
@@ -480,11 +532,23 @@ export function ObjectiveInactivateBlockedModal({
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-
-        <div className="flex justify-end mt-6">
-          <Button onClick={onClose}>Cerrar</Button>
         </div>
+
+        <DialogFooter className="p-4 border-t bg-muted/10">
+          <Button onClick={onClose} variant="outline">Cerrar</Button>
+        </DialogFooter>
       </DialogContent>
+
+      <ConfirmModal
+        open={confirm.open}
+        title="Confirmar reasignación"
+        message={confirm.message}
+        onConfirm={() => {
+          setConfirm((prev) => ({ ...prev, open: false }));
+          confirm.onConfirm();
+        }}
+        onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
+      />
     </Dialog>
   );
 }

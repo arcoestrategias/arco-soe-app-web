@@ -94,7 +94,7 @@ export function TaskRow({
       <ConfirmModal
         open={showConfirm}
         title="Eliminación de Tarea"
-        message="¿Estás seguro de que deseas inactivar esta tarea?"
+        message="¿Estás seguro de que deseas eliminar esta tarea?"
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => {
           onDelete();

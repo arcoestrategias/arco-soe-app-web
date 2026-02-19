@@ -58,7 +58,7 @@ interface FactorRowProps {
   onCancelTask: (
     factorNumber: number,
     taskNumber: number,
-    isNew?: boolean
+    isNew?: boolean,
   ) => void;
   onDeleteTask: (factorNumber: number, taskNumber: number) => void;
   onReorderTasks: (factorNumber: number, newOrder: Task[]) => void;
@@ -141,7 +141,7 @@ export function FactorRow({
   const showBlocked = () => {
     toast.info(
       dragDisabledReason ||
-        "No puedes reordenar mientras hay cambios sin guardar."
+        "No puedes reordenar mientras hay cambios sin guardar.",
     );
   };
 
@@ -373,15 +373,15 @@ export function FactorRow({
         title="Eliminación de factor"
         message={
           (factor.tasks?.length ?? 0) > 0
-            ? "Esto inactivará el factor y sus tareas relacionadas."
-            : "¿Estás seguro de que deseas inactivar este factor?"
+            ? "Esto eliminara el factor y sus tareas relacionadas."
+            : "¿Estás seguro de que deseas eliminar este factor?"
         }
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => {
           onDelete();
           setShowConfirm(false);
         }}
-        confirmText="Inactivar"
+        confirmText="Eliminar"
       >
         {(factor.tasks?.length ?? 0) > 0 && (
           <ul className="list-disc list-inside text-sm text-gray-700 max-h-32 overflow-auto pr-2">

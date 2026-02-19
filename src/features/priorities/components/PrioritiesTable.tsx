@@ -55,6 +55,7 @@ import NotesModal from "@/shared/components/comments/components/notes-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 /* ------------------------------------------------------------
    Tipos y utilidades base
@@ -349,6 +350,19 @@ export default function PrioritiesTable({
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
   const [notesFor, setNotesFor] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: "", onConfirm: () => {} });
+
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "OPE" | "CLO" | "CAN">("ALL");
+
+  const filteredItems = useMemo(() => {
+    if (statusFilter === "ALL") return items;
+    return items.filter((i) => i.status === statusFilter);
+  }, [items, statusFilter]);
+
   const [docsFor, setDocsFor] = useState<{
     open: boolean;
     id?: string;
@@ -550,54 +564,72 @@ export default function PrioritiesTable({
   const colsWithoutActions = totalCols - 1;
 
   return (
-    // Permitimos scroll horizontal si hace falta, pero la tabla se ajusta al contenido
-    <div className="w-full overflow-x-auto">
-      <Table className="w-full table-auto">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12 whitespace-nowrap">#</TableHead>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as any)}
+        >
+          <SelectTrigger className="w-[150px] h-8 text-xs">
+            <SelectValue placeholder="Filtrar estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos</SelectItem>
+            <SelectItem value="OPE">En proceso</SelectItem>
+            <SelectItem value="CLO">Terminado</SelectItem>
+            <SelectItem value="CAN">Anulado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-            <TableHead className="whitespace-nowrap">Prioridad</TableHead>
+      {/* Permitimos scroll horizontal si hace falta, pero la tabla se ajusta al contenido */}
+      <div className="w-full overflow-x-auto">
+        <Table className="w-full table-auto">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 whitespace-nowrap">#</TableHead>
 
-            {/*Objetivo en visualización */}
-            {!hasEditing && (
-              <TableHead className="whitespace-nowrap">Objetivo</TableHead>
-            )}
+              <TableHead className="whitespace-nowrap">Prioridad</TableHead>
 
-            <TableHead className="text-center w-24 whitespace-nowrap">
-              Estado
-            </TableHead>
-            <TableHead className="text-center w-40 whitespace-nowrap">
-              Inicio / Fin
-            </TableHead>
-            <TableHead className="text-center w-40 whitespace-nowrap">
-              Fecha Terminado
-            </TableHead>
+              {/*Objetivo en visualización */}
+              {!hasEditing && (
+                <TableHead className="whitespace-nowrap">Objetivo</TableHead>
+              )}
 
-            {/* Acciones sticky a la derecha */}
-            <TableHead className="text-center w-36 whitespace-nowrap sticky right-0 bg-background z-20 border-l">
-              Acciones
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+              <TableHead className="text-center w-24 whitespace-nowrap">
+                Estado
+              </TableHead>
+              <TableHead className="text-center w-40 whitespace-nowrap">
+                Inicio / Fin
+              </TableHead>
+              <TableHead className="text-center w-40 whitespace-nowrap">
+                Fecha Terminado
+              </TableHead>
 
-        <TableBody>
-          {items.map((p, idx) => {
-            const isEditing = editingId === p.id;
-            const d = drafts[p.id];
+              {/* Acciones sticky a la derecha */}
+              <TableHead className="text-center w-36 whitespace-nowrap sticky right-0 bg-background z-20 border-l">
+                Acciones
+              </TableHead>
+            </TableRow>
+          </TableHeader>
 
-            const monthlyLabel = resolveMonthlyLabel(p.monthlyClass);
-            const monthlyStyle = resolveMonthlyStyle(p.monthlyClass);
+          <TableBody>
+            {filteredItems.map((p, idx) => {
+              const isEditing = editingId === p.id;
+              const d = drafts[p.id];
 
-            const effectiveStatus: Status = (d?.status ?? p.status) as Status;
+              const monthlyLabel = resolveMonthlyLabel(p.monthlyClass);
+              const monthlyStyle = resolveMonthlyStyle(p.monthlyClass);
 
-            const objectiveName = p.objectiveName ?? "-";
-            const deliverableText = p.description ?? "-";
+              const effectiveStatus: Status = (d?.status ?? p.status) as Status;
 
-            if (isEditing && d) {
-              // --- Fila en EDICIÓN (editor en una sola celda + acciones sticky) ---
-              return (
-                <TableRow key={p.id}>
+              const objectiveName = p.objectiveName ?? "-";
+              const deliverableText = p.description ?? "-";
+
+              if (isEditing && d) {
+                // --- Fila en EDICIÓN (editor en una sola celda + acciones sticky) ---
+                return (
+                  <TableRow key={p.id}>
                   <TableCell
                     colSpan={colsWithoutActions}
                     className="align-top p-3"
@@ -906,7 +938,13 @@ export default function PrioritiesTable({
                       size="sm"
                       variant="ghost"
                       className="text-destructive"
-                      onClick={() => onInactivate?.(p.id)}
+                      onClick={() =>
+                        setConfirm({
+                          open: true,
+                          message: `¿Estás seguro de que deseas eliminar la prioridad "${p.name}"?`,
+                          onConfirm: () => onInactivate?.(p.id),
+                        })
+                      }
                       disabled={uiBusy || inactivatingId === p.id}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1084,7 +1122,7 @@ export default function PrioritiesTable({
             </TableRow>
           )}
 
-          {items.length === 0 && !showCreateRow && (
+          {filteredItems.length === 0 && !showCreateRow && (
             <TableRow>
               <TableCell
                 colSpan={totalCols}
@@ -1094,8 +1132,9 @@ export default function PrioritiesTable({
               </TableCell>
             </TableRow>
           )}
-        </TableBody>
-      </Table>
+          </TableBody>
+        </Table>
+      </div>
 
       <NotesModal
         isOpen={!!notesFor}
@@ -1109,6 +1148,17 @@ export default function PrioritiesTable({
         referenceId={docsFor.id ?? ""}
         type="document"
         title={`Documentos de ${docsFor.name ?? "esta prioridad"}`}
+      />
+
+      <ConfirmModal
+        open={confirm.open}
+        title="Confirmar eliminación"
+        message={confirm.message}
+        onConfirm={() => {
+          setConfirm((prev) => ({ ...prev, open: false }));
+          confirm.onConfirm();
+        }}
+        onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

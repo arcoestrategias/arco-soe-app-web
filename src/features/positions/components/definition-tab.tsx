@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
+import { getBusinessUnitId } from "@/shared/auth/storage";
 
 // UI
 import { DefinitionCard } from "./definition-card";
@@ -32,6 +33,7 @@ import {
 import {
   getPosition,
   updatePosition,
+  getPositionsByBusinessUnit,
 } from "@/features/positions/services/positionsService";
 import type { CreateStrategicProjectPayload } from "@/features/strategic-plans/types/strategicProjects";
 import type { CreateObjectivePayload } from "@/features/strategic-plans/types/objectives";
@@ -39,6 +41,7 @@ import type { CreateObjectivePayload } from "@/features/strategic-plans/types/ob
 // Modales Objetivos
 import { NewObjectiveModal } from "@/features/objectives/components/new-objective-modal";
 import { ObjectiveInactivateBlockedModal } from "@/features/objectives/components/objective-inactivate-blocked-modal";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 // Palancas
 import {
@@ -103,7 +106,14 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     message?: string;
     projects?: any[];
     priorities?: any[];
+    prioritiesByPosition?: any[];
   }>({});
+
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, message: "", onConfirm: () => {} });
 
   // ---- Queries ----
   const {
@@ -154,6 +164,23 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     enabled: !!positionId,
     staleTime: 60_000,
   });
+
+  // ---- Positions (para reasignación) ----
+  const buId = getBusinessUnitId();
+  const { data: positions = [] } = useQuery({
+    queryKey: buId ? QKEY.positionsByBU(buId) : ["positions", "disabled"],
+    queryFn: () => getPositionsByBusinessUnit(buId!),
+    enabled: !!buId,
+    staleTime: 60_000,
+  });
+
+  const otherPositions = useMemo(
+    () =>
+      (positions as Array<{ id: string; name: string }>)
+        .filter((p) => p.id !== positionId)
+        .map((p) => ({ id: p.id, name: p.name })),
+    [positions, positionId],
+  );
 
   // ---- Mutations ----
   const updatePositionMutation = useMutation({
@@ -386,15 +413,22 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
     updateProjectMutation.mutate({ id, name });
   };
   const handleDeleteProject = (uiIndex: number) => {
-    const payload = {
-      strategicPlanId: strategicPlanId!,
-      items: mappedProjects.map((it, idx) => ({
-        id: it.metaId!,
-        order: idx + 1,
-        isActive: it.id === uiIndex ? false : (it.isActive ?? true),
-      })),
-    };
-    reorderProjectsMutation.mutate(payload);
+    const item = mappedProjects.find((p) => p.id === uiIndex);
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar el proyecto "${item?.content}"?`,
+      onConfirm: () => {
+        const payload = {
+          strategicPlanId: strategicPlanId!,
+          items: mappedProjects.map((it, idx) => ({
+            id: it.metaId!,
+            order: idx + 1,
+            isActive: it.id === uiIndex ? false : (it.isActive ?? true),
+          })),
+        };
+        reorderProjectsMutation.mutate(payload);
+      },
+    });
   };
 
   const handleCreateLever = (name: string) => {
@@ -405,15 +439,22 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
   };
   const handleDeleteLever = (uiIndex: number) => {
     if (!positionId) return;
-    const payload = {
-      positionId,
-      items: mappedLevers.map((it, idx) => ({
-        id: it.metaId!,
-        order: idx + 1,
-        isActive: it.id === uiIndex ? false : (it.isActive ?? true),
-      })),
-    };
-    reorderLeversMutation.mutate(payload);
+    const item = mappedLevers.find((l) => l.id === uiIndex);
+    setConfirm({
+      open: true,
+      message: `¿Estás seguro de que deseas eliminar la palanca "${item?.content}"?`,
+      onConfirm: () => {
+        const payload = {
+          positionId,
+          items: mappedLevers.map((it, idx) => ({
+            id: it.metaId!,
+            order: idx + 1,
+            isActive: it.id === uiIndex ? false : (it.isActive ?? true),
+          })),
+        };
+        reorderLeversMutation.mutate(payload);
+      },
+    });
   };
 
   const handleUpdateObjective = (id: string, name: string) => {
@@ -529,17 +570,26 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
             onRequestDelete={
               permissions.objectivesDelete
                 ? (_uiIndex, item) => {
-                    const objectiveId = item.metaId!;
-                    inactivateObjectiveMutation.mutate(objectiveId, {
-                      onSuccess: (data) => {
-                        if (data?.blocked) {
-                          setDeleteObjectiveBlockedData({
-                            message: data.message,
-                            projects: data.associations?.projects ?? [],
-                            priorities: data.associations?.priorities ?? [],
-                          });
-                          setIsDeleteObjectiveBlockedModalOpen(true);
-                        }
+                    setConfirm({
+                      open: true,
+                      message: `¿Estás seguro de que deseas eliminar el objetivo "${item.content}"?`,
+                      onConfirm: () => {
+                        const objectiveId = item.metaId!;
+                        inactivateObjectiveMutation.mutate(objectiveId, {
+                          onSuccess: (data) => {
+                            if (data?.blocked) {
+                              setDeleteObjectiveBlockedData({
+                                message: data.message,
+                                projects: data.associations?.projects ?? [],
+                                prioritiesByPosition:
+                                  data.associations?.prioritiesByPosition ?? [],
+                              });
+                              setIsDeleteObjectiveBlockedModalOpen(true);
+                            } else {
+                              toast.success("Objetivo inactivado");
+                            }
+                          },
+                        });
                       },
                     });
                   }
@@ -657,8 +707,30 @@ export function DefinitionTab({ strategicPlanId, positionId, year }: Props) {
         open={isDeleteObjectiveBlockedModalOpen}
         message={deleteObjectiveBlockedData.message}
         projects={deleteObjectiveBlockedData.projects}
-        priorities={deleteObjectiveBlockedData.priorities}
+        prioritiesByPosition={deleteObjectiveBlockedData.prioritiesByPosition}
         onClose={() => setIsDeleteObjectiveBlockedModalOpen(false)}
+        strategicPlanId={strategicPlanId}
+        positionId={positionId}
+        year={year}
+        otherPositions={otherPositions}
+        onListChanged={(next) =>
+          setDeleteObjectiveBlockedData((prev) => ({
+            ...prev,
+            projects: next.projects,
+            prioritiesByPosition: next.prioritiesByPosition,
+          }))
+        }
+      />
+
+      <ConfirmModal
+        open={confirm.open}
+        title="Confirmar eliminación"
+        message={confirm.message}
+        onConfirm={() => {
+          setConfirm((prev) => ({ ...prev, open: false }));
+          confirm.onConfirm();
+        }}
+        onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );
