@@ -110,6 +110,7 @@ export function ObjectiveComplianceModal({
   const permissions = usePermissions({
     updateCompliance: PERMISSIONS.OBJECTIVE_GOALS.UPDATE_COMPLIANCE,
     updateTargetValue: PERMISSIONS.OBJECTIVE_GOALS.UPDATE_TARGET_VALUE,
+    updateBaseValue: PERMISSIONS.OBJECTIVE_GOALS.UPDATE_BASE_VALUE,
   });
 
   // Solo meses medidos
@@ -281,16 +282,16 @@ export function ObjectiveComplianceModal({
           if (tendence === "POS" && base >= goal) {
             toast.error(
               `Mes ${monthName(
-                p.month
-              )}: En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`
+                p.month,
+              )}: En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`,
             );
             return;
           }
           if (tendence === "NEG" && base < goal) {
             toast.error(
               `Mes ${monthName(
-                p.month
-              )}: En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`
+                p.month,
+              )}: En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`,
             );
             return;
           }
@@ -536,7 +537,7 @@ export function ObjectiveComplianceModal({
                         value={baseToShow ?? ""}
                         onChange={(e) => handleChangeBase(p, e.target.value)}
                         placeholder="—"
-                        disabled={!permissions.updateTargetValue}
+                        disabled={!permissions.updateBaseValue}
                       />
                     </TableCell>
 
