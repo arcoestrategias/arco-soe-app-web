@@ -27,6 +27,7 @@ import {
   StickyNote,
   Paperclip,
   Trash2,
+  Users,
 } from "lucide-react";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
@@ -47,9 +48,14 @@ import ObjectiveConfigureModal, {
 } from "./objective-configure-modal";
 import { useInactivateObjective } from "@/features/strategic-plans/hooks/use-inactivate-objective";
 import { ObjectiveInactivateBlockedModal } from "./objective-inactivate-blocked-modal";
+import {
+  ModalObjectiveDeployment,
+  type DeploymentModalData,
+} from "./modal-objective-deployment";
 import { QKEY } from "@/shared/api/query-keys";
 import { getBusinessUnitId } from "@/shared/auth/storage";
 import { getPositionsByBusinessUnit } from "@/features/positions/services/positionsService";
+import { useDeploymentMatrix } from "../hooks/use-deployment-matrix";
 
 // 🔐 permisos
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
@@ -203,6 +209,9 @@ export default function ObjectivesCompliance({
   const closeDocs = () =>
     setDocsFor({ open: false, id: undefined, name: null });
 
+  const [deploymentModal, setDeploymentModal] =
+    useState<DeploymentModalData | null>(null);
+
   const [blockedInfo, setBlockedInfo] = useState<{
     open: boolean;
     message?: string;
@@ -254,14 +263,32 @@ export default function ObjectivesCompliance({
     });
   };
 
-  // ---- Positions (para reasignación en modal de bloqueo) ----
-  const buId = getBusinessUnitId();
-  const { data: positions = [] } = useQuery({
+  // ---- Data de la Matriz (para pre-cargar responsabilidades en el modal) ----
+  const { data: matrixData } = useDeploymentMatrix(strategicPlanId, positionId);
+
+  // ---- Positions (Todas las posiciones de la BU para poder reasignar a cualquiera) ----
+  const [buId, setBuId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setBuId(getBusinessUnitId());
+  }, []);
+
+  const { data: rawPositions = [] } = useQuery({
     queryKey: buId ? QKEY.positionsByBU(buId) : ["positions", "disabled"],
     queryFn: () => getPositionsByBusinessUnit(buId!),
     enabled: !!buId,
     staleTime: 60_000,
   });
+
+  // Garantizar un arreglo estricto (evita errores si el backend lo envuelve en 'data')
+  const positions = useMemo(() => {
+    const arr = Array.isArray(rawPositions)
+      ? rawPositions
+      : ((rawPositions as any)?.data ?? (rawPositions as any)?.items ?? []);
+    return arr
+      .map((p: any) => ({ id: p.id, name: p.name }))
+      .filter((p: any) => !!p.id);
+  }, [rawPositions]);
 
   const otherPositions = useMemo(
     () =>
@@ -587,6 +614,52 @@ export default function ObjectivesCompliance({
                                 </Button>
                               )}
 
+                              {permissions.update && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Asignar Responsabilidades (RACI)"
+                                  aria-label="Asignar Responsabilidades"
+                                  onClick={() => {
+                                    const posName =
+                                      positions.find(
+                                        (p: any) => p.id === positionId,
+                                      )?.name ?? "Esta posición";
+                                    const matrixObj =
+                                      matrixData?.objectives?.find(
+                                        (o) => o.id === r.id,
+                                      );
+                                    const rels = matrixObj?.relations || [];
+                                    const myRelation = Array.isArray(rels)
+                                      ? rels.find(
+                                          (rel: any) =>
+                                            rel.positionId === positionId,
+                                        )
+                                      : rels?.[positionId];
+
+                                    setDeploymentModal({
+                                      objectiveId: r.id,
+                                      objectiveName: r.name,
+                                      positionId: positionId,
+                                      positionName: posName,
+                                      currentType: myRelation?.type
+                                        ? (String(
+                                            myRelation.type,
+                                          ).toUpperCase() as any)
+                                        : null,
+                                      relationId: myRelation?.relationId,
+                                      availablePositions: positions as {
+                                        id: string;
+                                        name: string;
+                                      }[],
+                                      relations: rels,
+                                    });
+                                  }}
+                                >
+                                  <Users className="w-4 h-4" />
+                                </Button>
+                              )}
+
                               {/* Mostrar solo si tiene permiso de eliminar/inactivar */}
                               {permissions.delete && (
                                 <Button
@@ -734,6 +807,52 @@ export default function ObjectivesCompliance({
                                 </Button>
                               )}
 
+                              {permissions.update && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Asignar Responsabilidades (RACI)"
+                                  aria-label="Asignar Responsabilidades"
+                                  onClick={() => {
+                                    const posName =
+                                      positions.find(
+                                        (p: any) => p.id === positionId,
+                                      )?.name ?? "Esta posición";
+                                    const matrixObj =
+                                      matrixData?.objectives?.find(
+                                        (o) => o.id === r.id,
+                                      );
+                                    const rels = matrixObj?.relations || [];
+                                    const myRelation = Array.isArray(rels)
+                                      ? rels.find(
+                                          (rel: any) =>
+                                            rel.positionId === positionId,
+                                        )
+                                      : rels?.[positionId];
+
+                                    setDeploymentModal({
+                                      objectiveId: r.id,
+                                      objectiveName: r.name,
+                                      positionId: positionId,
+                                      positionName: posName,
+                                      currentType: myRelation?.type
+                                        ? (String(
+                                            myRelation.type,
+                                          ).toUpperCase() as any)
+                                        : null,
+                                      relationId: myRelation?.relationId,
+                                      availablePositions: positions as {
+                                        id: string;
+                                        name: string;
+                                      }[],
+                                      relations: rels,
+                                    });
+                                  }}
+                                >
+                                  <Users className="w-4 h-4" />
+                                </Button>
+                              )}
+
                               {permissions.delete && (
                                 <Button
                                   size="icon"
@@ -831,6 +950,12 @@ export default function ObjectivesCompliance({
           confirm.onConfirm();
         }}
         onCancel={() => setConfirm((prev) => ({ ...prev, open: false }))}
+      />
+
+      <ModalObjectiveDeployment
+        open={!!deploymentModal}
+        onClose={() => setDeploymentModal(null)}
+        data={deploymentModal}
       />
     </Card>
   );

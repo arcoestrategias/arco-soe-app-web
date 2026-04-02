@@ -41,7 +41,7 @@ export const QKEY = {
     strategicPlanId: string,
     year: number | string,
     month: number | string,
-    positionId?: string | null
+    positionId?: string | null,
   ) => [
     "positions",
     "overview",
@@ -57,7 +57,7 @@ export const QKEY = {
     strategicPlanId: string,
     year: number | string,
     month: number | string,
-    positionId?: string | null
+    positionId?: string | null,
   ) =>
     [
       "positions",
@@ -110,7 +110,7 @@ export const QKEY = {
     limit: number = 1000,
     status?: "OPE" | "CLO" | "CAN",
     objectiveId?: string,
-    monthlyClass?: string
+    monthlyClass?: string,
   ) =>
     [
       "priorities",
@@ -132,7 +132,7 @@ export const QKEY = {
     planId: string,
     positionId: string,
     fromYear: number | string,
-    toYear: number | string
+    toYear: number | string,
   ) =>
     [
       "objectives",
@@ -152,6 +152,12 @@ export const QKEY = {
   objectiveConfigure: (objectiveId: string) =>
     ["objective", "configure", objectiveId] as const,
 
+  deploymentMatrix: (planId: string, positionId: string) =>
+    ["objectives", "deployment-matrix", planId, positionId] as const,
+
+  collaborations: (planId: string, positionId: string) =>
+    ["objectives", "collaborations", planId, positionId] as const,
+
   comments: ["comments"] as const,
   commentsByReference: (referenceId: string) =>
     ["comments", "ref", referenceId] as const,
@@ -167,7 +173,7 @@ export const QKEY = {
     to: string,
     companyId: string,
     businessUnitId?: string,
-    onlyMine?: boolean
+    onlyMine?: boolean,
   ) =>
     [
       "meetings",

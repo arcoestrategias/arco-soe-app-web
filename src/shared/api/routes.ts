@@ -18,11 +18,11 @@ const prefixed = (...parts: Array<string | number | undefined | null>) =>
 
 // Builder opcional de querystring
 export const qs = (
-  params?: Record<string, string | number | boolean | undefined | null>
+  params?: Record<string, string | number | boolean | undefined | null>,
 ) => {
   if (!params) return "";
   const entries = Object.entries(params).filter(
-    ([, v]) => v !== undefined && v !== null
+    ([, v]) => v !== undefined && v !== null,
   );
   if (!entries.length) return "";
   const search = new URLSearchParams();
@@ -104,7 +104,7 @@ export const routes = {
         businessUnitId,
         "users",
         userId,
-        "permissions"
+        "permissions",
       ),
     users: (businessUnitId: string) =>
       `/api/v1/business-units/${businessUnitId}/users`,
@@ -117,7 +117,7 @@ export const routes = {
         "users",
         userId,
         "permissions",
-        "reset"
+        "reset",
       ),
   },
 
@@ -183,6 +183,13 @@ export const routes = {
       prefixed("ico", "objectives", "strategic-map") + qs({ strategicPlanId }),
     configure: (objectiveId: string) =>
       prefixed(Modules.OBJECTIVES, objectiveId, "configure"),
+    deploymentMatrix: (strategicPlanId: string, positionId: string) =>
+      prefixed(Modules.OBJECTIVES, "deployment-matrix") +
+      qs({ strategicPlanId, positionId }),
+    collaborations: (strategicPlanId: string, positionId: string) =>
+      prefixed(Modules.OBJECTIVES, "collaborations") + qs({ strategicPlanId, positionId }),
+    responsibilities: () => prefixed(Modules.OBJECTIVES, "responsibilities"),
+    responsibility: (id: string) => prefixed(Modules.OBJECTIVES, "responsibilities", id),
   },
 
   strategicProjects: {
