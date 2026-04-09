@@ -7,10 +7,14 @@ import {
   deleteResponsibility,
 } from "../services/deploymentMatrixService";
 
-export function useDeploymentMatrix(planId?: string, positionId?: string) {
+export function useDeploymentMatrix(
+  planId?: string,
+  positionId?: string,
+  year?: number | string,
+) {
   return useQuery({
-    queryKey: QKEY.deploymentMatrix(planId ?? "", positionId ?? ""),
-    queryFn: () => getDeploymentMatrixData(planId!, positionId!),
+    queryKey: [...QKEY.deploymentMatrix(planId ?? "", positionId ?? ""), year],
+    queryFn: () => getDeploymentMatrixData(planId!, positionId!, year),
     // Solo ejecutamos si ambos IDs existen
     enabled: !!planId && !!positionId,
     // Configuramos un staleTime razonable (opcional)
@@ -18,10 +22,14 @@ export function useDeploymentMatrix(planId?: string, positionId?: string) {
   });
 }
 
-export function useCollaborations(planId?: string, positionId?: string) {
+export function useCollaborations(
+  planId?: string,
+  positionId?: string,
+  year?: number | string,
+) {
   return useQuery({
-    queryKey: QKEY.collaborations(planId ?? "", positionId ?? ""),
-    queryFn: () => getCollaborationsData(planId!, positionId!),
+    queryKey: [...QKEY.collaborations(planId ?? "", positionId ?? ""), year],
+    queryFn: () => getCollaborationsData(planId!, positionId!, year),
     enabled: !!planId && !!positionId,
     staleTime: 60_000,
   });

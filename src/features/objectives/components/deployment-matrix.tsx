@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { ResponsibilityType } from "../types/deployment-matrix";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
@@ -47,6 +47,7 @@ const MATRIX_STATES: Record<
 export function DeploymentMatrix({
   planId,
   positionId,
+  year,
 }: DeploymentMatrixProps) {
   // Estado para el hover en cruz (resalta fila y columna)
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
@@ -59,10 +60,11 @@ export function DeploymentMatrix({
   });
 
   // Consumo del Endpoint
-  const { data, isLoading, isError } = useDeploymentMatrix(planId, positionId);
+  const { data, isLoading, isError } = useDeploymentMatrix(planId, positionId, year);
   const { data: colabs, isLoading: isColabsLoading } = useCollaborations(
     planId,
     positionId,
+    year
   );
 
   const sortedPositions = useMemo(() => {
@@ -152,19 +154,24 @@ export function DeploymentMatrix({
                   >
                     {data.objectives.map((objective, rIdx) => {
                       const isMyRow = objective.isMine;
+                      const isOutOfRange = objective.isOutOfRange;
                       return (
                         <tr
                           key={objective.id}
-                          className="border-b border-slate-100 last:border-0 transition-colors duration-150 group/row"
+                          className={`border-b border-slate-100 last:border-0 transition-colors duration-150 group/row ${
+                            isOutOfRange ? "bg-red-50/40" : ""
+                          }`}
                         >
                           {/* Celda del Objetivo */}
                           <td
                             className={`p-4 text-sm transition-colors duration-150 border-r border-slate-200 ${
                               hoveredRow === rIdx
-                                ? "bg-slate-50"
+                                ? isOutOfRange ? "bg-red-50" : "bg-slate-50"
                                 : isMyRow
                                   ? "bg-[#ffa466]/10"
-                                  : "bg-white"
+                                  : isOutOfRange
+                                    ? "bg-red-50/20"
+                                    : "bg-white"
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -173,13 +180,24 @@ export function DeploymentMatrix({
                               )}
                               <span
                                 className={
-                                  isMyRow
-                                    ? "font-bold text-slate-900"
-                                    : "font-medium text-slate-800"
+                                  isOutOfRange
+                                    ? "font-medium text-slate-500"
+                                    : isMyRow
+                                      ? "font-bold text-slate-900"
+                                      : "font-medium text-slate-800"
                                 }
                               >
                                 {objective.name}
                               </span>
+                              {isOutOfRange && (
+                                <div className="group/tooltip relative flex items-center justify-center">
+                                  <AlertTriangle className="w-4 h-4 text-red-500 cursor-help" />
+                                  <div className="absolute bottom-[calc(100%+4px)] left-0 px-2.5 py-1.5 bg-slate-800 text-white text-[11px] font-medium rounded-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-40 shadow-lg">
+                                    {objective.outOfRangeMessage}
+                                    <div className="absolute top-full left-2 border-4 border-transparent border-t-slate-800" />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
 
@@ -294,15 +312,31 @@ export function DeploymentMatrix({
                   <tbody className="divide-y divide-slate-100">
                     {colabs.map((colab) => {
                       const state = MATRIX_STATES[colab.myRelation];
+                      const isOutOfRange = colab.isOutOfRange;
                       return (
                         <tr
                           key={colab.id}
-                          className="hover:bg-slate-50 transition-colors"
+                          className={`transition-colors ${
+                            isOutOfRange ? "bg-red-50/30 hover:bg-red-50/60" : "hover:bg-slate-50"
+                          }`}
                         >
-                          <td className="p-4 text-sm font-medium text-slate-800 border-r border-slate-100">
-                            {colab.name}
+                          <td className="p-4 text-sm font-medium border-r border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <span className={isOutOfRange ? "text-slate-500" : "text-slate-800"}>
+                                {colab.name}
+                              </span>
+                              {isOutOfRange && (
+                                <div className="group/tooltip relative flex items-center justify-center">
+                                  <AlertTriangle className="w-4 h-4 text-red-500 cursor-help" />
+                                  <div className="absolute bottom-[calc(100%+4px)] left-0 px-2.5 py-1.5 bg-slate-800 text-white text-[11px] font-medium rounded-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-40 shadow-lg">
+                                    {colab.outOfRangeMessage}
+                                    <div className="absolute top-full left-2 border-4 border-transparent border-t-slate-800" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </td>
-                          <td className="p-4 text-sm text-slate-600 border-r border-slate-100">
+                          <td className={`p-4 text-sm border-r border-slate-100 ${isOutOfRange ? "text-slate-400" : "text-slate-600"}`}>
                             {colab.ownerPosition.name}
                           </td>
                           <td className="p-4 text-center relative cursor-pointer group/cell">

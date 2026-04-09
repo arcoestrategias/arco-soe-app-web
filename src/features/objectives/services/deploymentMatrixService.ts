@@ -9,18 +9,20 @@ import type {
 export async function getDeploymentMatrixData(
   strategicPlanId: string,
   positionId: string,
+  year?: number | string,
 ): Promise<DeploymentMatrixResponse> {
   const url = routes.objectives.deploymentMatrix(strategicPlanId, positionId);
-  const res = await http.get(url);
+  const res = await http.get(url, { params: { year } });
   return unwrapAny<DeploymentMatrixResponse>(res);
 }
 
 export async function getCollaborationsData(
   strategicPlanId: string,
   positionId: string,
+  year?: number | string,
 ): Promise<CollaborationItem[]> {
   const url = routes.objectives.collaborations(strategicPlanId, positionId);
-  const res = await http.get(url);
+  const res = await http.get(url, { params: { year } });
   return unwrapAny<CollaborationItem[]>(res);
 }
 

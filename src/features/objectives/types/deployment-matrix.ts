@@ -23,6 +23,8 @@ export interface DeploymentMatrixResponse {
     relations: Record<string, ObjectiveRelation> | ObjectiveRelation[];
     myRelation: ResponsibilityType | null;
     isMine: boolean;
+    isOutOfRange?: boolean;
+    outOfRangeMessage?: string;
   }>;
 }
 
@@ -34,4 +36,6 @@ export interface CollaborationItem {
     name: string;
   };
   myRelation: ResponsibilityType;
+  isOutOfRange?: boolean;
+  outOfRangeMessage?: string;
 }

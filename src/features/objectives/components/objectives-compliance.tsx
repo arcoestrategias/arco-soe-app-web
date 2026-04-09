@@ -264,7 +264,7 @@ export default function ObjectivesCompliance({
   };
 
   // ---- Data de la Matriz (para pre-cargar responsabilidades en el modal) ----
-  const { data: matrixData } = useDeploymentMatrix(strategicPlanId, positionId);
+  const { data: matrixData } = useDeploymentMatrix(strategicPlanId, positionId, year);
 
   // ---- Positions (Todas las posiciones de la BU para poder reasignar a cualquiera) ----
   const [buId, setBuId] = useState<string | null>(null);
