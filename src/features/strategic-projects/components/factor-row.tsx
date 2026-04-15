@@ -21,6 +21,7 @@ import { useState } from "react";
 import {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
+  TaskParticipant,
 } from "../types/strategicProjectStructure";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,7 +55,7 @@ interface FactorRowProps {
   hasItemInCreation?: () => boolean;
   isDragging?: boolean;
   onEditTask: (factorNumber: number, taskNumber: number) => void;
-  onSaveTask: (factorNumber: number, task: Task) => void;
+  onSaveTask: (factorNumber: number, task: Task, participants: TaskParticipant[]) => void;
   onCancelTask: (
     factorNumber: number,
     taskNumber: number,
@@ -78,6 +79,7 @@ interface FactorRowProps {
     tasksDelete: boolean;
     tasksReorder: boolean;
   };
+  businessUnitId?: string;
 }
 
 export function FactorRow({
@@ -105,6 +107,7 @@ export function FactorRow({
   listeners,
   attributes,
   permissions,
+  businessUnitId,
 }: FactorRowProps) {
   const [editedFactor, setEditedFactor] = useState<Factor>({ ...factor });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -185,7 +188,7 @@ export function FactorRow({
         {/* Modo edición de factor */}
         {isEditing ? (
           <>
-            <div className="col-span-4 flex items-center gap-2">
+            <div className="col-span-5 flex items-center gap-2">
               <div
                 className={`flex items-center gap-2 px-3 py-2 ${
                   dragDisabled ? "cursor-not-allowed opacity-60" : "cursor-grab"
@@ -221,7 +224,7 @@ export function FactorRow({
               </div>
             </div>
 
-            <div className="col-span-4">
+            <div className="col-span-5">
               <label className="text-xs text-gray-500 mb-1 block">
                 Resultado
               </label>
@@ -232,33 +235,34 @@ export function FactorRow({
               />
             </div>
 
-            <div className="col-span-2 text-xs text-gray-500 flex items-center">
-              Tareas: {tareasTerminadas} / {totalTareas}
-            </div>
-
-            <div className="col-span-2 flex justify-end items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={() => onCancel()}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-green-600 hover:text-green-700"
-                onClick={handleSave}
-              >
-                <Save className="h-3.5 w-3.5" />
-              </Button>
+            <div className="col-span-2 flex justify-between items-center gap-1">
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                Tareas: {tareasTerminadas}/{totalTareas}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => onCancel()}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-green-600 hover:text-green-700"
+                  onClick={handleSave}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </>
         ) : (
           // Vista lectura
           <>
-            <div className="col-span-4 flex items-center gap-2">
+            <div className="col-span-5 flex items-center gap-2">
               <div
                 className={`text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 ${
                   dragDisabled ? "cursor-not-allowed opacity-60" : "cursor-grab"
@@ -286,47 +290,47 @@ export function FactorRow({
                 {factor.name ?? ""}
               </span>
             </div>
-            <div className="col-span-4">
+            <div className="col-span-5">
               <span className="text-sm text-gray-600 line-clamp-2">
                 {factor.result ?? ""}
               </span>
             </div>
-            <div className="col-span-2">
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                Tareas: {tareasTerminadas} / {totalTareas}
+            <div className="col-span-2 flex justify-between items-center gap-1">
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                Tareas: {tareasTerminadas}/{totalTareas}
               </span>
-            </div>
-            <div className="col-span-2 flex justify-end items-center gap-1">
-              {permissions.factorsUpdate && (
-                <Button
-                  onClick={onEdit}
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {permissions.tasksCreate && (
-                <Button
-                  onClick={onAddTask}
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-blue-500 hover:bg-blue-50"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {permissions.factorsDelete && (
-                <Button
-                  onClick={() => setShowConfirm(true)}
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-red-500 hover:bg-red-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {permissions.factorsUpdate && (
+                  <Button
+                    onClick={onEdit}
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {permissions.tasksCreate && (
+                  <Button
+                    onClick={onAddTask}
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-blue-500 hover:bg-blue-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {permissions.factorsDelete && (
+                  <Button
+                    onClick={() => setShowConfirm(true)}
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-red-500 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -350,9 +354,10 @@ export function FactorRow({
                   <SortableTask
                     key={task.id}
                     task={task}
+                    participants={task.participants}
                     isEditing={editingTaskId === task.id}
                     onEdit={() => onEditTask(rowNumber, idx + 1)}
-                    onSave={(t) => onSaveTask(rowNumber, t)}
+                    onSave={(t, p) => onSaveTask(rowNumber, t, p)}
                     onCancel={() => onCancelTask(rowNumber, idx + 1, false)}
                     onDelete={() => onDeleteTask(rowNumber, idx + 1)}
                     dragDisabled={dragDisabled}
@@ -360,6 +365,7 @@ export function FactorRow({
                     canUpdate={permissions.tasksUpdate}
                     canDelete={permissions.tasksDelete}
                     canReorder={permissions.tasksReorder}
+                    businessUnitId={businessUnitId}
                   />
                 ))}
               </SortableContext>

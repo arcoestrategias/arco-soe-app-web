@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
+  TaskParticipant,
 } from "../types/strategicProjectStructure";
 import { FactorRow } from "./factor-row";
 import type { DraggableAttributes } from "@dnd-kit/core";
@@ -24,7 +25,7 @@ interface SortableFactorProps {
   countCompletedTasks: () => number;
   hasItemInCreation: () => boolean;
   onEditTask: (factorRowNumber: number, taskRowNumber: number) => void;
-  onSaveTask: (factorRowNumber: number, task: Task) => void;
+  onSaveTask: (factorRowNumber: number, task: Task, participants: TaskParticipant[]) => void;
   onCancelTask: (
     factorRowNumber: number,
     taskRowNumber: number,
@@ -46,6 +47,7 @@ interface SortableFactorProps {
     tasksDelete: boolean;
     tasksReorder: boolean;
   };
+  businessUnitId?: string;
 }
 
 export function SortableFactor({
@@ -70,6 +72,7 @@ export function SortableFactor({
   dragDisabled = false,
   dragDisabledReason = "",
   permissions,
+  businessUnitId,
 }: SortableFactorProps) {
   const {
     attributes,
@@ -112,6 +115,7 @@ export function SortableFactor({
         dragDisabled={dragDisabled}
         dragDisabledReason={dragDisabledReason}
         permissions={permissions}
+        businessUnitId={businessUnitId}
       />
     </div>
   );

@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/shared/components/single-date-picker";
-import { StrategicProjectStructureTask as Task } from "../types/strategicProjectStructure";
+import {
+  StrategicProjectStructureTask as Task,
+  TaskParticipant,
+} from "../types/strategicProjectStructure";
 import { isValid } from "date-fns";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
@@ -27,9 +30,10 @@ import { projectRangeToDates, toYmd } from "@/shared/utils/dateFormatters";
 
 interface TaskRowResumeProps {
   task: Task;
+  participants: TaskParticipant[];
   onEdit: () => void;
   onRequestDelete: () => void;
-  onSave: (task: Task) => void;
+  onSave: (task: Task, participants: TaskParticipant[]) => void;
   range: DateRange;
   setRange: (range: DateRange) => void;
   formatShortDate: (date?: Date) => string;
@@ -43,6 +47,7 @@ interface TaskRowResumeProps {
 
 export function TaskRowResume({
   task,
+  participants,
   onEdit,
   onRequestDelete,
   onSave,
@@ -73,7 +78,7 @@ export function TaskRowResume({
       status: isFinished ? "OPE" : "CLO",
       finishedAt: isFinished ? null : new Date().toISOString(),
     };
-    onSave(next);
+    onSave(next, participants);
   };
 
   // Bloqueo drag
@@ -111,10 +116,12 @@ export function TaskRowResume({
     ? { ...(listeners ?? {}), ...(attributes ?? {}) }
     : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
 
+  const activeParticipants = participants.filter((p) => p.isActive);
+
   return (
     <div className="col-span-12 grid grid-cols-12 gap-2 items-center">
       {/* Columna: Nombre (task.name) */}
-      <div className="col-span-4 min-w-0">
+      <div className="col-span-3 min-w-0">
         <div
           className={`flex items-center gap-2 min-w-0 ${
             dragDisabled ? "cursor-not-allowed opacity-50" : "cursor-grab"
@@ -144,7 +151,7 @@ export function TaskRowResume({
       </div>
 
       {/* Columna: Resultado (task.result) */}
-      <div className="col-span-4 min-w-0">
+      <div className="col-span-3 min-w-0">
         <CellWithTooltip
           lines={[{ label: "Entregable", text: task.result ?? "" }]}
           side="top"
@@ -156,8 +163,41 @@ export function TaskRowResume({
         </CellWithTooltip>
       </div>
 
+      {/* Columna: Responsables */}
+      <div className="col-span-3 min-w-0">
+        {activeParticipants.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {activeParticipants.slice(0, 2).map((p) => (
+              <Badge
+                key={p.id}
+                variant="secondary"
+                className={`text-[10px] px-1.5 py-0.5 ${
+                  p.positionId
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "bg-purple-50 text-purple-700 border-purple-200"
+                }`}
+              >
+                {p.positionId
+                  ? p.positionName ?? "Cargo"
+                  : p.externalUserName ?? "Externo"}
+              </Badge>
+            ))}
+            {activeParticipants.length > 2 && (
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600"
+              >
+                +{activeParticipants.length - 2}
+              </Badge>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400">Sin responsables</span>
+        )}
+      </div>
+
       {/* Estado */}
-      <div className="col-span-2">
+      <div className="col-span-1">
         {canUpdate ? (
           <Badge
             onClick={toggleStatus}
@@ -215,7 +255,7 @@ export function TaskRowResume({
                     fromAt: toYmd(r.from)!,
                     untilAt: toYmd(r.to)!,
                   };
-                  onSave(next);
+                  onSave(next, participants);
                   setRange({ from: r.from, to: r.to });
                 }}
               />

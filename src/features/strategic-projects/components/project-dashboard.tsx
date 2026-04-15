@@ -114,6 +114,7 @@ export function StrategicProjectsDashboard({
   const [selectedProject, setSelectedProject] = useState<{
     id: string;
     name: string;
+    businessUnitId?: string;
   } | null>(null);
 
   const mappedProjects = useMemo(() => {
@@ -342,6 +343,7 @@ export function StrategicProjectsDashboard({
           onClose={closeModal}
           projectId={selectedProject.id}
           projectName={selectedProject.name}
+          businessUnitId={getBusinessUnitId() ?? undefined}
         />
       )}
 

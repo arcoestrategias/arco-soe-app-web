@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { StrategicProjectStructureTask as Task } from "../types/strategicProjectStructure";
+import {
+  StrategicProjectStructureTask as Task,
+  TaskParticipant,
+} from "../types/strategicProjectStructure";
 import { DateRange } from "react-day-picker";
 import { TaskRowEditor } from "./task-row-editor";
 import { TaskRowResume } from "./task-row-resume";
@@ -15,9 +18,10 @@ import { isValid } from "date-fns";
 
 interface TaskRowProps {
   task: Task;
+  participants: TaskParticipant[];
   isEditing?: boolean;
   onEdit: () => void;
-  onSave: (task: Task) => void;
+  onSave: (task: Task, participants: TaskParticipant[]) => void;
   onCancel: () => void;
   onDelete: () => void;
   isDragging?: boolean;
@@ -27,10 +31,12 @@ interface TaskRowProps {
   attributes: DraggableAttributes;
   canUpdate?: boolean;
   canDelete?: boolean;
+  businessUnitId?: string;
 }
 
 export function TaskRow({
   task,
+  participants,
   isEditing = false,
   onEdit,
   onSave,
@@ -43,6 +49,7 @@ export function TaskRow({
   attributes,
   canUpdate = false,
   canDelete = false,
+  businessUnitId,
 }: TaskRowProps) {
   const [range, setRange] = useState<DateRange>({
     from: parseYmdOrIsoToLocalDate(task.fromAt),
@@ -72,10 +79,17 @@ export function TaskRow({
       }`}
     >
       {isEditing ? (
-        <TaskRowEditor task={task} onSave={onSave} onCancel={onCancel} />
+        <TaskRowEditor
+          task={task}
+          participants={participants}
+          onSave={onSave}
+          onCancel={onCancel}
+          businessUnitId={businessUnitId}
+        />
       ) : (
         <TaskRowResume
           task={task}
+          participants={participants}
           onEdit={onEdit}
           onRequestDelete={() => setShowConfirm(true)}
           onSave={onSave}

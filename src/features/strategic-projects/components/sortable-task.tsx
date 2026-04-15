@@ -2,14 +2,18 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { StrategicProjectStructureTask as Task } from "../types/strategicProjectStructure";
+import {
+  StrategicProjectStructureTask as Task,
+  TaskParticipant,
+} from "../types/strategicProjectStructure";
 import { TaskRow } from "./task-row";
 
 interface Props {
   task: Task;
+  participants: TaskParticipant[];
   isEditing?: boolean;
   onEdit: () => void;
-  onSave: (task: Task) => void;
+  onSave: (task: Task, participants: TaskParticipant[]) => void;
   onCancel: () => void;
   onDelete: () => void;
   dragDisabled?: boolean;
@@ -17,10 +21,12 @@ interface Props {
   canUpdate?: boolean;
   canDelete?: boolean;
   canReorder?: boolean;
+  businessUnitId?: string;
 }
 
 export function SortableTask({
   task,
+  participants,
   isEditing = false,
   onEdit,
   onSave,
@@ -31,6 +37,7 @@ export function SortableTask({
   canUpdate = false,
   canDelete = false,
   canReorder = false,
+  businessUnitId,
 }: Props) {
   const {
     attributes,
@@ -50,6 +57,7 @@ export function SortableTask({
     <div ref={setNodeRef} style={style}>
       <TaskRow
         task={task}
+        participants={participants}
         isEditing={isEditing}
         onEdit={onEdit}
         onSave={onSave}
@@ -66,6 +74,7 @@ export function SortableTask({
         }
         canUpdate={canUpdate}
         canDelete={canDelete}
+        businessUnitId={businessUnitId}
       />
     </div>
   );

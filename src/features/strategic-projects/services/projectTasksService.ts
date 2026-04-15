@@ -2,6 +2,14 @@
 import http from "@/shared/api/http";
 import { unwrapAny } from "@/shared/api/response";
 import { routes } from "@/shared/api/routes";
+import type { TaskParticipant } from "../types/strategicProjectStructure";
+
+export type ParticipantInput = {
+  positionId?: string;
+  externalUserId?: string;
+  name?: string;
+  email?: string;
+};
 
 export type CreateProjectTaskPayload = {
   projectFactorId: string;
@@ -14,9 +22,9 @@ export type CreateProjectTaskPayload = {
   props?: string | null;
   fromAt?: string | null;
   untilAt?: string | null;
-  status?: string; // "OPE" según tu ejemplo
+  status?: string;
   budget?: number | string | null;
-  projectParticipantId?: string | null;
+  participants?: ParticipantInput[];
 };
 
 export type UpdateProjectTaskPayload = Partial<{
@@ -31,7 +39,6 @@ export type UpdateProjectTaskPayload = Partial<{
   untilAt: string | null;
   status: string;
   budget: number | string | null;
-  projectParticipantId: string | null;
   finishedAt: string | null;
 }>;
 
@@ -61,5 +68,37 @@ export async function reorderProjectTasks(
     projectFactorId,
     items,
   });
+  return unwrapAny(res.data);
+}
+
+export async function addTaskParticipants(
+  taskId: string,
+  participants: ParticipantInput[]
+): Promise<TaskParticipant[]> {
+  const res = await http.post(
+    routes.projectTasks.addParticipants(taskId),
+    { participants }
+  );
+  return unwrapAny<TaskParticipant[]>(res.data);
+}
+
+export async function replaceTaskParticipants(
+  taskId: string,
+  participants: ParticipantInput[]
+): Promise<TaskParticipant[]> {
+  const res = await http.patch(
+    routes.projectTasks.replaceParticipants(taskId),
+    { participants }
+  );
+  return unwrapAny<TaskParticipant[]>(res.data);
+}
+
+export async function deleteTaskParticipant(
+  taskId: string,
+  participantId: string
+): Promise<void> {
+  const res = await http.delete(
+    routes.projectTasks.deleteParticipant(taskId, participantId)
+  );
   return unwrapAny(res.data);
 }

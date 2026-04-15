@@ -1,3 +1,17 @@
+export interface TaskParticipant {
+  id: string;
+  taskId: string;
+  positionId: string | null;
+  positionName: string | null;
+  userId: string | null;
+  userName: string | null;
+  externalUserId: string | null;
+  externalUserName: string | null;
+  externalUserEmail: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface StrategicProjectStructureTask {
   id: string;
   name: string;
@@ -14,10 +28,10 @@ export interface StrategicProjectStructureTask {
   limitation?: string | null;
   comments: string | null;
   projectFactorId: string;
-  projectParticipantId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string | null;
+  participants: TaskParticipant[];
 }
 
 export interface StrategicProjectStructureFactor {
@@ -33,17 +47,6 @@ export interface StrategicProjectStructureFactor {
   tasks: StrategicProjectStructureTask[];
   taskOpe: number;
   taskClo: number;
-}
-
-export interface StrategicProjectStructureParticipant {
-  id: string;
-  isLeader: boolean;
-  projectId: string;
-  positionId: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string | null;
-  position: { id: string; name: string };
 }
 
 export interface StrategicProjectStructureProject {
@@ -64,10 +67,8 @@ export interface StrategicProjectStructureProject {
   createdAt: string;
   updatedAt: string | null;
   objective: { id: string; name: string } | null;
-  position: { id: string; name: string };
-  participants: StrategicProjectStructureParticipant[];
+  position: { id: string; name: string; businessUnitId?: string };
   factors: StrategicProjectStructureFactor[];
-  leader?: StrategicProjectStructureParticipant;
   progressProject?: number | null;
 }
 

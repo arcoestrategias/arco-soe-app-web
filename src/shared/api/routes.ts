@@ -52,6 +52,8 @@ export const Modules = {
   MODULES: "modules",
   PERMISSIONS: "permissions",
   MEETINGS: "meetings",
+  EXTERNAL_USERS: "external-users",
+  PROJECT_TASK_PARTICIPANTS: "project-task-participants",
   // agrega aquí más módulos a futuro…
 } as const;
 
@@ -219,6 +221,16 @@ export const routes = {
     update: (id: string) => prefixed("project-tasks", id),
     setActive: (id: string) => prefixed("project-tasks", id, "active"),
     reorder: () => prefixed("project-tasks", "reorder"),
+    addParticipants: (taskId: string) =>
+      prefixed("project-tasks", taskId, "participants"),
+    replaceParticipants: (taskId: string) =>
+      prefixed("project-tasks", taskId, "participants"),
+    deleteParticipant: (taskId: string, participantId: string) =>
+      prefixed("project-tasks", taskId, "participants", participantId),
+  },
+
+  externalUsers: {
+    list: () => prefixed(Modules.EXTERNAL_USERS),
   },
 
   strategicValues: {

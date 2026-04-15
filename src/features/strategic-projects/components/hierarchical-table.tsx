@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
+  TaskParticipant,
 } from "../types/strategicProjectStructure";
 import { SortableFactor } from "./sortable-factor";
 
@@ -38,7 +39,7 @@ interface HierarchicalTableProps {
 
   addTask: (factorRowNumber: number) => void;
   editTask: (factorRowNumber: number, taskRowNumber: number) => void;
-  saveTask: (factorRowNumber: number, task: Task) => void;
+  saveTask: (factorRowNumber: number, task: Task, participants: TaskParticipant[]) => void;
   cancelTask: (
     factorRowNumber: number,
     taskRowNumber: number,
@@ -65,6 +66,8 @@ interface HierarchicalTableProps {
     tasksDelete: boolean;
     tasksReorder: boolean;
   };
+
+  businessUnitId?: string;
 }
 
 export function HierarchicalTable({
@@ -90,6 +93,7 @@ export function HierarchicalTable({
   dragDisabled = false,
   dragDisabledReason = "",
   permissions,
+  businessUnitId,
 }: HierarchicalTableProps) {
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -130,9 +134,10 @@ export function HierarchicalTable({
     <div className="rounded-md border">
       {/* Encabezado */}
       <div className="grid grid-cols-12 gap-2 bg-gray-100 p-3 text-xs font-medium text-gray-600">
-        <div className="col-span-4">Nombre</div>
-        <div className="col-span-4">Resultado / Entregable</div>
-        <div className="col-span-2">Estado</div>
+        <div className="col-span-3">Nombre</div>
+        <div className="col-span-3">Resultado / Entregable</div>
+        <div className="col-span-3">Responsables</div>
+        <div className="col-span-1">Estado</div>
         <div className="col-span-2 text-right">Acciones</div>
       </div>
 
@@ -168,7 +173,7 @@ export function HierarchicalTable({
                   onEditTask={(factorNum, taskNum) =>
                     editTask(factorNum, taskNum)
                   }
-                  onSaveTask={(factorNum, t) => saveTask(factorNum, t)}
+                  onSaveTask={(factorNum, t, participants) => saveTask(factorNum, t, participants)}
                   onCancelTask={(factorNum, taskNum, isNew) =>
                     cancelTask(factorNum, taskNum, isNew)
                   }
@@ -181,6 +186,7 @@ export function HierarchicalTable({
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
                   permissions={permissions}
+                  businessUnitId={businessUnitId}
                 />
               </div>
             ))}

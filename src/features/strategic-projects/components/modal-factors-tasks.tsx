@@ -15,6 +15,7 @@ import { HierarchicalTable } from "./hierarchical-table";
 import type {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
+  TaskParticipant,
 } from "@/features/strategic-projects/types/strategicProjectStructure";
 
 import {
@@ -29,6 +30,7 @@ import {
   updateProjectTask,
   setProjectTaskActive,
   reorderProjectTasks,
+  ParticipantInput,
 } from "@/features/strategic-projects/services/projectTasksService";
 
 import * as AuthStorage from "@/shared/auth/storage";
@@ -51,6 +53,7 @@ interface ModalFactorsTasksProps {
   onClose: () => void;
   projectId: string; // UUID real
   projectName: string;
+  businessUnitId?: string;
 }
 
 export function ModalFactorsTasks({
@@ -58,6 +61,7 @@ export function ModalFactorsTasks({
   onClose,
   projectId,
   projectName,
+  businessUnitId,
 }: ModalFactorsTasksProps) {
   const qc = useQueryClient();
   const { data, isPending, isError, error } = useProjectStructure(projectId);
@@ -155,18 +159,6 @@ export function ModalFactorsTasks({
       const posFromAuth = (AuthStorage as any)?.getPositionId?.();
       if (typeof posFromAuth === "string" && posFromAuth) return posFromAuth;
     } catch {}
-    return null;
-  }
-
-  function resolveDefaultParticipantId(): string | null {
-    const posId = resolveCurrentPositionId();
-    const participants = data?.project?.participants ?? [];
-    if (posId) {
-      const match = participants.find(
-        (p) => p.positionId === posId && p.isActive
-      );
-      if (match) return match.id;
-    }
     return null;
   }
 
@@ -334,7 +326,6 @@ export function ModalFactorsTasks({
   /* ---------------- TAREA CRUD ---------------- */
   function startCreateTask(factorId: string) {
     const draftId = `__new__:${crypto.randomUUID()}`;
-    const defaultParticipantId = resolveDefaultParticipantId();
     const ymdToday = todayClampedYmd(projectMin, projectMax);
 
     setFactors((prev) =>
@@ -356,10 +347,10 @@ export function ModalFactorsTasks({
           limitation: null,
           comments: null,
           projectFactorId: f.id,
-          projectParticipantId: defaultParticipantId ?? "",
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: null,
+          participants: [],
         };
         const tasks = [
           draft,
@@ -373,7 +364,7 @@ export function ModalFactorsTasks({
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: draftId }));
   }
 
-  async function saveTask(factorId: string, task: Task) {
+  async function saveTask(factorId: string, task: Task, participants: TaskParticipant[]) {
     await blocking.withBlocking(
       task.id.startsWith("__new__") ? "Creando tarea…" : "Actualizando tarea…",
       async () => {
@@ -385,6 +376,21 @@ export function ModalFactorsTasks({
 
         const toNull = (v?: string | null) =>
           (typeof v === "string" ? v.trim() : v) || null;
+
+        // Preparar participantes para enviar al API
+        const participantsPayload: ParticipantInput[] = participants
+          .filter((p) => p.isActive)
+          .map((p) => {
+            if (p.positionId) {
+              return { positionId: p.positionId };
+            } else if (p.externalUserId) {
+              return { externalUserId: p.externalUserId };
+            } else if (p.externalUserEmail) {
+              return { email: p.externalUserEmail, name: p.externalUserName ?? undefined };
+            }
+            return {};
+          })
+          .filter((p) => Object.keys(p).length > 0);
 
         if (!task.id.startsWith("__new__")) {
           await updateProjectTask(task.id, {
@@ -399,9 +405,15 @@ export function ModalFactorsTasks({
             untilAt: task.untilAt,
             status: task.status,
             budget: task.budget,
-            projectParticipantId: task.projectParticipantId ?? null,
             finishedAt: task.finishedAt ?? null,
           });
+
+          // Actualizar participantes usando PATCH (reemplazar todos, incluso si está vacío)
+          const { replaceTaskParticipants } = await import(
+            "@/features/strategic-projects/services/projectTasksService"
+          );
+          await replaceTaskParticipants(task.id, participantsPayload);
+
           await refetch();
           toast.success("Tarea actualizada");
           return;
@@ -412,8 +424,7 @@ export function ModalFactorsTasks({
           return;
         }
 
-        const fallbackParticipantId = resolveDefaultParticipantId();
-
+        // Crear tarea con participantes
         await createProjectTask({
           projectFactorId: factorId,
           name: task.name,
@@ -427,8 +438,7 @@ export function ModalFactorsTasks({
           untilAt: task.untilAt ?? undefined,
           status: task.status ?? "OPE",
           budget: task.budget ?? 0,
-          projectParticipantId:
-            task.projectParticipantId || fallbackParticipantId || undefined,
+          participants: participantsPayload.length > 0 ? participantsPayload : undefined,
         });
 
         await refetch();
@@ -618,9 +628,9 @@ export function ModalFactorsTasks({
                     const t = f?.tasks?.[taskRow - 1];
                     if (f?.id && t?.id) editTask(f.id, t.id);
                   }}
-                  saveTask={(row, t) => {
+                  saveTask={(row, t, participants) => {
                     const f = factors[row - 1];
-                    if (f?.id) saveTask(f.id, t);
+                    if (f?.id) saveTask(f.id, t, participants);
                   }}
                   cancelTask={(row, taskRow) => {
                     const f = factors[row - 1];
@@ -647,6 +657,7 @@ export function ModalFactorsTasks({
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
                   permissions={permissions}
+                  businessUnitId={businessUnitId}
                 />
                 ) : (
                   <div className="text-center text-gray-500 py-10">

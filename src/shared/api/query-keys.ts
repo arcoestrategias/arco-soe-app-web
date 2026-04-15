@@ -186,4 +186,6 @@ export const QKEY = {
     ] as const,
   meetingsMy: (companyId: string) => ["meetings", "my", companyId] as const,
   meeting: (id: string) => ["meetings", id] as const,
+
+  externalUsers: ["external-users"] as const,
 };
