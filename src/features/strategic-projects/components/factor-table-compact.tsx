@@ -12,7 +12,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { FactorCard } from "./factor-card";
+import { FactorCard, FactorTableHeader } from "./factor-card";
 import { TaskItem, TaskTableHeader } from "./task-item";
 import type {
   StrategicProjectStructureFactor as Factor,
@@ -135,6 +135,7 @@ export function FactorTableCompact({
           items={factors.map((f) => f.id)}
           strategy={verticalListSortingStrategy}
         >
+          <FactorTableHeader />
           {factors.map((factor) => {
             const isExpanded = expandedMap[factor.id] ?? false;
             const tasks = factor.tasks ?? [];
