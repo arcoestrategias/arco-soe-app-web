@@ -55,7 +55,11 @@ interface FactorRowProps {
   hasItemInCreation?: () => boolean;
   isDragging?: boolean;
   onEditTask: (factorNumber: number, taskNumber: number) => void;
-  onSaveTask: (factorNumber: number, task: Task, participants: TaskParticipant[]) => void;
+  onSaveTask: (
+    factorNumber: number,
+    task: Task,
+    participants: TaskParticipant[],
+  ) => void;
   onCancelTask: (
     factorNumber: number,
     taskNumber: number,

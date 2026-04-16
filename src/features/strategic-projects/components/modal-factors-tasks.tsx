@@ -10,7 +10,10 @@ import { toast } from "sonner";
 import { useProjectStructure } from "@/features/strategic-projects/hooks/use-project-structure";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
-import { HierarchicalTable } from "./hierarchical-table";
+import { FactorCardsList } from "./factor-cards-list";
+import { FactorCardsHorizontal } from "./factor-cards-horizontal";
+import { FactorTableCompact } from "./factor-table-compact";
+import { FactorViewSelector, getStoredViewMode } from "./factor-view-selector";
 
 import type {
   StrategicProjectStructureFactor as Factor,
@@ -73,6 +76,7 @@ export function ModalFactorsTasks({
   const [editingTaskByFactor, setEditingTaskByFactor] = useState<
     Record<string, string | null>
   >({});
+  const [viewMode, setViewMode] = useState<"cards" | "table">(() => getStoredViewMode());
 
   const permissions = usePermissions({
     factorsRead: PERMISSIONS.PROJECT_FACTORS.READ,
@@ -450,18 +454,25 @@ export function ModalFactorsTasks({
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: null }));
   }
 
-  function editTask(factorId: string, taskId: string) {
+  function editTask(factorId: string, taskIndex: number) {
+    const factor = factors.find((f) => f.id === factorId);
+    const task = factor?.tasks?.[taskIndex];
+    if (!task) return;
     setExpandedMap((prev) => ({ ...prev, [factorId]: true }));
-    setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: taskId }));
+    setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: task.id }));
   }
 
-  function cancelTask(factorId: string, taskId: string) {
+  function cancelTask(factorId: string, taskIndex: number, isNew?: boolean) {
+    const factor = factors.find((f) => f.id === factorId);
+    const task = factor?.tasks?.[taskIndex];
+    if (!task) return;
+    
     setFactors((prev) =>
       prev.map((f) => {
         if (f.id !== factorId) return f;
-        if (taskId.startsWith("__new__")) {
+        if (task.id.startsWith("__new__")) {
           const left = (f.tasks ?? [])
-            .filter((t) => t.id !== taskId)
+            .filter((t) => t.id !== task.id)
             .map((t, i) => ({ ...t, order: i + 1 }));
           return { ...f, tasks: left };
         }
@@ -562,31 +573,34 @@ export function ModalFactorsTasks({
       <DialogContent className="w-[80vw] !max-w-[80vw] p-0 overflow-hidden">
         <div className="relative">
           <DialogTitle className="px-5 pt-5 pb-0 text-lg font-semibold text-gray-900">
-            Factores Clave de Éxito y Tareas
+            Factores del Proyecto
           </DialogTitle>
           <p className="px-5 text-sm text-gray-600 -mt-1 mb-2">{projectName}</p>
 
-          <div className="flex flex-col h-[85vh]">
+            <div className="flex flex-col h-[85vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b">
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={toggleExpandAll}
-                disabled={blocking.open}
-              >
-                {factors.length > 0 &&
-                factors.every((f) => expandedMap[f.id]) ? (
-                  <>
-                    <ChevronUp className="w-4 h-4" />
-                    Colapsar todo
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-4 h-4" />
-                    Expandir todo
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-3">
+                <FactorViewSelector />
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={toggleExpandAll}
+                  disabled={blocking.open}
+                >
+                  {factors.length > 0 &&
+                  factors.every((f) => expandedMap[f.id]) ? (
+                    <>
+                      <ChevronUp className="w-4 h-4" />
+                      Colapsar todo
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4" />
+                      Expandir todo
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {permissions.factorsCreate && (
                 <Button
@@ -599,74 +613,42 @@ export function ModalFactorsTasks({
               )}
             </div>
 
-            <PlanRangeProvider
-              planFromAt={projectFromAt}
-              planUntilAt={projectUntilAt}
-            >
-              <div className="flex-1 overflow-auto bg-white p-5">
-                {permissions.factorsRead ? (
-                <HierarchicalTable
-                  factors={factors}
-                  loading={loading}
-                  expandedMap={expandedMap}
-                  editingFactorId={editingFactorId}
-                  editingTaskByFactor={editingTaskByFactor}
-                  toggleExpandFactor={(id) => toggleExpandFactor(String(id))}
-                  /* FACTORES */
-                  editFactor={(row) => editFactor(factors[row - 1]?.id!)}
-                  saveFactor={(f) => saveFactor(f)}
-                  cancelFactor={(row) => cancelFactor(factors[row - 1]?.id!)}
-                  deleteFactor={(row) => deleteFactor(factors[row - 1]?.id!)}
-                  reorderFactors={handleReorderFactors}
-                  /* TAREAS */
-                  addTask={(row) => {
-                    const f = factors[row - 1];
-                    if (f?.id) startCreateTask(f.id);
-                  }}
-                  editTask={(row, taskRow) => {
-                    const f = factors[row - 1];
-                    const t = f?.tasks?.[taskRow - 1];
-                    if (f?.id && t?.id) editTask(f.id, t.id);
-                  }}
-                  saveTask={(row, t, participants) => {
-                    const f = factors[row - 1];
-                    if (f?.id) saveTask(f.id, t, participants);
-                  }}
-                  cancelTask={(row, taskRow) => {
-                    const f = factors[row - 1];
-                    const t = f?.tasks?.[taskRow - 1];
-                    if (f?.id && t?.id) cancelTask(f.id, t.id);
-                  }}
-                  deleteTask={(row, taskRow) => {
-                    const f = factors[row - 1];
-                    const t = f?.tasks?.[taskRow - 1];
-                    if (t?.id) deleteTask(t.id);
-                  }}
-                  reorderTasks={(row, next) => {
-                    const f = factors[row - 1];
-                    if (f?.id) handleReorderTasks(f.id, next);
-                  }}
-                  countCompletedTasks={(tasks) =>
-                    (tasks ?? []).filter(
-                      (t) =>
-                        !!t.finishedAt ||
-                        (t.status ?? "").toUpperCase() === "CLO"
-                    ).length
-                  }
-                  hasItemInCreation={() => false}
-                  dragDisabled={dragDisabled}
-                  dragDisabledReason={dragDisabledReason}
-                  permissions={permissions}
-                  businessUnitId={businessUnitId}
-                />
-                ) : (
-                  <div className="text-center text-gray-500 py-10">
-                    No tienes permisos para ver los factores.
-                  </div>
-                )}
-              </div>
-            </PlanRangeProvider>
-          </div>
+              <PlanRangeProvider
+                planFromAt={projectFromAt}
+                planUntilAt={projectUntilAt}
+              >
+                <div className="flex-1 overflow-auto bg-gray-50 p-5">
+                  {permissions.factorsRead ? (
+                    <ViewRenderer
+                      factors={factors}
+                      expandedMap={expandedMap}
+                      editingFactorId={editingFactorId}
+                      editingTaskByFactor={editingTaskByFactor}
+                      toggleExpandFactor={toggleExpandFactor}
+                      editFactor={editFactor}
+                      saveFactor={saveFactor}
+                      cancelFactor={cancelFactor}
+                      deleteFactor={deleteFactor}
+                      startCreateTask={startCreateTask}
+                      editTask={editTask}
+                      saveTask={saveTask}
+                      cancelTask={cancelTask}
+                      deleteTask={deleteTask}
+                      handleReorderFactors={handleReorderFactors}
+                      handleReorderTasks={handleReorderTasks}
+                      dragDisabled={dragDisabled}
+                      dragDisabledReason={dragDisabledReason}
+                      permissions={permissions}
+                      businessUnitId={businessUnitId}
+                    />
+                  ) : (
+                    <div className="text-center text-gray-500 py-10">
+                      No tienes permisos para ver los factores.
+                    </div>
+                  )}
+                </div>
+              </PlanRangeProvider>
+            </div>
 
           {/* 🆕 Overlay bloqueante y con porcentaje */}
           <BlockingProgressOverlay
@@ -680,4 +662,93 @@ export function ModalFactorsTasks({
       </DialogContent>
     </Dialog>
   );
+}
+
+interface ViewRendererProps {
+  factors: Factor[];
+  expandedMap: Record<string, boolean>;
+  editingFactorId: string | null;
+  editingTaskByFactor: Record<string, string | null>;
+  toggleExpandFactor: (factorId: string) => void;
+  editFactor: (factorId: string) => void;
+  saveFactor: (factor: Factor) => void;
+  cancelFactor: (factorId: string) => void;
+  deleteFactor: (factorId: string) => void;
+  startCreateTask: (factorId: string) => void;
+  editTask: (factorId: string, taskIndex: number) => void;
+  saveTask: (factorId: string, task: Task, participants: TaskParticipant[]) => void;
+  cancelTask: (factorId: string, taskIndex: number, isNew?: boolean) => void;
+  deleteTask: (taskId: string) => void;
+  handleReorderFactors: (newOrder: Factor[]) => void;
+  handleReorderTasks: (factorId: string, next: Task[]) => void;
+  dragDisabled: boolean;
+  dragDisabledReason: string;
+  permissions: ReturnType<typeof usePermissions>;
+  businessUnitId?: string;
+}
+
+function ViewRenderer({
+  factors,
+  expandedMap,
+  editingFactorId,
+  editingTaskByFactor,
+  toggleExpandFactor,
+  editFactor,
+  saveFactor,
+  cancelFactor,
+  deleteFactor,
+  startCreateTask,
+  editTask,
+  saveTask,
+  cancelTask,
+  deleteTask,
+  handleReorderFactors,
+  handleReorderTasks,
+  dragDisabled,
+  dragDisabledReason,
+  permissions,
+  businessUnitId,
+}: ViewRendererProps) {
+  const viewMode = getStoredViewMode();
+
+  const commonProps = {
+    factors,
+    expandedMap,
+    editingFactorId,
+    editingTaskByFactor,
+    toggleExpandFactor,
+    editFactor,
+    saveFactor,
+    cancelFactor,
+    deleteFactor,
+    addTask: startCreateTask,
+    editTask,
+    saveTask,
+    cancelTask,
+    deleteTask: (factorId: string, taskIndex: number) => {
+      const factor = factors.find((f) => f.id === factorId);
+      const task = factor?.tasks?.[taskIndex];
+      if (task?.id) deleteTask(task.id);
+    },
+    reorderFactors: handleReorderFactors,
+    reorderTasks: handleReorderTasks,
+    dragDisabled,
+    dragDisabledReason,
+    permissions: {
+      factorsUpdate: permissions.factorsUpdate,
+      factorsDelete: permissions.factorsDelete,
+      factorsReorder: permissions.factorsReorder,
+      tasksCreate: permissions.tasksCreate,
+      tasksUpdate: permissions.tasksUpdate,
+      tasksDelete: permissions.tasksDelete,
+      tasksReorder: permissions.tasksReorder,
+    },
+    businessUnitId,
+  };
+
+  if (viewMode === "table") {
+    return <FactorTableCompact {...commonProps} />;
+  }
+
+  return <FactorCardsHorizontal {...commonProps} />;
 }
