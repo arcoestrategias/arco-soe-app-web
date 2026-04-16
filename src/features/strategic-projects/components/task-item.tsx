@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Edit, Trash2, Calendar } from "lucide-react";
@@ -449,6 +449,82 @@ function renderCardVariant({
   );
 }
 
+interface ParticipantBadgesProps {
+  participants: TaskParticipant[];
+}
+
+function ParticipantBadges({ participants }: ParticipantBadgesProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const badgeWidthRef = useRef<number>(0);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateLayout = () => {
+      const width = el.offsetWidth;
+      setContainerWidth(width);
+
+      const badges = el.querySelectorAll("[data-badge]");
+      if (badges.length > 0) {
+        badgeWidthRef.current = badges[0].offsetWidth + 4;
+      }
+
+      const spaceForPlus = 40;
+      const availableWidth = width - spaceForPlus;
+      const count = Math.floor(availableWidth / badgeWidthRef.current);
+
+      setVisibleCount(Math.max(0, count));
+    };
+
+    updateLayout();
+
+    const observer = new ResizeObserver(updateLayout);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [participants.length]);
+
+  if (participants.length === 0) {
+    return <span className="text-[10px] text-gray-400">—</span>;
+  }
+
+  const visibleParticipants = visibleCount > 0 
+    ? participants.slice(0, visibleCount) 
+    : participants;
+  const hiddenCount = participants.length - visibleParticipants.length;
+
+  return (
+    <div ref={containerRef} className="flex items-center gap-1 w-full">
+      {visibleParticipants.map((p) => (
+        <Badge
+          key={p.id}
+          data-badge
+          variant="secondary"
+          className={`text-[10px] px-1.5 py-0.5 whitespace-nowrap shrink-0 ${
+            p.positionId
+              ? "bg-blue-50 text-blue-700"
+              : "bg-purple-50 text-purple-700"
+          }`}
+        >
+          {p.positionId
+            ? (p.positionName ?? "Cargo")
+            : (p.externalUserName ?? "Ext.")}
+        </Badge>
+      ))}
+      {hiddenCount > 0 && (
+        <Badge
+          variant="secondary"
+          className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 shrink-0"
+        >
+          +{hiddenCount}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 function renderTableVariant({
   task,
   activeParticipants,
@@ -475,9 +551,6 @@ function renderTableVariant({
   setNodeRef,
   style,
 }: TaskVariantProps) {
-  const otherParticipants =
-    activeParticipants.length > 1 ? activeParticipants.length - 1 : 0;
-
   return (
     <div
       ref={setNodeRef}
@@ -520,33 +593,8 @@ function renderTableVariant({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 px-3 py-2">
-        {activeParticipants.length > 0 ? (
-          <>
-            <Badge
-              variant="secondary"
-              className={`text-[10px] px-1.5 py-0.5 ${
-                activeParticipants[0].positionId
-                  ? "bg-blue-50 text-blue-700"
-                  : "bg-purple-50 text-purple-700"
-              }`}
-            >
-              {activeParticipants[0].positionId
-                ? (activeParticipants[0].positionName ?? "Cargo")
-                : (activeParticipants[0].externalUserName ?? "Ext.")}
-            </Badge>
-            {otherParticipants > 0 && (
-              <Badge
-                variant="secondary"
-                className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600"
-              >
-                +{otherParticipants}
-              </Badge>
-            )}
-          </>
-        ) : (
-          <span className="text-[10px] text-gray-400">—</span>
-        )}
+      <div className="flex items-center justify-center px-3 py-2">
+        <ParticipantBadges participants={activeParticipants} />
       </div>
 
       <div className="flex items-center justify-center px-3 py-2">
