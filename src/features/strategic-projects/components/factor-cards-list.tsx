@@ -159,6 +159,7 @@ export function FactorCardsList({
               permissions={{
                 factorsUpdate: permissions.factorsUpdate,
                 factorsDelete: permissions.factorsDelete,
+                factorsReorder: permissions.factorsReorder,
                 tasksCreate: permissions.tasksCreate,
                 tasksUpdate: permissions.tasksUpdate,
                 tasksDelete: permissions.tasksDelete,

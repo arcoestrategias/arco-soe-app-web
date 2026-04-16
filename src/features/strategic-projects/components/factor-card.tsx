@@ -14,7 +14,9 @@ import {
   SortableContext,
   verticalListSortingStrategy,
   arrayMove,
+  useSortable,
 } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   GripVertical,
@@ -58,11 +60,12 @@ interface FactorCardProps {
   onReorderTasks: (newOrder: Task[]) => void;
   dragDisabled?: boolean;
   dragDisabledReason?: string;
-  listeners: SyntheticListenerMap;
-  attributes: DraggableAttributes;
+  listeners?: SyntheticListenerMap;
+  attributes?: DraggableAttributes;
   permissions: {
     factorsUpdate: boolean;
     factorsDelete: boolean;
+    factorsReorder: boolean;
     tasksCreate: boolean;
     tasksUpdate: boolean;
     tasksDelete: boolean;
@@ -100,6 +103,21 @@ export function FactorCard({
   const [showConfirm, setShowConfirm] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
+
+  const {
+    attributes: sortableAttributes,
+    listeners: sortableListeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: factor.id, disabled: dragDisabled || !permissions.factorsReorder });
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const tareasCompletadas = (factor.tasks ?? []).filter(
     (t) => (t.status ?? "").toUpperCase() === "CLO",
@@ -148,8 +166,14 @@ export function FactorCard({
   };
 
   const sortableProps = (!dragDisabled
-    ? { ...(listeners ?? {}), ...(attributes ?? {}) }
+    ? {
+        ...(variant === "compact"
+          ? { ...sortableListeners, ...sortableAttributes }
+          : { ...(listeners ?? {}), ...(attributes ?? {}) }),
+      }
     : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
+
+  const sortableRef = variant === "compact" ? setSortableRef : undefined;
 
   const renderProgressBar = () => {
     const progressValue = Math.round(progreso * 100);
@@ -188,6 +212,8 @@ export function FactorCard({
       setShowConfirm,
       renderProgressBar,
       permissions,
+      sortableRef,
+      sortableStyle,
     });
   }
 
@@ -512,6 +538,8 @@ interface CompactVariantProps {
   setShowConfirm: (show: boolean) => void;
   renderProgressBar: () => React.ReactNode;
   permissions: FactorCardProps["permissions"];
+  sortableRef?: (node: HTMLElement | null) => void;
+  sortableStyle?: React.CSSProperties;
 }
 
 function renderCompactVariant({
@@ -533,10 +561,16 @@ function renderCompactVariant({
   setShowConfirm,
   renderProgressBar,
   permissions,
+  sortableRef,
+  sortableStyle,
 }: CompactVariantProps) {
   return (
     <>
-      <div className="grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50  border-t border-gray-200">
+      <div
+        ref={sortableRef}
+        style={sortableStyle}
+        className="grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50 border-t border-gray-200"
+      >
         <div className="flex items-center gap-2 px-3 py-3">
           <div
             className={`flex items-center ${

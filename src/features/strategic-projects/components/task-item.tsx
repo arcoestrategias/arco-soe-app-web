@@ -469,7 +469,8 @@ function ParticipantBadges({ participants }: ParticipantBadgesProps) {
 
       const badges = el.querySelectorAll("[data-badge]");
       if (badges.length > 0) {
-        badgeWidthRef.current = badges[0].offsetWidth + 4;
+        const firstBadge = badges[0] as HTMLElement;
+        badgeWidthRef.current = firstBadge.offsetWidth + 4;
       }
 
       const spaceForPlus = 40;

@@ -160,11 +160,10 @@ export function FactorTableCompact({
                   onReorderTasks={(newOrder) => reorderTasks(factor.id, newOrder)}
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
-                  listeners={{} as any}
-                  attributes={{} as any}
                   permissions={{
                     factorsUpdate: permissions.factorsUpdate,
                     factorsDelete: permissions.factorsDelete,
+                    factorsReorder: permissions.factorsReorder,
                     tasksCreate: permissions.tasksCreate,
                     tasksUpdate: permissions.tasksUpdate,
                     tasksDelete: permissions.tasksDelete,
@@ -176,47 +175,71 @@ export function FactorTableCompact({
 
                 {isExpanded && (
                   <div className="ml-6 pl-4 border-l-4 border-blue-300 bg-blue-50/20">
-                    {tasks.length > 0 ? (
-                      <>
-                        <TaskTableHeader 
-                          factorName={factor.name ?? "Factor sin nombre"}
-                          completedTasks={tasks.filter(t => (t.status ?? '').toUpperCase() === 'CLO').length}
-                          totalTasks={tasks.length}
-                        />
-                        {tasks.map((task) => (
-                          <TaskItem
-                            key={task.id}
-                            task={task}
-                            participants={task.participants}
-                            isEditing={editingTaskByFactor[factor.id] === task.id}
-                            onEdit={() => {
-                              const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                              if (taskIndex !== -1) editTask(factor.id, taskIndex);
-                            }}
-                            onSave={(t, p) => saveTask(factor.id, t, p)}
-                            onCancel={() => {
-                              const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                              if (taskIndex !== -1) cancelTask(factor.id, taskIndex, false);
-                            }}
-                            onDelete={() => {
-                              const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                              if (taskIndex !== -1) deleteTask(factor.id, taskIndex);
-                            }}
-                            dragDisabled={dragDisabled}
-                            dragDisabledReason={dragDisabledReason}
-                            canUpdate={permissions.tasksUpdate}
-                            canDelete={permissions.tasksDelete}
-                            canReorder={permissions.tasksReorder}
-                            businessUnitId={businessUnitId}
-                            variant="table"
-                          />
-                        ))}
-                      </>
-                    ) : (
-                      <div className="px-4 py-3 text-center text-xs text-gray-400 bg-gray-50">
-                        No hay tareas en este factor
-                      </div>
-                    )}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event: DragEndEvent) => {
+                        const { active, over } = event;
+                        if (!over || active.id === over.id) return;
+
+                        const oldIndex = tasks.findIndex((t) => t.id === active.id);
+                        const newIndex = tasks.findIndex((t) => t.id === over.id);
+
+                        if (oldIndex !== -1 && newIndex !== -1) {
+                          const reordered = [...tasks];
+                          const [removed] = reordered.splice(oldIndex, 1);
+                          reordered.splice(newIndex, 0, removed);
+                          reorderTasks(factor.id, reordered);
+                        }
+                      }}
+                    >
+                      <SortableContext
+                        items={tasks.map((t) => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {tasks.length > 0 ? (
+                          <>
+                            <TaskTableHeader
+                              factorName={factor.name ?? "Factor sin nombre"}
+                              completedTasks={tasks.filter(t => (t.status ?? '').toUpperCase() === 'CLO').length}
+                              totalTasks={tasks.length}
+                            />
+                            {tasks.map((task) => (
+                              <TaskItem
+                                key={task.id}
+                                task={task}
+                                participants={task.participants}
+                                isEditing={editingTaskByFactor[factor.id] === task.id}
+                                onEdit={() => {
+                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
+                                  if (taskIndex !== -1) editTask(factor.id, taskIndex);
+                                }}
+                                onSave={(t, p) => saveTask(factor.id, t, p)}
+                                onCancel={() => {
+                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
+                                  if (taskIndex !== -1) cancelTask(factor.id, taskIndex, false);
+                                }}
+                                onDelete={() => {
+                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
+                                  if (taskIndex !== -1) deleteTask(factor.id, taskIndex);
+                                }}
+                                dragDisabled={dragDisabled}
+                                dragDisabledReason={dragDisabledReason}
+                                canUpdate={permissions.tasksUpdate}
+                                canDelete={permissions.tasksDelete}
+                                canReorder={permissions.tasksReorder}
+                                businessUnitId={businessUnitId}
+                                variant="table"
+                              />
+                            ))}
+                          </>
+                        ) : (
+                          <div className="px-4 py-3 text-center text-xs text-gray-400 bg-gray-50">
+                            No hay tareas en este factor
+                          </div>
+                        )}
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
               </div>
