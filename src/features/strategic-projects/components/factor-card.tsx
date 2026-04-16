@@ -536,8 +536,8 @@ function renderCompactVariant({
 }: CompactVariantProps) {
   return (
     <>
-      <div className="grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50">
-        <div className="flex items-center gap-2 px-3 py-3 border-r border-gray-200">
+      <div className="grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50  border-t border-gray-200">
+        <div className="flex items-center gap-2 px-3 py-3">
           <div
             className={`flex items-center ${
               dragDisabled ? "cursor-not-allowed opacity-50" : "cursor-grab"
@@ -570,7 +570,7 @@ function renderCompactVariant({
           )}
         </div>
 
-        <div className="flex items-center px-3 py-3 border-r border-gray-200">
+        <div className="flex items-center px-3 py-3  border-gray-200">
           {isEditing ? (
             <TextareaWithCounter
               value={editedFactor.result ?? ""}
@@ -585,7 +585,7 @@ function renderCompactVariant({
           )}
         </div>
 
-        <div className="flex items-center justify-center px-3 py-3 border-r border-gray-200">
+        <div className="flex items-center justify-center px-3 py-3  border-gray-200">
           {!isEditing && renderProgressBar()}
         </div>
 

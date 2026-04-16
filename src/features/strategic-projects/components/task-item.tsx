@@ -482,11 +482,11 @@ function renderTableVariant({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[30%_25%_15%_10%_10%_10%] border-t border-gray-200 bg-white hover:bg-gray-50 transition-colors ${
+      className={`grid grid-cols-[35%_30%_15%_10%_10%] border-t bg-white hover:bg-gray-50 transition-colors ${
         isDragging ? "opacity-50 bg-blue-50" : ""
       }`}
     >
-      <div className="flex items-center gap-2 px-3 py-2 border-r border-gray-200">
+      <div className="flex items-center gap-2 px-3 py-2">
         <div
           className={`flex items-center ${
             dragDisabled
@@ -506,20 +506,21 @@ function renderTableVariant({
         >
           <GripVertical size={14} />
         </div>
-        <span
-          className={`text-xs font-medium truncate ${isFinished ? "text-gray-400 line-through" : "text-gray-800"}`}
-        >
-          {task.name || "Tarea sin nombre"}
-        </span>
+        <div className="min-w-0 flex-1">
+          <div
+            className={`text-xs font-semibold truncate ${isFinished ? "text-gray-400 line-through" : "text-gray-800"}`}
+          >
+            {task.name || "Tarea sin nombre"}
+          </div>
+          {task.result && (
+            <div className="text-[10px] text-gray-500 truncate">
+              Entregable: {task.result}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center px-3 py-2 border-r border-gray-200">
-        <span className="text-xs text-gray-500 line-clamp-1 truncate">
-          {task.result || "—"}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1 px-3 py-2 border-r border-gray-200">
+      <div className="flex items-center gap-1 px-3 py-2">
         {activeParticipants.length > 0 ? (
           <>
             <Badge
@@ -548,7 +549,7 @@ function renderTableVariant({
         )}
       </div>
 
-      <div className="flex items-center justify-center px-3 py-2 border-r border-gray-200">
+      <div className="flex items-center justify-center px-3 py-2">
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
           <PopoverTrigger asChild disabled={!canUpdate}>
             <button
@@ -577,7 +578,7 @@ function renderTableVariant({
         </Popover>
       </div>
 
-      <div className="flex items-center justify-center px-3 py-2 border-r border-gray-200">
+      <div className="flex items-center justify-center px-3 py-2">
         {canUpdate ? (
           <Badge
             onClick={toggleStatus}
@@ -626,7 +627,7 @@ function renderTableVariant({
       </div>
 
       {showDeleteConfirm && (
-        <div className="col-span-6 p-0">
+        <div className="col-span-5 p-0">
           <DeleteConfirmModal
             onConfirm={onDelete}
             onCancel={() => setShowDeleteConfirm(false)}
@@ -683,31 +684,24 @@ export function TaskTableHeader({
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="bg-blue-50 border-b border-gray-200">
-      <div className="grid grid-cols-[30%_25%_15%_10%_10%_10%]">
-        <div className="flex items-center gap-2 px-3 py-2 border-r border-gray-200">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-700 truncate">
-              {factorName}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center px-3 py-2 border-r border-gray-200">
-          <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">
-            Resultado
+    <div className="bg-blue-50 ">
+      <div className="grid grid-cols-[35%_30%_15%_10%_10%]">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+            Tareas
           </span>
         </div>
-        <div className="flex items-center px-3 py-2 border-r border-gray-200">
+        <div className="flex items-center px-3 py-2">
           <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">
             Responsables
           </span>
         </div>
-        <div className="flex items-center justify-center px-3 py-2 border-r border-gray-200">
+        <div className="flex items-center justify-center px-3 py-2">
           <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">
             Fechas
           </span>
         </div>
-        <div className="flex items-center justify-center px-3 py-2 border-r border-gray-200">
+        <div className="flex items-center justify-center px-3 py-2">
           <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">
             Estado
           </span>

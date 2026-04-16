@@ -174,7 +174,7 @@ export function FactorTableCompact({
                 />
 
                 {isExpanded && (
-                  <div className="border-t border-gray-200">
+                  <div className="ml-6 pl-4 border-l-4 border-blue-300 bg-blue-50/20">
                     {tasks.length > 0 ? (
                       <>
                         <TaskTableHeader 
