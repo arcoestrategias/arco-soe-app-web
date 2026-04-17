@@ -300,6 +300,14 @@ export function ModalFactorsTasks({
   }
 
   function editFactor(factorId: string) {
+    if (editingFactorId && editingFactorId !== factorId) {
+      toast.error("No puedes editar otro factor mientras editas uno");
+      return;
+    }
+    if (Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+      toast.error("No puedes editar un factor mientras editas una tarea");
+      return;
+    }
     setExpandedMap((prev) => ({ ...prev, [factorId]: true }));
     setEditingFactorId(factorId);
   }
@@ -320,6 +328,10 @@ export function ModalFactorsTasks({
   }
 
   async function deleteFactor(factorId: string) {
+    if (editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+      toast.error("No puedes eliminar mientras hay una edición en progreso");
+      return;
+    }
     await blocking.withBlocking("Inactivando factor…", async () => {
       await setProjectFactorActive(factorId, false);
       await refetch();
@@ -455,9 +467,18 @@ export function ModalFactorsTasks({
   }
 
   function editTask(factorId: string, taskIndex: number) {
+    if (editingFactorId) {
+      toast.error("No puedes editar una tarea mientras editas un factor");
+      return;
+    }
+    const currentEditingTask = editingTaskByFactor[factorId];
     const factor = factors.find((f) => f.id === factorId);
     const task = factor?.tasks?.[taskIndex];
     if (!task) return;
+    if (currentEditingTask && currentEditingTask !== task.id) {
+      toast.error("No puedes editar otra tarea mientras editas una");
+      return;
+    }
     setExpandedMap((prev) => ({ ...prev, [factorId]: true }));
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: task.id }));
   }
@@ -483,6 +504,10 @@ export function ModalFactorsTasks({
   }
 
   async function deleteTask(taskId: string) {
+    if (editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+      toast.error("No puedes eliminar mientras hay una edición en progreso");
+      return;
+    }
     await blocking.withBlocking("Inactivando tarea…", async () => {
       await setProjectTaskActive(taskId, false);
       await refetch();
@@ -503,6 +528,8 @@ export function ModalFactorsTasks({
   };
 
   const loading = isPending;
+
+  const isEditingActive = !!editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k]);
 
   function normalizeName(s?: string | null) {
     return (s ?? "").trim().toLowerCase();
@@ -640,6 +667,7 @@ export function ModalFactorsTasks({
                       dragDisabledReason={dragDisabledReason}
                       permissions={permissions}
                       businessUnitId={businessUnitId}
+                      isEditingActive={isEditingActive}
                     />
                   ) : (
                     <div className="text-center text-gray-500 py-10">
@@ -685,6 +713,7 @@ interface ViewRendererProps {
   dragDisabledReason: string;
   permissions: ReturnType<typeof usePermissions>;
   businessUnitId?: string;
+  isEditingActive: boolean;
 }
 
 function ViewRenderer({
@@ -708,6 +737,7 @@ function ViewRenderer({
   dragDisabledReason,
   permissions,
   businessUnitId,
+  isEditingActive,
 }: ViewRendererProps) {
   const viewMode = getStoredViewMode();
 
@@ -744,6 +774,7 @@ function ViewRenderer({
       tasksReorder: permissions.tasksReorder,
     },
     businessUnitId,
+    isEditingActive,
   };
 
   if (viewMode === "table") {

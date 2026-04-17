@@ -49,6 +49,7 @@ interface FactorTableCompactProps {
     tasksReorder: boolean;
   };
   businessUnitId?: string;
+  isEditingActive?: boolean;
 }
 
 export function FactorTableCompact({
@@ -72,6 +73,7 @@ export function FactorTableCompact({
   dragDisabledReason = "",
   permissions,
   businessUnitId,
+  isEditingActive = false,
 }: FactorTableCompactProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -171,6 +173,7 @@ export function FactorTableCompact({
                   }}
                   businessUnitId={businessUnitId}
                   variant="compact"
+                  isEditingActive={isEditingActive}
                 />
 
                 {isExpanded && (
@@ -230,6 +233,7 @@ export function FactorTableCompact({
                                 canReorder={permissions.tasksReorder}
                                 businessUnitId={businessUnitId}
                                 variant="table"
+                                isEditingActive={isEditingActive}
                               />
                             ))}
                           </>

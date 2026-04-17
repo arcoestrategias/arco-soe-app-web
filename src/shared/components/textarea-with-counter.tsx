@@ -32,7 +32,7 @@ export const TextareaWithCounter = forwardRef<
   ref
 ) {
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <Textarea
         ref={ref}
         value={typeof value === "string" ? value : ""} // 🔒 guard

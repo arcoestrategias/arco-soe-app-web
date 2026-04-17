@@ -101,40 +101,40 @@ export function TaskEditorInline({
         {task.id.startsWith("__new__") ? "Nueva tarea" : "Editando tarea"}
       </h4>
 
-      {/* Task Name */}
-      <div className="mb-3">
-        <label className="text-xs text-gray-500 mb-1 block">
-          Acción clave <span className="text-red-500">*</span>
-        </label>
-        <TextareaWithCounter
-          value={editedTask.name ?? ""}
-          onValueChange={(val) => handleChange("name", val)}
-          maxLength={500}
-          className="min-h-[50px]"
-        />
-        {errors.name && (
-          <p className="text-xs text-red-500 mt-1">{errors.name}</p>
-        )}
-      </div>
-
-      {/* Deliverable */}
-      <div className="mb-3">
-        <label className="text-xs text-gray-500 mb-1 block">
-          Entregable <span className="text-red-500">*</span>
-        </label>
-        <TextareaWithCounter
-          value={editedTask.result ?? ""}
-          onValueChange={(val) => handleChange("result", val)}
-          maxLength={1000}
-          className="min-h-[50px]"
-        />
-        {errors.result && (
-          <p className="text-xs text-red-500 mt-1">{errors.result}</p>
-        )}
-      </div>
-
-      {/* Dates and Status */}
+      {/* Fila 1: Acción Clave y Entregable (side by side) */}
       <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Acción clave <span className="text-red-500">*</span>
+          </label>
+          <TextareaWithCounter
+            value={editedTask.name ?? ""}
+            onValueChange={(val) => handleChange("name", val)}
+            maxLength={500}
+            className="min-h-[60px]"
+          />
+          {errors.name && (
+            <p className="text-xs text-red-500 mt-1">{errors.name}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Entregable <span className="text-red-500">*</span>
+          </label>
+          <TextareaWithCounter
+            value={editedTask.result ?? ""}
+            onValueChange={(val) => handleChange("result", val)}
+            maxLength={1000}
+            className="min-h-[60px]"
+          />
+          {errors.result && (
+            <p className="text-xs text-red-500 mt-1">{errors.result}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Fila 2: Fechas, Estado, Responsables (1/3 cada uno) */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
             Fechas <span className="text-red-500">*</span>
@@ -175,21 +175,21 @@ export function TaskEditorInline({
             <option value="CLO">Terminado</option>
           </select>
         </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Responsables</label>
+          <TaskParticipantsSelector
+            participants={editedParticipants}
+            onParticipantsChange={setEditedParticipants}
+            businessUnitId={businessUnitId}
+          />
+        </div>
       </div>
 
-      {/* Participants Selector */}
-      <div className="mb-3">
-        <label className="text-xs text-gray-500 mb-1 block">Responsables</label>
-        <TaskParticipantsSelector
-          participants={editedParticipants}
-          onParticipantsChange={setEditedParticipants}
-          businessUnitId={businessUnitId}
-        />
-      </div>
-
-      {/* Assigned Participants */}
-      {activeParticipants.length > 0 && (
+      {/* Fila 3: Responsables asignados */}
+      {activeParticipants.length > 0 ? (
         <div className="mb-3 flex flex-wrap gap-1">
+          <span className="text-xs text-gray-500 mr-2">Asignados:</span>
           {activeParticipants.map((p) => (
             <Badge
               key={p.id}
@@ -215,6 +215,10 @@ export function TaskEditorInline({
               </button>
             </Badge>
           ))}
+        </div>
+      ) : (
+        <div className="mb-3 text-xs text-gray-400">
+          Sin responsables asignados
         </div>
       )}
 

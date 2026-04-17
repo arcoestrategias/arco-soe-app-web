@@ -46,6 +46,7 @@ interface TaskItemProps {
   canReorder?: boolean;
   businessUnitId?: string;
   variant?: TaskItemVariant;
+  isEditingActive?: boolean;
 }
 
 export function TaskItem({
@@ -63,6 +64,7 @@ export function TaskItem({
   canReorder = false,
   businessUnitId,
   variant = "card",
+  isEditingActive = false,
 }: TaskItemProps) {
   const {
     attributes,
@@ -172,6 +174,7 @@ export function TaskItem({
       showBlocked,
       setNodeRef,
       style,
+      isEditingActive,
     });
   }
 
@@ -228,6 +231,7 @@ interface TaskVariantProps {
   showBlocked: () => void;
   setNodeRef: (node: HTMLElement | null) => void;
   style: React.CSSProperties;
+  isEditingActive?: boolean;
 }
 
 function renderCardVariant({
@@ -551,6 +555,7 @@ function renderTableVariant({
   showBlocked,
   setNodeRef,
   style,
+  isEditingActive = false,
 }: TaskVariantProps) {
   return (
     <div
@@ -600,13 +605,9 @@ function renderTableVariant({
 
       <div className="flex items-center justify-center px-3 py-2">
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
-          <PopoverTrigger asChild disabled={!canUpdate}>
+          <PopoverTrigger asChild disabled={!canUpdate || isEditingActive}>
             <button
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                canUpdate
-                  ? "hover:bg-gray-100 cursor-pointer"
-                  : "cursor-default"
-              } ${isFinished ? "border-green-200 bg-green-50 text-green-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${!canUpdate || isEditingActive ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100 cursor-pointer"} ${isFinished ? "border-green-200 bg-green-50 text-green-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}
             >
               {safeRangeLabel}
             </button>
@@ -630,8 +631,8 @@ function renderTableVariant({
       <div className="flex items-center justify-center px-3 py-2">
         {canUpdate ? (
           <Badge
-            onClick={toggleStatus}
-            className={`cursor-pointer text-[10px] ${
+            onClick={isEditingActive ? undefined : toggleStatus}
+            className={`${isEditingActive ? "cursor-not-allowed opacity-60" : "cursor-pointer"} text-[10px] ${
               isFinished
                 ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
                 : "bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200"
@@ -658,7 +659,8 @@ function renderTableVariant({
             variant="ghost"
             size="icon"
             onClick={onEdit}
-            className="h-6 w-6"
+            disabled={isEditingActive}
+            className={`h-6 w-6 ${isEditingActive ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <Edit className="h-3 w-3 text-gray-500" />
           </Button>
@@ -668,7 +670,8 @@ function renderTableVariant({
             variant="ghost"
             size="icon"
             onClick={() => setShowDeleteConfirm(true)}
-            className="h-6 w-6"
+            disabled={isEditingActive}
+            className={`h-6 w-6 ${isEditingActive ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <Trash2 className="h-3 w-3 text-red-400 hover:text-red-600" />
           </Button>

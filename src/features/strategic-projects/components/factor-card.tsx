@@ -73,6 +73,7 @@ interface FactorCardProps {
   };
   businessUnitId?: string;
   variant?: FactorCardVariant;
+  isEditingActive?: boolean;
 }
 
 export function FactorCard({
@@ -98,6 +99,7 @@ export function FactorCard({
   permissions,
   businessUnitId,
   variant = "card",
+  isEditingActive = false,
 }: FactorCardProps) {
   const [editedFactor, setEditedFactor] = useState<Factor>({ ...factor });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -214,6 +216,7 @@ export function FactorCard({
       permissions,
       sortableRef,
       sortableStyle,
+      isEditingActive,
     });
   }
 
@@ -540,6 +543,7 @@ interface CompactVariantProps {
   permissions: FactorCardProps["permissions"];
   sortableRef?: (node: HTMLElement | null) => void;
   sortableStyle?: React.CSSProperties;
+  isEditingActive?: boolean;
 }
 
 function renderCompactVariant({
@@ -563,6 +567,7 @@ function renderCompactVariant({
   permissions,
   sortableRef,
   sortableStyle,
+  isEditingActive = false,
 }: CompactVariantProps) {
   return (
     <>
@@ -650,7 +655,8 @@ function renderCompactVariant({
                   variant="ghost"
                   size="icon"
                   onClick={onAddTask}
-                  className="h-7 w-7 text-blue-500"
+                  disabled={isEditingActive}
+                  className={`h-7 w-7 text-blue-500 ${isEditingActive ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
@@ -660,7 +666,8 @@ function renderCompactVariant({
                   variant="ghost"
                   size="icon"
                   onClick={onEdit}
-                  className="h-7 w-7"
+                  disabled={isEditingActive}
+                  className={`h-7 w-7 ${isEditingActive ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <Edit className="h-3.5 w-3.5" />
                 </Button>
@@ -670,7 +677,8 @@ function renderCompactVariant({
                   variant="ghost"
                   size="icon"
                   onClick={() => setShowConfirm(true)}
-                  className="h-7 w-7 text-red-500"
+                  disabled={isEditingActive}
+                  className={`h-7 w-7 text-red-500 ${isEditingActive ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
