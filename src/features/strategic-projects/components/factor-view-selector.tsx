@@ -1,34 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ViewMode = "cards" | "table";
 
-const STORAGE_KEY = "factorViewMode";
+export interface FactorViewSelectorProps {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+}
 
-export function FactorViewSelector() {
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as ViewMode | null;
-    if (stored === "cards" || stored === "table") {
-      setViewMode(stored);
-    }
-  }, []);
-
-  const handleChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem(STORAGE_KEY, mode);
-  };
-
+export function FactorViewSelector({ viewMode, onViewModeChange }: FactorViewSelectorProps) {
   return (
     <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
       <Button
         variant={viewMode === "cards" ? "default" : "ghost"}
         size="sm"
-        onClick={() => handleChange("cards")}
+        onClick={() => onViewModeChange("cards")}
         className={`h-7 px-2 ${
           viewMode === "cards"
             ? "bg-white text-gray-900 shadow-sm hover:bg-white"
@@ -41,7 +29,7 @@ export function FactorViewSelector() {
       <Button
         variant={viewMode === "table" ? "default" : "ghost"}
         size="sm"
-        onClick={() => handleChange("table")}
+        onClick={() => onViewModeChange("table")}
         className={`h-7 px-2 ${
           viewMode === "table"
             ? "bg-white text-gray-900 shadow-sm hover:bg-white"
@@ -57,6 +45,6 @@ export function FactorViewSelector() {
 
 export function getStoredViewMode(): ViewMode {
   if (typeof window === "undefined") return "cards";
-  const stored = localStorage.getItem(STORAGE_KEY) as ViewMode | null;
+  const stored = localStorage.getItem("factorViewMode") as ViewMode | null;
   return stored === "table" ? "table" : "cards";
 }

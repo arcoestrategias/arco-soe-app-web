@@ -1,4 +1,3 @@
-// src/features/strategic-projects/services/projectTasksService.ts
 import http from "@/shared/api/http";
 import { unwrapAny } from "@/shared/api/response";
 import { routes } from "@/shared/api/routes";
@@ -49,7 +48,7 @@ export async function createProjectTask(payload: CreateProjectTaskPayload) {
 
 export async function updateProjectTask(
   id: string,
-  payload: UpdateProjectTaskPayload
+  payload: UpdateProjectTaskPayload,
 ) {
   const res = await http.patch(routes.projectTasks.update(id), payload);
   return unwrapAny(res.data);
@@ -62,7 +61,7 @@ export async function setProjectTaskActive(id: string, isActive: boolean) {
 
 export async function reorderProjectTasks(
   projectFactorId: string,
-  items: Array<{ id: string; order: number; isActive: boolean }>
+  items: Array<{ id: string; order: number; isActive: boolean }>,
 ) {
   const res = await http.patch(routes.projectTasks.reorder(), {
     projectFactorId,
@@ -73,32 +72,31 @@ export async function reorderProjectTasks(
 
 export async function addTaskParticipants(
   taskId: string,
-  participants: ParticipantInput[]
+  participants: ParticipantInput[],
 ): Promise<TaskParticipant[]> {
-  const res = await http.post(
-    routes.projectTasks.addParticipants(taskId),
-    { participants }
-  );
+  const res = await http.post(routes.projectTasks.addParticipants(taskId), {
+    participants,
+  });
   return unwrapAny<TaskParticipant[]>(res.data);
 }
 
 export async function replaceTaskParticipants(
   taskId: string,
-  participants: ParticipantInput[]
+  participants: ParticipantInput[],
 ): Promise<TaskParticipant[]> {
   const res = await http.patch(
     routes.projectTasks.replaceParticipants(taskId),
-    { participants }
+    { participants },
   );
   return unwrapAny<TaskParticipant[]>(res.data);
 }
 
 export async function deleteTaskParticipant(
   taskId: string,
-  participantId: string
+  participantId: string,
 ): Promise<void> {
   const res = await http.delete(
-    routes.projectTasks.deleteParticipant(taskId, participantId)
+    routes.projectTasks.deleteParticipant(taskId, participantId),
   );
   return unwrapAny(res.data);
 }

@@ -10,16 +10,16 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { FactorCard } from "./factor-card";
 import type {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
   TaskParticipant,
-} from "../types/strategicProjectStructure";
+} from "../../types/strategicProjectStructure";
 
-interface FactorCardsListProps {
+interface FactorCardsContainerProps {
   factors: Factor[];
   expandedMap: Record<string, boolean>;
   editingFactorId: string | null;
@@ -50,7 +50,7 @@ interface FactorCardsListProps {
   businessUnitId?: string;
 }
 
-export function FactorCardsList({
+export function FactorCardsContainer({
   factors,
   expandedMap,
   editingFactorId,
@@ -71,7 +71,7 @@ export function FactorCardsList({
   dragDisabledReason = "",
   permissions,
   businessUnitId,
-}: FactorCardsListProps) {
+}: FactorCardsContainerProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -123,6 +123,9 @@ export function FactorCardsList({
     );
   }
 
+  const totalSlots = Math.ceil(factors.length / 4) * 4;
+  const emptySlots = totalSlots - factors.length;
+
   return (
     <DndContext
       sensors={sensors}
@@ -131,16 +134,17 @@ export function FactorCardsList({
     >
       <SortableContext
         items={factors.map((f) => f.id)}
-        strategy={verticalListSortingStrategy}
+        strategy={horizontalListSortingStrategy}
       >
-        <div className="space-y-4">
-          {factors.map((factor) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {factors.map((factor, index) => (
             <FactorCard
               key={factor.id}
               factor={factor}
-              isExpanded={expandedMap[factor.id] ?? false}
+              orderNumber={index + 1}
               isEditing={editingFactorId === factor.id}
               editingTaskId={editingTaskByFactor[factor.id]}
+              isExpanded={expandedMap[factor.id] ?? false}
               onToggleExpand={() => toggleExpandFactor(factor.id)}
               onEdit={() => editFactor(factor.id)}
               onSave={saveFactor}
@@ -154,7 +158,9 @@ export function FactorCardsList({
               onReorderTasks={(newOrder) => reorderTasks(factor.id, newOrder)}
               dragDisabled={dragDisabled}
               dragDisabledReason={dragDisabledReason}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               listeners={{} as any}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               attributes={{} as any}
               permissions={{
                 factorsUpdate: permissions.factorsUpdate,
@@ -167,6 +173,18 @@ export function FactorCardsList({
               }}
               businessUnitId={businessUnitId}
             />
+          ))}
+
+          {Array.from({ length: emptySlots }).map((_, i) => (
+            <div
+              key={`empty-${i}`}
+              className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center min-h-[200px] bg-gray-50"
+            >
+              <div className="text-center text-gray-400">
+                <p className="text-sm">Espacio disponible</p>
+                <p className="text-xs">para nuevo factor</p>
+              </div>
+            </div>
           ))}
         </div>
       </SortableContext>

@@ -14,11 +14,11 @@ import {
 import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
 import { CurrencyInput } from "@/shared/components/currency-input";
 import { DateRangePicker } from "@/shared/components/single-date-picker";
-import { TaskParticipantsSelector } from "./task-participants-selector";
+import { TaskParticipantsSelector } from "../task-participants-selector";
 import {
   StrategicProjectStructureTask as Task,
   TaskParticipant,
-} from "../types/strategicProjectStructure";
+} from "../../types/strategicProjectStructure";
 import { parseYmdOrIsoToLocalDate, toYmd } from "@/shared/utils/dateFormatters";
 
 interface TaskEditorInlineProps {
@@ -37,7 +37,9 @@ export function TaskEditorInline({
   businessUnitId,
 }: TaskEditorInlineProps) {
   const [editedTask, setEditedTask] = useState<Task>({ ...task });
-  const [editedParticipants, setEditedParticipants] = useState<TaskParticipant[]>([...participants]);
+  const [editedParticipants, setEditedParticipants] = useState<
+    TaskParticipant[]
+  >([...participants]);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof Task, string>>>({});
@@ -56,7 +58,7 @@ export function TaskEditorInline({
     });
   }, [task, participants]);
 
-  const handleChange = (field: keyof Task, value: any) =>
+  const handleChange = (field: keyof Task, value: unknown) =>
     setEditedTask((prev) => ({ ...prev, [field]: value }));
 
   const handleApplyDates = (r?: DateRange) => {
@@ -89,7 +91,7 @@ export function TaskEditorInline({
     range.from && isValid(range.from) && range.to && isValid(range.to)
       ? `${format(range.from, "dd/MM/yyyy")} - ${format(
           range.to,
-          "dd/MM/yyyy"
+          "dd/MM/yyyy",
         )}`
       : "";
 
@@ -101,7 +103,6 @@ export function TaskEditorInline({
         {task.id.startsWith("__new__") ? "Nueva tarea" : "Editando tarea"}
       </h4>
 
-      {/* Fila 1: Acción Clave y Entregable (side by side) */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
@@ -133,7 +134,6 @@ export function TaskEditorInline({
         </div>
       </div>
 
-      {/* Fila 2: Fechas, Estado, Responsables (1/3 cada uno) */}
       <div className="grid grid-cols-3 gap-3 mb-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
@@ -144,7 +144,7 @@ export function TaskEditorInline({
               <input
                 readOnly
                 value={safeRangeLabel}
-                className="h-8 text-sm w-full rounded-md border border-input px-3 bg-white text-xs"
+                className="h-8 text-sm w-full rounded-md border border-input px-3 bg-white"
                 placeholder="Seleccionar"
               />
             </PopoverTrigger>
@@ -168,7 +168,7 @@ export function TaskEditorInline({
           <select
             value={editedTask.status ?? ""}
             onChange={(e) => handleChange("status", e.target.value)}
-            className="h-8 text-sm w-full rounded-md border border-input px-3 bg-white text-xs"
+            className="h-8 text-sm w-full rounded-md border border-input px-3 bg-white"
           >
             <option value="">Seleccionar</option>
             <option value="OPE">En proceso</option>
@@ -177,7 +177,9 @@ export function TaskEditorInline({
         </div>
 
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Responsables</label>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Responsables
+          </label>
           <TaskParticipantsSelector
             participants={editedParticipants}
             onParticipantsChange={setEditedParticipants}
@@ -186,7 +188,6 @@ export function TaskEditorInline({
         </div>
       </div>
 
-      {/* Fila 3: Responsables asignados */}
       {activeParticipants.length > 0 ? (
         <div className="mb-3 flex flex-wrap gap-1">
           <span className="text-xs text-gray-500 mr-2">Asignados:</span>
@@ -201,13 +202,13 @@ export function TaskEditorInline({
               }`}
             >
               {p.positionId
-                ? p.positionName ?? "Cargo"
-                : p.externalUserName ?? "Externo"}
+                ? (p.positionName ?? "Cargo")
+                : (p.externalUserName ?? "Externo")}
               <button
                 className="ml-1 hover:text-red-600"
                 onClick={() =>
                   setEditedParticipants((prev) =>
-                    prev.filter((x) => x.id !== p.id)
+                    prev.filter((x) => x.id !== p.id),
                   )
                 }
               >
@@ -222,7 +223,6 @@ export function TaskEditorInline({
         </div>
       )}
 
-      {/* More Info Toggle */}
       <button
         type="button"
         onClick={() => setShowMoreInfo(!showMoreInfo)}
@@ -231,7 +231,6 @@ export function TaskEditorInline({
         {showMoreInfo ? "- Menos información" : "+ Más información"}
       </button>
 
-      {/* More Info Fields */}
       {showMoreInfo && (
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
@@ -280,7 +279,6 @@ export function TaskEditorInline({
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="flex gap-2 justify-end">
         <Button
           variant="outline"

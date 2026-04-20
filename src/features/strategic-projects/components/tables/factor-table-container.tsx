@@ -12,13 +12,15 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { FactorCard, FactorTableHeader } from "./factor-card";
-import { TaskItem, TaskTableHeader } from "./task-item";
+import { FactorCardCompact } from "./factor-card-compact";
+import { TaskItemRow } from "./task-item-row";
+import { FactorTableHeader } from "./factor-table-header";
+import { TaskTableHeader } from "./task-table-header";
 import type {
   StrategicProjectStructureFactor as Factor,
   StrategicProjectStructureTask as Task,
   TaskParticipant,
-} from "../types/strategicProjectStructure";
+} from "../../types/strategicProjectStructure";
 
 interface FactorTableCompactProps {
   factors: Factor[];
@@ -32,7 +34,11 @@ interface FactorTableCompactProps {
   deleteFactor: (factorId: string) => void;
   addTask: (factorId: string) => void;
   editTask: (factorId: string, taskIndex: number) => void;
-  saveTask: (factorId: string, task: Task, participants: TaskParticipant[]) => void;
+  saveTask: (
+    factorId: string,
+    task: Task,
+    participants: TaskParticipant[],
+  ) => void;
   cancelTask: (factorId: string, taskIndex: number, isNew?: boolean) => void;
   deleteTask: (factorId: string, taskIndex: number) => void;
   reorderFactors: (newOrder: Factor[]) => void;
@@ -80,7 +86,7 @@ export function FactorTableCompact({
       activationConstraint: {
         distance: 8,
       },
-    })
+    }),
   );
 
   const handleDragEndFactor = (event: DragEndEvent) => {
@@ -144,7 +150,7 @@ export function FactorTableCompact({
 
             return (
               <div key={factor.id}>
-                <FactorCard
+                <FactorCardCompact
                   factor={factor}
                   isExpanded={isExpanded}
                   isEditing={editingFactorId === factor.id}
@@ -156,10 +162,16 @@ export function FactorTableCompact({
                   onDelete={() => deleteFactor(factor.id)}
                   onAddTask={() => addTask(factor.id)}
                   onEditTask={(taskIndex) => editTask(factor.id, taskIndex)}
-                  onSaveTask={(task, participants) => saveTask(factor.id, task, participants)}
-                  onCancelTask={(taskIndex, isNew) => cancelTask(factor.id, taskIndex, isNew)}
+                  onSaveTask={(task, participants) =>
+                    saveTask(factor.id, task, participants)
+                  }
+                  onCancelTask={(taskIndex, isNew) =>
+                    cancelTask(factor.id, taskIndex, isNew)
+                  }
                   onDeleteTask={(taskIndex) => deleteTask(factor.id, taskIndex)}
-                  onReorderTasks={(newOrder) => reorderTasks(factor.id, newOrder)}
+                  onReorderTasks={(newOrder) =>
+                    reorderTasks(factor.id, newOrder)
+                  }
                   dragDisabled={dragDisabled}
                   dragDisabledReason={dragDisabledReason}
                   permissions={{
@@ -185,8 +197,12 @@ export function FactorTableCompact({
                         const { active, over } = event;
                         if (!over || active.id === over.id) return;
 
-                        const oldIndex = tasks.findIndex((t) => t.id === active.id);
-                        const newIndex = tasks.findIndex((t) => t.id === over.id);
+                        const oldIndex = tasks.findIndex(
+                          (t) => t.id === active.id,
+                        );
+                        const newIndex = tasks.findIndex(
+                          (t) => t.id === over.id,
+                        );
 
                         if (oldIndex !== -1 && newIndex !== -1) {
                           const reordered = [...tasks];
@@ -204,27 +220,43 @@ export function FactorTableCompact({
                           <>
                             <TaskTableHeader
                               factorName={factor.name ?? "Factor sin nombre"}
-                              completedTasks={tasks.filter(t => (t.status ?? '').toUpperCase() === 'CLO').length}
+                              completedTasks={
+                                tasks.filter(
+                                  (t) =>
+                                    (t.status ?? "").toUpperCase() === "CLO",
+                                ).length
+                              }
                               totalTasks={tasks.length}
                             />
                             {tasks.map((task) => (
-                              <TaskItem
+                              <TaskItemRow
                                 key={task.id}
                                 task={task}
                                 participants={task.participants}
-                                isEditing={editingTaskByFactor[factor.id] === task.id}
+                                isEditing={
+                                  editingTaskByFactor[factor.id] === task.id
+                                }
                                 onEdit={() => {
-                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                                  if (taskIndex !== -1) editTask(factor.id, taskIndex);
+                                  const taskIndex = tasks.findIndex(
+                                    (t) => t.id === task.id,
+                                  );
+                                  if (taskIndex !== -1)
+                                    editTask(factor.id, taskIndex);
                                 }}
                                 onSave={(t, p) => saveTask(factor.id, t, p)}
                                 onCancel={() => {
-                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                                  if (taskIndex !== -1) cancelTask(factor.id, taskIndex, false);
+                                  const taskIndex = tasks.findIndex(
+                                    (t) => t.id === task.id,
+                                  );
+                                  if (taskIndex !== -1)
+                                    cancelTask(factor.id, taskIndex, false);
                                 }}
                                 onDelete={() => {
-                                  const taskIndex = tasks.findIndex((t) => t.id === task.id);
-                                  if (taskIndex !== -1) deleteTask(factor.id, taskIndex);
+                                  const taskIndex = tasks.findIndex(
+                                    (t) => t.id === task.id,
+                                  );
+                                  if (taskIndex !== -1)
+                                    deleteTask(factor.id, taskIndex);
                                 }}
                                 dragDisabled={dragDisabled}
                                 dragDisabledReason={dragDisabledReason}

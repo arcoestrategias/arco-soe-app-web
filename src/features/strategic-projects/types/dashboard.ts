@@ -1,4 +1,3 @@
-// src/features/strategic-projects/types/dashboard.ts
 export interface StrategicProjectsDashboardSummary {
   totalProjects: number;
   avgCompliance: number; // 8.33

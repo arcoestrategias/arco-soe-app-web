@@ -10,9 +10,8 @@ import { toast } from "sonner";
 import { useProjectStructure } from "@/features/strategic-projects/hooks/use-project-structure";
 import { QKEY } from "@/shared/api/query-keys";
 import { getHumanErrorMessage } from "@/shared/api/response";
-import { FactorCardsList } from "./factor-cards-list";
-import { FactorCardsHorizontal } from "./factor-cards-horizontal";
-import { FactorTableCompact } from "./factor-table-compact";
+import { FactorCardsContainer } from "./cards";
+import { FactorTableCompact } from "./tables";
 import { FactorViewSelector, getStoredViewMode } from "./factor-view-selector";
 
 import type {
@@ -78,6 +77,11 @@ export function ModalFactorsTasks({
   >({});
   const [viewMode, setViewMode] = useState<"cards" | "table">(() => getStoredViewMode());
 
+  const handleViewModeChange = (mode: "cards" | "table") => {
+    setViewMode(mode);
+    localStorage.setItem("factorViewMode", mode);
+  };
+
   const permissions = usePermissions({
     factorsRead: PERMISSIONS.PROJECT_FACTORS.READ,
     factorsCreate: PERMISSIONS.PROJECT_FACTORS.CREATE,
@@ -124,10 +128,10 @@ export function ModalFactorsTasks({
 
     setExpandedMap((prev) => {
       if (!sorted.length) return {};
-      // por defecto: abrir todos
+      // por defecto: cerrar todos
       const next: Record<string, boolean> = {};
       for (const f of sorted) {
-        next[f.id] = prev.hasOwnProperty(f.id) ? prev[f.id] : true; // NUEVOS → abiertos
+        next[f.id] = prev.hasOwnProperty(f.id) ? prev[f.id] : false; // NUEVOS → cerrados
       }
       return next;
     });
@@ -234,7 +238,7 @@ export function ModalFactorsTasks({
       draft,
       ...prev.map((f, idx) => ({ ...f, order: idx + 2 })),
     ]);
-    setExpandedMap((prev) => ({ ...prev, [draft.id]: true })); // abrir el nuevo
+    setExpandedMap((prev) => ({ ...prev, [draft.id]: false })); // nuevo factor cerrado
     setEditingFactorId(draft.id);
   }
 
@@ -607,7 +611,7 @@ export function ModalFactorsTasks({
             <div className="flex flex-col h-[85vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div className="flex items-center gap-3">
-                <FactorViewSelector />
+                <FactorViewSelector viewMode={viewMode} onViewModeChange={handleViewModeChange} />
                 <Button
                   variant="outline"
                   className="gap-2"
@@ -781,5 +785,5 @@ function ViewRenderer({
     return <FactorTableCompact {...commonProps} />;
   }
 
-  return <FactorCardsHorizontal {...commonProps} />;
+  return <FactorCardsContainer {...commonProps} />;
 }
