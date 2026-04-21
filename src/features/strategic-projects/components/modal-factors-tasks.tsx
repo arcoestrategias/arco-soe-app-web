@@ -49,6 +49,7 @@ import { BlockingProgressOverlay } from "@/shared/components/blocking-progress-o
 import { useBlockingProgress } from "@/shared/hooks/use-blocking-progress";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermissions } from "@/shared/auth/access-control";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
 
 interface ModalFactorsTasksProps {
   isOpen: boolean;
@@ -75,11 +76,33 @@ export function ModalFactorsTasks({
   const [editingTaskByFactor, setEditingTaskByFactor] = useState<
     Record<string, string | null>
   >({});
-  const [viewMode, setViewMode] = useState<"cards" | "table">(() => getStoredViewMode());
+  const [viewMode, setViewMode] = useState<"cards" | "table">(() =>
+    getStoredViewMode(),
+  );
+
+  const [confirmViewChange, setConfirmViewChange] = useState<{
+    open: boolean;
+    targetMode: "cards" | "table";
+  }>({ open: false, targetMode: "cards" });
+
+  const hasActiveEdits =
+    editingFactorId || Object.values(editingTaskByFactor).some(Boolean);
 
   const handleViewModeChange = (mode: "cards" | "table") => {
+    if (hasActiveEdits) {
+      setConfirmViewChange({ open: true, targetMode: mode });
+      return;
+    }
     setViewMode(mode);
     localStorage.setItem("factorViewMode", mode);
+  };
+
+  const confirmViewChangeAction = () => {
+    setEditingFactorId(null);
+    setEditingTaskByFactor({});
+    setViewMode(confirmViewChange.targetMode);
+    localStorage.setItem("factorViewMode", confirmViewChange.targetMode);
+    setConfirmViewChange({ open: false, targetMode: "cards" });
   };
 
   const permissions = usePermissions({
@@ -100,7 +123,7 @@ export function ModalFactorsTasks({
   const projectUntilAt = data?.project?.untilAt ?? null;
   const { min: projectMin, max: projectMax } = projectRangeToDates(
     projectFromAt,
-    projectUntilAt
+    projectUntilAt,
   );
 
   useEffect(() => {
@@ -138,7 +161,7 @@ export function ModalFactorsTasks({
 
     // NO toques edición actual; sólo resetea si el factor ya no existe
     setEditingFactorId((curr) =>
-      curr && sorted.some((f) => f.id === curr) ? curr : null
+      curr && sorted.some((f) => f.id === curr) ? curr : null,
     );
     setEditingTaskByFactor((curr) => {
       const next: Record<string, string | null> = {};
@@ -172,7 +195,7 @@ export function ModalFactorsTasks({
 
   function assertDatesWithinProject(
     fromAt?: string | null,
-    untilAt?: string | null
+    untilAt?: string | null,
   ) {
     if (!projectMin || !projectMax) return;
     const f = parseYmdOrIsoToLocalDate(fromAt ?? undefined);
@@ -187,7 +210,7 @@ export function ModalFactorsTasks({
       throw new Error("La fecha fin no puede ser posterior al Proyecto.");
     if (f && u && f > u)
       throw new Error(
-        "La fecha de inicio no puede ser mayor que la fecha de fin."
+        "La fecha de inicio no puede ser mayor que la fecha de fin.",
       );
   }
 
@@ -235,10 +258,10 @@ export function ModalFactorsTasks({
       taskClo: 0,
     };
     setFactors((prev) => [
-      draft,
-      ...prev.map((f, idx) => ({ ...f, order: idx + 2 })),
+      ...prev.map((f, idx) => ({ ...f, order: idx + 1 })),
+      { ...draft, order: prev.length + 1 },
     ]);
-    setExpandedMap((prev) => ({ ...prev, [draft.id]: false })); // nuevo factor cerrado
+    setExpandedMap((prev) => ({ ...prev, [draft.id]: true }));
     setEditingFactorId(draft.id);
   }
 
@@ -254,7 +277,7 @@ export function ModalFactorsTasks({
       isDuplicateFactorName(
         name,
         factors,
-        factor.id.startsWith("__new__") ? undefined : factor.id
+        factor.id.startsWith("__new__") ? undefined : factor.id,
       )
     ) {
       toast.error("Ya existe un factor con ese nombre en este proyecto");
@@ -287,7 +310,7 @@ export function ModalFactorsTasks({
           }
           await refetch();
           success = true;
-        }
+        },
       );
     } catch (e) {
       // Mostramos el mensaje real del backend (ej: "Factor name must be unique within the project")
@@ -308,7 +331,7 @@ export function ModalFactorsTasks({
       toast.error("No puedes editar otro factor mientras editas uno");
       return;
     }
-    if (Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+    if (Object.keys(editingTaskByFactor).some((k) => editingTaskByFactor[k])) {
       toast.error("No puedes editar un factor mientras editas una tarea");
       return;
     }
@@ -321,7 +344,7 @@ export function ModalFactorsTasks({
       setFactors((prev) =>
         prev
           .filter((f) => f.id !== factorId)
-          .map((f, idx) => ({ ...f, order: idx + 1 }))
+          .map((f, idx) => ({ ...f, order: idx + 1 })),
       );
       setExpandedMap((prev) => {
         const { [factorId]: _, ...rest } = prev;
@@ -332,7 +355,10 @@ export function ModalFactorsTasks({
   }
 
   async function deleteFactor(factorId: string) {
-    if (editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+    if (
+      editingFactorId ||
+      Object.keys(editingTaskByFactor).some((k) => editingTaskByFactor[k])
+    ) {
       toast.error("No puedes eliminar mientras hay una edición en progreso");
       return;
     }
@@ -377,21 +403,25 @@ export function ModalFactorsTasks({
           ...(f.tasks ?? []).map((t, i) => ({ ...t, order: i + 2 })),
         ];
         return { ...f, tasks };
-      })
+      }),
     );
 
     setExpandedMap((prev) => ({ ...prev, [factorId]: true }));
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: draftId }));
   }
 
-  async function saveTask(factorId: string, task: Task, participants: TaskParticipant[]) {
+  async function saveTask(
+    factorId: string,
+    task: Task,
+    participants: TaskParticipant[],
+  ) {
     await blocking.withBlocking(
       task.id.startsWith("__new__") ? "Creando tarea…" : "Actualizando tarea…",
       async () => {
         // Validación fechas proyecto
         assertDatesWithinProject(
           task.fromAt ?? undefined,
-          task.untilAt ?? undefined
+          task.untilAt ?? undefined,
         );
 
         const toNull = (v?: string | null) =>
@@ -406,7 +436,10 @@ export function ModalFactorsTasks({
             } else if (p.externalUserId) {
               return { externalUserId: p.externalUserId };
             } else if (p.externalUserEmail) {
-              return { email: p.externalUserEmail, name: p.externalUserName ?? undefined };
+              return {
+                email: p.externalUserEmail,
+                name: p.externalUserName ?? undefined,
+              };
             }
             return {};
           })
@@ -429,9 +462,8 @@ export function ModalFactorsTasks({
           });
 
           // Actualizar participantes usando PATCH (reemplazar todos, incluso si está vacío)
-          const { replaceTaskParticipants } = await import(
-            "@/features/strategic-projects/services/projectTasksService"
-          );
+          const { replaceTaskParticipants } =
+            await import("@/features/strategic-projects/services/projectTasksService");
           await replaceTaskParticipants(task.id, participantsPayload);
 
           await refetch();
@@ -458,12 +490,13 @@ export function ModalFactorsTasks({
           untilAt: task.untilAt ?? undefined,
           status: task.status ?? "OPE",
           budget: task.budget ?? 0,
-          participants: participantsPayload.length > 0 ? participantsPayload : undefined,
+          participants:
+            participantsPayload.length > 0 ? participantsPayload : undefined,
         });
 
         await refetch();
         toast.success("Tarea creada");
-      }
+      },
     );
 
     setExpandedMap((prev) => ({ ...prev, [factorId]: true })); // mantener abierto
@@ -491,7 +524,7 @@ export function ModalFactorsTasks({
     const factor = factors.find((f) => f.id === factorId);
     const task = factor?.tasks?.[taskIndex];
     if (!task) return;
-    
+
     setFactors((prev) =>
       prev.map((f) => {
         if (f.id !== factorId) return f;
@@ -502,13 +535,16 @@ export function ModalFactorsTasks({
           return { ...f, tasks: left };
         }
         return f;
-      })
+      }),
     );
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: null }));
   }
 
   async function deleteTask(taskId: string) {
-    if (editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k])) {
+    if (
+      editingFactorId ||
+      Object.keys(editingTaskByFactor).some((k) => editingTaskByFactor[k])
+    ) {
       toast.error("No puedes eliminar mientras hay una edición en progreso");
       return;
     }
@@ -533,7 +569,9 @@ export function ModalFactorsTasks({
 
   const loading = isPending;
 
-  const isEditingActive = !!editingFactorId || Object.keys(editingTaskByFactor).some(k => editingTaskByFactor[k]);
+  const isEditingActive =
+    !!editingFactorId ||
+    Object.keys(editingTaskByFactor).some((k) => editingTaskByFactor[k]);
 
   function normalizeName(s?: string | null) {
     return (s ?? "").trim().toLowerCase();
@@ -542,30 +580,34 @@ export function ModalFactorsTasks({
   function isDuplicateFactorName(
     name: string,
     factors: Factor[],
-    excludeId?: string
+    excludeId?: string,
   ) {
     const norm = normalizeName(name);
     return factors.some(
       (f) =>
         f.id !== excludeId &&
         normalizeName(f.name) === norm &&
-        f.isActive !== false
+        f.isActive !== false,
     );
   }
 
   const isAnyTaskEditing = Object.values(editingTaskByFactor).some(Boolean);
   const isAnyFactorEditing = !!editingFactorId;
 
-  const dragDisabled = blocking.open || isAnyFactorEditing || isAnyTaskEditing || !permissions.factorsReorder;
+  const dragDisabled =
+    blocking.open ||
+    isAnyFactorEditing ||
+    isAnyTaskEditing ||
+    !permissions.factorsReorder;
   const dragDisabledReason = blocking.open
     ? blocking.label || "Operación en curso…"
     : isAnyFactorEditing
-    ? "No puedes reordenar mientras editas un factor."
-    : isAnyTaskEditing
-    ? "No puedes reordenar mientras editas o creas una tarea."
-    : !permissions.factorsReorder
-    ? "No tienes permiso para reordenar factores."
-    : "";
+      ? "No puedes reordenar mientras editas un factor."
+      : isAnyTaskEditing
+        ? "No puedes reordenar mientras editas o creas una tarea."
+        : !permissions.factorsReorder
+          ? "No tienes permiso para reordenar factores."
+          : "";
 
   function invalidateProjectsList() {
     // planId: primero lo tomo del proyecto cargado en la modal (fuente más confiable),
@@ -608,10 +650,13 @@ export function ModalFactorsTasks({
           </DialogTitle>
           <p className="px-5 text-sm text-gray-600 -mt-1 mb-2">{projectName}</p>
 
-            <div className="flex flex-col h-[85vh]">
+          <div className="flex flex-col h-[85vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b">
               <div className="flex items-center gap-3">
-                <FactorViewSelector viewMode={viewMode} onViewModeChange={handleViewModeChange} />
+                <FactorViewSelector
+                  viewMode={viewMode}
+                  onViewModeChange={handleViewModeChange}
+                />
                 <Button
                   variant="outline"
                   className="gap-2"
@@ -644,43 +689,43 @@ export function ModalFactorsTasks({
               )}
             </div>
 
-              <PlanRangeProvider
-                planFromAt={projectFromAt}
-                planUntilAt={projectUntilAt}
-              >
-                <div className="flex-1 overflow-auto bg-gray-50 p-5">
-                  {permissions.factorsRead ? (
-                    <ViewRenderer
-                      factors={factors}
-                      expandedMap={expandedMap}
-                      editingFactorId={editingFactorId}
-                      editingTaskByFactor={editingTaskByFactor}
-                      toggleExpandFactor={toggleExpandFactor}
-                      editFactor={editFactor}
-                      saveFactor={saveFactor}
-                      cancelFactor={cancelFactor}
-                      deleteFactor={deleteFactor}
-                      startCreateTask={startCreateTask}
-                      editTask={editTask}
-                      saveTask={saveTask}
-                      cancelTask={cancelTask}
-                      deleteTask={deleteTask}
-                      handleReorderFactors={handleReorderFactors}
-                      handleReorderTasks={handleReorderTasks}
-                      dragDisabled={dragDisabled}
-                      dragDisabledReason={dragDisabledReason}
-                      permissions={permissions}
-                      businessUnitId={businessUnitId}
-                      isEditingActive={isEditingActive}
-                    />
-                  ) : (
-                    <div className="text-center text-gray-500 py-10">
-                      No tienes permisos para ver los factores.
-                    </div>
-                  )}
-                </div>
-              </PlanRangeProvider>
-            </div>
+            <PlanRangeProvider
+              planFromAt={projectFromAt}
+              planUntilAt={projectUntilAt}
+            >
+              <div className="flex-1 overflow-auto bg-gray-50 p-5">
+                {permissions.factorsRead ? (
+                  <ViewRenderer
+                    factors={factors}
+                    expandedMap={expandedMap}
+                    editingFactorId={editingFactorId}
+                    editingTaskByFactor={editingTaskByFactor}
+                    toggleExpandFactor={toggleExpandFactor}
+                    editFactor={editFactor}
+                    saveFactor={saveFactor}
+                    cancelFactor={cancelFactor}
+                    deleteFactor={deleteFactor}
+                    startCreateTask={startCreateTask}
+                    editTask={editTask}
+                    saveTask={saveTask}
+                    cancelTask={cancelTask}
+                    deleteTask={deleteTask}
+                    handleReorderFactors={handleReorderFactors}
+                    handleReorderTasks={handleReorderTasks}
+                    dragDisabled={dragDisabled}
+                    dragDisabledReason={dragDisabledReason}
+                    permissions={permissions}
+                    businessUnitId={businessUnitId}
+                    isEditingActive={isEditingActive}
+                  />
+                ) : (
+                  <div className="text-center text-gray-500 py-10">
+                    No tienes permisos para ver los factores.
+                  </div>
+                )}
+              </div>
+            </PlanRangeProvider>
+          </div>
 
           {/* 🆕 Overlay bloqueante y con porcentaje */}
           <BlockingProgressOverlay
@@ -689,6 +734,17 @@ export function ModalFactorsTasks({
               blocking.open ? blocking.label : "Cargando factores y tareas…"
             }
             progress={blocking.open ? blocking.progress : 60}
+          />
+
+          {/* ConfirmModal para cambio de vista */}
+          <ConfirmModal
+            open={confirmViewChange.open}
+            title="Cambios sin guardar"
+            message="¿Estás seguro de que deseas cambiar de vista? Perderás los cambios realizados."
+            onConfirm={confirmViewChangeAction}
+            onCancel={() =>
+              setConfirmViewChange({ open: false, targetMode: "cards" })
+            }
           />
         </div>
       </DialogContent>
@@ -708,7 +764,11 @@ interface ViewRendererProps {
   deleteFactor: (factorId: string) => void;
   startCreateTask: (factorId: string) => void;
   editTask: (factorId: string, taskIndex: number) => void;
-  saveTask: (factorId: string, task: Task, participants: TaskParticipant[]) => void;
+  saveTask: (
+    factorId: string,
+    task: Task,
+    participants: TaskParticipant[],
+  ) => void;
   cancelTask: (factorId: string, taskIndex: number, isNew?: boolean) => void;
   deleteTask: (taskId: string) => void;
   handleReorderFactors: (newOrder: Factor[]) => void;

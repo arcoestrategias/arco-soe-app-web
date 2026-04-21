@@ -1,353 +1,354 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
-  DndContext,
-  DragEndEvent,
-  closestCenter,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  type DraggableAttributes,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import {
-  GripVertical,
-  Edit,
+  MoreHorizontal,
   Plus,
+  Edit,
   Trash2,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
-import { TaskItemCard } from "./task-item-card";
-import { ConfirmModal } from "@/shared/components/confirm-modal";
 import {
-  StrategicProjectStructureFactor as Factor,
-  StrategicProjectStructureTask as Task,
-  TaskParticipant,
-} from "../../types/strategicProjectStructure";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ConfirmModal } from "@/shared/components/confirm-modal";
+import type { StrategicProjectStructureFactor as Factor } from "../../types/strategicProjectStructure";
+import type { StrategicProjectStructureTask as Task, TaskParticipant } from "../../types/strategicProjectStructure";
+import { TaskItemCardMini } from "./task-item-card-mini";
+import { TaskEditorInline } from "./task-editor-inline";
+import { toggleTaskStatus } from "./task-utils";
 
 interface FactorCardProps {
   factor: Factor;
   orderNumber: number;
-  isEditing: boolean;
-  editingTaskId?: string | null;
   isExpanded: boolean;
+  editingTaskId?: string | null;
+  isEditing?: boolean;
   onToggleExpand: () => void;
-  onEdit: () => void;
-  onSave: (factor: Factor) => void;
-  onCancel: () => void;
-  onDelete: () => void;
+  onEditFactor: () => void;
+  onDeleteFactor: () => void;
   onAddTask: () => void;
   onEditTask: (taskIndex: number) => void;
-  onSaveTask: (task: Task, participants: TaskParticipant[]) => void;
-  onCancelTask: (taskIndex: number, isNew?: boolean) => void;
   onDeleteTask: (taskIndex: number) => void;
-  onReorderTasks: (newOrder: Task[]) => void;
-  dragDisabled?: boolean;
-  dragDisabledReason?: string;
-  listeners?: SyntheticListenerMap;
-  attributes?: DraggableAttributes;
-  permissions: {
-    factorsUpdate: boolean;
-    factorsDelete: boolean;
-    factorsReorder: boolean;
-    tasksCreate: boolean;
-    tasksUpdate: boolean;
-    tasksDelete: boolean;
-    tasksReorder: boolean;
-  };
+  onSaveTask: (task: Task, participants: TaskParticipant[]) => void;
+  onCancelTask: (taskIndex: number) => void;
+  onSaveFactor: (factor: Factor) => void;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canReorder: boolean;
+  dragDisabled: boolean;
+  dragDisabledReason: string;
   businessUnitId?: string;
 }
 
-export function FactorCard({
+function calculateTaskProgress(tasks: Task[]) {
+  const completed = tasks.filter(
+    (t) => (t.status ?? "").toUpperCase() === "CLO"
+  ).length;
+  const total = tasks.length;
+  const progress = total > 0 ? completed / total : 0;
+  return { completed, total, progress };
+}
+
+export const FactorCard = memo(function FactorCard({
   factor,
   orderNumber,
-  isEditing,
-  editingTaskId,
   isExpanded,
+  editingTaskId,
+  isEditing,
   onToggleExpand,
-  onEdit,
-  onSave,
-  onCancel,
-  onDelete,
+  onEditFactor,
+  onDeleteFactor,
   onAddTask,
   onEditTask,
+  onDeleteTask,
   onSaveTask,
   onCancelTask,
-  onDeleteTask,
-  onReorderTasks,
-  dragDisabled = false,
-  dragDisabledReason = "",
-  listeners,
-  attributes,
-  permissions,
+  onSaveFactor,
+  canUpdate,
+  canDelete,
+  canReorder,
+  dragDisabled,
+  dragDisabledReason,
   businessUnitId,
 }: FactorCardProps) {
-  const [editedFactor, setEditedFactor] = useState<Factor>({ ...factor });
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [editFactorDialogOpen, setEditFactorDialogOpen] = useState(false);
+  const tasks = factor.tasks ?? [];
+  const { completed, total, progress } = useMemo(
+    () => calculateTaskProgress(tasks),
+    [tasks]
+  );
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  const progressColor =
+    progress === 1
+      ? "bg-green-500"
+      : progress > 0
+        ? "bg-yellow-400"
+        : "bg-gray-300";
 
-  const tareasCompletadas = (factor.tasks ?? []).filter(
-    (t) => (t.status ?? "").toUpperCase() === "CLO",
-  ).length;
-  const totalTareas = (factor.tasks ?? []).length;
-  const progreso = totalTareas > 0 ? tareasCompletadas / totalTareas : 0;
+  const [editData, setEditData] = useState({ name: factor.name ?? "", result: factor.result ?? "" });
+  const [errors, setErrors] = useState<{ name?: string }>({});
+  const [showEditFactor, setShowEditFactor] = useState(false);
+  const [showDeleteFactorConfirm, setShowDeleteFactorConfirm] = useState(false);
 
-  const handleChange = (field: keyof Factor, value: unknown) => {
-    setEditedFactor({ ...editedFactor, [field]: value });
-  };
+  const [showResultTooltip, setShowResultTooltip] = useState(false);
+  const [resultTooltipPos, setResultTooltipPos] = useState({ x: 0, y: 0 });
 
-  const handleSave = () => onSave(editedFactor);
-
-  const handleDragEndTask = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const list = factor.tasks ?? [];
-    const oldIndex = list.findIndex((t) => t.id === active.id);
-    const newIndex = list.findIndex((t) => t.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const reordered = arrayMove(list, oldIndex, newIndex).map((t, i) => ({
-        ...t,
-        order: i + 1,
-      }));
-      onReorderTasks(reordered);
+  useEffect(() => {
+    if (isEditing) {
+      setEditData({ name: factor.name ?? "", result: factor.result ?? "" });
+      setShowEditFactor(true);
     }
+  }, [isEditing, factor.name, factor.result]);
+
+  const editingTask = editingTaskId ? tasks.find(t => t.id === editingTaskId) : null;
+
+  const {
+    attributes: sortableAttrs,
+    listeners: sortableListeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: factor.id, disabled: dragDisabled || !canReorder });
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
   };
 
-  const progressValue = Math.round(progreso * 100);
-
-  const blockedProps: React.HTMLAttributes<HTMLDivElement> = {
-    onMouseDown: (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    },
+  const handleSaveEdit = () => {
+    if (!editData.name.trim()) {
+      setErrors({ name: "El nombre es obligatorio" });
+      return;
+    }
+    const updatedFactor: Factor = {
+      ...factor,
+      name: editData.name.trim(),
+      result: editData.result.trim() || null,
+    };
+    onSaveFactor(updatedFactor);
+    setShowEditFactor(false);
   };
-
-  const sortableProps = (!dragDisabled
-    ? { ...(listeners ?? {}), ...(attributes ?? {}) }
-    : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
 
   return (
-    <div className="bg-white rounded-xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col min-h-[200px]">
-      <div
-        className={`p-5 ${dragDisabled ? "cursor-not-allowed opacity-60" : "cursor-grab"}`}
-        {...(dragDisabled ? blockedProps : sortableProps)}
-      >
-        <div className="flex items-start gap-4">
-          <div className="flex items-center gap-1 text-gray-400 hover:text-gray-600 pt-1">
-            <GripVertical size={16} />
+    <div
+      ref={setNodeRef}
+      style={sortableStyle}
+      {...sortableAttrs}
+      className="group flex flex-col rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all bg-white"
+    >
+      <div className={`w-full h-1.5 ${progressColor}`} />
+
+      <div className="flex flex-col">
+        <div className="flex items-start justify-between p-4 pb-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] text-gray-400 font-medium shrink-0">
+              #{orderNumber}
+            </span>
+            <h3 
+              onClick={onToggleExpand}
+              className="text-base font-semibold text-gray-900 leading-snug truncate cursor-pointer hover:text-gray-700"
+            >
+              {factor.name || "Factor sin nombre"}
+            </h3>
           </div>
 
-          <div className="flex-1 min-w-0 space-y-4">
-            {/* 1. Número + Expand + Nombre */}
-            <div className="flex items-center gap-3">
-              <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs font-bold">
-                #{orderNumber}
-              </Badge>
-              
-              {!isEditing && (
-                <button
-                  onClick={onToggleExpand}
-                  className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              )}
-              
-              {isEditing ? (
-                <div className="flex-1">
-                  <TextareaWithCounter
-                    value={editedFactor.name ?? ""}
-                    onValueChange={(val) => handleChange("name", val)}
-                    maxLength={150}
-                    className="min-h-[40px] text-sm"
-                  />
-                </div>
-              ) : (
-                <h3 className="text-sm font-semibold text-gray-800 truncate flex-1">
-                  {factor.name ?? "Factor sin nombre"}
-                </h3>
-              )}
-            </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => {
+                setEditData({ name: factor.name ?? "", result: factor.result ?? "" });
+                setShowEditFactor(true);
+              }}
+              className="opacity-0 group-hover:opacity-100 transition p-1 rounded hover:bg-gray-100"
+            >
+              <Edit size={14} className="text-gray-400" />
+            </button>
+            <button
+              onClick={() => setShowDeleteFactorConfirm(true)}
+              className="opacity-0 group-hover:opacity-100 transition p-1 rounded hover:bg-gray-100"
+            >
+              <Trash2 size={14} className="text-gray-400" />
+            </button>
+            <button
+              onClick={onToggleExpand}
+              className="opacity-0 group-hover:opacity-100 transition p-1 rounded hover:bg-gray-100"
+            >
+              <MoreHorizontal size={16} className="text-gray-400" />
+            </button>
+          </div>
+        </div>
 
-            {/* 2. Resultado */}
-            {isEditing ? (
-              <div>
-                <TextareaWithCounter
-                  value={editedFactor.result ?? ""}
-                  onValueChange={(val) => handleChange("result", val)}
-                  maxLength={300}
-                  className="min-h-[60px] text-xs"
-                />
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 line-clamp-2">
-                <span className="font-medium">Resultado: </span>
-                {factor.result || "Sin resultado definido"}
-              </p>
-            )}
+        <div className="px-4">
+          <p
+            className="text-xs text-gray-500 line-clamp-2"
+            onMouseEnter={(e) => {
+              if (factor.result && factor.result.length > 50) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setResultTooltipPos({ x: rect.left, y: rect.bottom });
+                setShowResultTooltip(true);
+              }
+            }}
+            onMouseLeave={() => setShowResultTooltip(false)}
+          >
+            {factor.result || "Sin resultado definido"}
+          </p>
+        </div>
 
-            {/* 3. Título Tareas + Barra de progreso */}
-            {!isEditing && (
-              <div>
-                <div className="text-xs font-medium text-gray-600 mb-2">
-                  Tareas:
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 flex-1 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full transition-all duration-300"
-                      style={{ width: `${progressValue}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {tareasCompletadas}/{totalTareas}
-                  </span>
-                </div>
-              </div>
-            )}
+        {showResultTooltip && factor.result && factor.result.length > 50 &&
+          createPortal(
+            <div
+              style={{
+                position: "fixed",
+                top: resultTooltipPos.y + 6,
+                left: resultTooltipPos.x,
+                zIndex: 9999,
+              }}
+              className="bg-gray-900 text-white text-xs rounded-md px-3 py-2 shadow-lg max-w-sm break-words"
+            >
+              {factor.result}
+            </div>,
+            document.body,
+          )}
 
-            {/* 4. Botones de acción */}
-            <div className="flex items-center justify-between pt-2">
-              {isEditing ? (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onCancel}
-                    className="h-7 text-xs"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                  >
-                    Guardar
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {permissions.tasksCreate && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onAddTask}
-                      className="h-7 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Agregar tarea
-                    </Button>
-                  )}
-                  <div className="flex gap-1">
-                    {permissions.factorsUpdate && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onEdit}
-                        className="h-7 w-7"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {permissions.factorsDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowConfirm(true)}
-                        className="h-7 w-7 text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </>
-              )}
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3 flex-1">
+            <span className="text-xs text-gray-400">
+              {completed}/{total} tareas
+            </span>
+            <span className="text-sm font-semibold text-gray-900">
+              {Math.round(progress * 100)}%
+            </span>
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all"
+                style={{ width: `${progress * 100}%` }}
+              />
             </div>
           </div>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={onAddTask}
+            className="h-7 w-7"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
-      {isExpanded && (factor.tasks?.length ?? 0) > 0 && (
-        <div className="border-t bg-gray-50 p-4 space-y-3">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEndTask}
-          >
-            <SortableContext
-              items={(factor.tasks ?? []).map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {factor.tasks?.map((task, index) => (
-                <TaskItemCard
-                  key={task.id}
-                  task={task}
-                  participants={task.participants}
-                  isEditing={editingTaskId === task.id}
-                  onEdit={() => onEditTask(index)}
-                  onSave={onSaveTask}
-                  onCancel={() => onCancelTask(index)}
-                  onDelete={() => onDeleteTask(index)}
-                  dragDisabled={dragDisabled}
-                  dragDisabledReason={dragDisabledReason}
-                  canUpdate={permissions.tasksUpdate}
-                  canDelete={permissions.tasksDelete}
-                  canReorder={permissions.tasksReorder}
-                  businessUnitId={businessUnitId}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+      {isExpanded && tasks.length > 0 && (
+        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-3">
+{tasks.map((task, idx) => (
+              <TaskItemCardMini
+                key={task.id}
+                task={task}
+                onEdit={() => onEditTask(idx)}
+                onDelete={() => onDeleteTask(idx)}
+                onToggleStatus={() => toggleTaskStatus(task, onSaveTask)}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+              />
+            ))}
         </div>
       )}
 
-      {isExpanded && (factor.tasks?.length ?? 0) === 0 && (
-        <div className="border-t p-4 text-center text-xs text-gray-400 bg-gray-50">
-          No hay tareas en este factor
-        </div>
-      )}
+      <Dialog open={showEditFactor} onOpenChange={setShowEditFactor}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>Editar Factor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">
+                Nombre <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={editData.name}
+                onChange={(e) => {
+                  setEditData((prev) => ({ ...prev, name: e.target.value }));
+                  if (errors.name) setErrors({});
+                }}
+                className="w-full min-h-[60px] rounded-md border border-input px-3 py-2 text-sm"
+                placeholder="Nombre del factor"
+              />
+              {errors.name && (
+                <p className="text-xs text-red-500 mt-1">{errors.name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">
+                Resultado
+              </label>
+              <textarea
+                value={editData.result}
+                onChange={(e) =>
+                  setEditData((prev) => ({ ...prev, result: e.target.value }))
+                }
+                className="w-full min-h-[80px] rounded-md border border-input px-3 py-2 text-sm"
+                placeholder="Resultado esperado"
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowEditFactor(false)}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleSaveEdit}>
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmModal
-        open={showConfirm}
+        open={showDeleteFactorConfirm}
         title="Eliminar factor"
-        message={
-          (factor.tasks?.length ?? 0) > 0
-            ? "Esto eliminará el factor y todas sus tareas relacionadas."
-            : "¿Estás seguro de que deseas eliminar este factor?"
-        }
-        onCancel={() => setShowConfirm(false)}
+        message={`¿Estás seguro de que deseas eliminar el factor "${factor.name}"? ${
+          total > 0
+            ? ` Este factor tiene ${total} tarea${total > 1 ? "s" : ""}. También se eliminarán.`
+            : ""
+        }`}
         onConfirm={() => {
-          onDelete();
-          setShowConfirm(false);
+          onDeleteFactor();
+          setShowDeleteFactorConfirm(false);
         }}
-        confirmText="Eliminar"
-      >
-        {(factor.tasks?.length ?? 0) > 0 && (
-          <ul className="list-disc list-inside text-sm text-gray-700 max-h-32 overflow-auto pr-2">
-            {(factor.tasks ?? []).map((t) => (
-              <li key={t.id}>{t.name || "Sin nombre"}</li>
-            ))}
-          </ul>
-        )}
-      </ConfirmModal>
+        onCancel={() => setShowDeleteFactorConfirm(false)}
+      />
+
+      {editingTask && (
+        <Dialog open={!!editingTask} onOpenChange={(open) => !open && onCancelTask(tasks.findIndex(t => t.id === editingTaskId))}>
+          <DialogContent className="w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingTask.id.startsWith("__new__") ? "Nueva tarea" : "Editar tarea"}
+              </DialogTitle>
+            </DialogHeader>
+            <TaskEditorInline
+              task={editingTask}
+              participants={editingTask.participants ?? []}
+              onSave={(task, participants) => {
+                onSaveTask(task, participants);
+                onCancelTask(tasks.findIndex(t => t.id === editingTaskId));
+              }}
+              onCancel={() => onCancelTask(tasks.findIndex(t => t.id === editingTaskId))}
+              businessUnitId={businessUnitId}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
-}
+});
+
+FactorCard.displayName = 'FactorCard';

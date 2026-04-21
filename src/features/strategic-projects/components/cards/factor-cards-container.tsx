@@ -123,9 +123,6 @@ export function FactorCardsContainer({
     );
   }
 
-  const totalSlots = Math.ceil(factors.length / 4) * 4;
-  const emptySlots = totalSlots - factors.length;
-
   return (
     <DndContext
       sensors={sensors}
@@ -142,49 +139,25 @@ export function FactorCardsContainer({
               key={factor.id}
               factor={factor}
               orderNumber={index + 1}
-              isEditing={editingFactorId === factor.id}
-              editingTaskId={editingTaskByFactor[factor.id]}
               isExpanded={expandedMap[factor.id] ?? false}
+              editingTaskId={editingTaskByFactor[factor.id]}
+              isEditing={editingFactorId === factor.id}
               onToggleExpand={() => toggleExpandFactor(factor.id)}
-              onEdit={() => editFactor(factor.id)}
-              onSave={saveFactor}
-              onCancel={() => cancelFactor(factor.id)}
-              onDelete={() => deleteFactor(factor.id)}
+              onEditFactor={() => editFactor(factor.id)}
+              onDeleteFactor={() => deleteFactor(factor.id)}
               onAddTask={() => addTask(factor.id)}
               onEditTask={(taskIndex) => editTask(factor.id, taskIndex)}
-              onSaveTask={(task, participants) => saveTask(factor.id, task, participants)}
-              onCancelTask={(taskIndex, isNew) => cancelTask(factor.id, taskIndex, isNew)}
               onDeleteTask={(taskIndex) => deleteTask(factor.id, taskIndex)}
-              onReorderTasks={(newOrder) => reorderTasks(factor.id, newOrder)}
+              onSaveTask={(task, participants) => saveTask(factor.id, task, participants)}
+              onCancelTask={(taskIndex) => cancelTask(factor.id, taskIndex)}
+              onSaveFactor={(factor) => saveFactor(factor)}
+              canUpdate={permissions.factorsUpdate}
+              canDelete={permissions.factorsDelete}
+              canReorder={permissions.factorsReorder}
               dragDisabled={dragDisabled}
               dragDisabledReason={dragDisabledReason}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              listeners={{} as any}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              attributes={{} as any}
-              permissions={{
-                factorsUpdate: permissions.factorsUpdate,
-                factorsDelete: permissions.factorsDelete,
-                factorsReorder: permissions.factorsReorder,
-                tasksCreate: permissions.tasksCreate,
-                tasksUpdate: permissions.tasksUpdate,
-                tasksDelete: permissions.tasksDelete,
-                tasksReorder: permissions.tasksReorder,
-              }}
               businessUnitId={businessUnitId}
             />
-          ))}
-
-          {Array.from({ length: emptySlots }).map((_, i) => (
-            <div
-              key={`empty-${i}`}
-              className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center min-h-[200px] bg-gray-50"
-            >
-              <div className="text-center text-gray-400">
-                <p className="text-sm">Espacio disponible</p>
-                <p className="text-xs">para nuevo factor</p>
-              </div>
-            </div>
           ))}
         </div>
       </SortableContext>
