@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Edit, Trash2, GripVertical } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
@@ -17,6 +19,8 @@ interface TaskItemCardMiniProps {
   onToggleStatus: () => void;
   canUpdate: boolean;
   canDelete: boolean;
+  dragDisabled?: boolean;
+  canReorder?: boolean;
 }
 
 function formatShortDate(dateStr?: string | null) {
@@ -36,8 +40,28 @@ export function TaskItemCardMini({
   onToggleStatus,
   canUpdate,
   canDelete,
+  dragDisabled = false,
+  canReorder = false,
 }: TaskItemCardMiniProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const {
+    attributes: sortableAttrs,
+    listeners: sortableListeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: task.id,
+    disabled: dragDisabled || !canReorder,
+  });
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   // Tooltip state for extra participants
   const [showParticipantsTooltip, setShowParticipantsTooltip] = useState(false);
@@ -59,12 +83,21 @@ export function TaskItemCardMini({
   return (
     <>
       <div
+        ref={setNodeRef}
+        style={sortableStyle}
         className={`group bg-white border border-gray-100 border-l-4 ${borderColor} rounded-lg px-3 py-3.5 hover:shadow-sm hover:border-gray-300 transition-all`}
       >
         {/* 🔹 BLOQUE 1 */}
         <div className="flex items-start gap-2">
           {/* DRAG */}
-          <div className="cursor-grab text-gray-300 hover:text-gray-500 mt-0.5">
+          <div
+            className={`flex items-center ${
+              dragDisabled || !canReorder
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
+            } mt-0.5`}
+            {...(dragDisabled || !canReorder ? {} : { ...sortableListeners, ...sortableAttrs })}
+          >
             <GripVertical className="h-4 w-4" />
           </div>
 

@@ -2,14 +2,21 @@
 
 import { useMemo, useState, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  useSensor,
+  useSensors,
+  PointerSensor,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  MoreHorizontal,
-  Plus,
-  Edit,
-  Trash2,
-} from "lucide-react";
+import { MoreHorizontal, Plus, Edit, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +26,10 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 import type { StrategicProjectStructureFactor as Factor } from "../../types/strategicProjectStructure";
-import type { StrategicProjectStructureTask as Task, TaskParticipant } from "../../types/strategicProjectStructure";
+import type {
+  StrategicProjectStructureTask as Task,
+  TaskParticipant,
+} from "../../types/strategicProjectStructure";
 import { TaskItemCardMini } from "./task-item-card-mini";
 import { TaskEditorInline } from "./task-editor-inline";
 import { toggleTaskStatus } from "./task-utils";
@@ -39,6 +49,7 @@ interface FactorCardProps {
   onSaveTask: (task: Task, participants: TaskParticipant[]) => void;
   onCancelTask: (taskIndex: number) => void;
   onSaveFactor: (factor: Factor) => void;
+  reorderTasks: (factorId: string, newOrder: Task[]) => void;
   canUpdate: boolean;
   canDelete: boolean;
   canReorder: boolean;
@@ -49,7 +60,7 @@ interface FactorCardProps {
 
 function calculateTaskProgress(tasks: Task[]) {
   const completed = tasks.filter(
-    (t) => (t.status ?? "").toUpperCase() === "CLO"
+    (t) => (t.status ?? "").toUpperCase() === "CLO",
   ).length;
   const total = tasks.length;
   const progress = total > 0 ? completed / total : 0;
@@ -71,6 +82,7 @@ export const FactorCard = memo(function FactorCard({
   onSaveTask,
   onCancelTask,
   onSaveFactor,
+  reorderTasks,
   canUpdate,
   canDelete,
   canReorder,
@@ -80,9 +92,33 @@ export const FactorCard = memo(function FactorCard({
 }: FactorCardProps) {
   const [editFactorDialogOpen, setEditFactorDialogOpen] = useState(false);
   const tasks = factor.tasks ?? [];
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  );
+
+  const handleDragEndTask = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = tasks.findIndex((t) => t.id === active.id);
+    const newIndex = tasks.findIndex((t) => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reordered = [...tasks];
+      const [removed] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, removed);
+      reorderTasks(factor.id, reordered);
+    }
+  };
+
   const { completed, total, progress } = useMemo(
     () => calculateTaskProgress(tasks),
-    [tasks]
+    [tasks],
   );
 
   const progressColor =
@@ -92,7 +128,10 @@ export const FactorCard = memo(function FactorCard({
         ? "bg-yellow-400"
         : "bg-gray-300";
 
-  const [editData, setEditData] = useState({ name: factor.name ?? "", result: factor.result ?? "" });
+  const [editData, setEditData] = useState({
+    name: factor.name ?? "",
+    result: factor.result ?? "",
+  });
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [showEditFactor, setShowEditFactor] = useState(false);
   const [showDeleteFactorConfirm, setShowDeleteFactorConfirm] = useState(false);
@@ -107,7 +146,9 @@ export const FactorCard = memo(function FactorCard({
     }
   }, [isEditing, factor.name, factor.result]);
 
-  const editingTask = editingTaskId ? tasks.find(t => t.id === editingTaskId) : null;
+  const editingTask = editingTaskId
+    ? tasks.find((t) => t.id === editingTaskId)
+    : null;
 
   const {
     attributes: sortableAttrs,
@@ -150,10 +191,33 @@ export const FactorCard = memo(function FactorCard({
       <div className="flex flex-col">
         <div className="flex items-start justify-between p-4 pb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] text-gray-400 font-medium shrink-0">
-              #{orderNumber}
-            </span>
-            <h3 
+            <div
+              className={`flex items-center gap-1 ${
+                canReorder
+                  ? "cursor-grab active:cursor-grabbing"
+                  : "cursor-not-allowed opacity-50"
+              }`}
+              {...(canReorder
+                ? { ...sortableListeners, ...sortableAttrs }
+                : {})}
+            >
+              <GripVertical size={12} className="text-gray-400" />
+
+              {/* 🔥 STEP BADGE */}
+              <div
+                className={`flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold transition-all
+        ${
+          progress === 1
+            ? "bg-green-600 text-white"
+            : progress > 0
+              ? "bg-yellow-400 text-white"
+              : "bg-gray-300 text-gray-700"
+        }`}
+              >
+                {orderNumber}
+              </div>
+            </div>
+            <h3
               onClick={onToggleExpand}
               className="text-base font-semibold text-gray-900 leading-snug truncate cursor-pointer hover:text-gray-700"
             >
@@ -164,7 +228,10 @@ export const FactorCard = memo(function FactorCard({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
-                setEditData({ name: factor.name ?? "", result: factor.result ?? "" });
+                setEditData({
+                  name: factor.name ?? "",
+                  result: factor.result ?? "",
+                });
                 setShowEditFactor(true);
               }}
               className="opacity-0 group-hover:opacity-100 transition p-1 rounded hover:bg-gray-100"
@@ -202,7 +269,9 @@ export const FactorCard = memo(function FactorCard({
           </p>
         </div>
 
-        {showResultTooltip && factor.result && factor.result.length > 50 &&
+        {showResultTooltip &&
+          factor.result &&
+          factor.result.length > 50 &&
           createPortal(
             <div
               style={{
@@ -246,19 +315,32 @@ export const FactorCard = memo(function FactorCard({
       </div>
 
       {isExpanded && tasks.length > 0 && (
-        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-3">
-{tasks.map((task, idx) => (
-              <TaskItemCardMini
-                key={task.id}
-                task={task}
-                onEdit={() => onEditTask(idx)}
-                onDelete={() => onDeleteTask(idx)}
-                onToggleStatus={() => toggleTaskStatus(task, onSaveTask)}
-                canUpdate={canUpdate}
-                canDelete={canDelete}
-              />
-            ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEndTask}
+        >
+          <SortableContext
+            items={tasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-3">
+              {tasks.map((task, idx) => (
+                <TaskItemCardMini
+                  key={task.id}
+                  task={task}
+                  onEdit={() => onEditTask(idx)}
+                  onDelete={() => onDeleteTask(idx)}
+                  onToggleStatus={() => toggleTaskStatus(task, onSaveTask)}
+                  canUpdate={canUpdate}
+                  canDelete={canDelete}
+                  dragDisabled={dragDisabled}
+                  canReorder={canReorder}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       <Dialog open={showEditFactor} onOpenChange={setShowEditFactor}>
@@ -300,7 +382,11 @@ export const FactorCard = memo(function FactorCard({
             </div>
 
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowEditFactor(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEditFactor(false)}
+              >
                 Cancelar
               </Button>
               <Button size="sm" onClick={handleSaveEdit}>
@@ -327,11 +413,19 @@ export const FactorCard = memo(function FactorCard({
       />
 
       {editingTask && (
-        <Dialog open={!!editingTask} onOpenChange={(open) => !open && onCancelTask(tasks.findIndex(t => t.id === editingTaskId))}>
+        <Dialog
+          open={!!editingTask}
+          onOpenChange={(open) =>
+            !open &&
+            onCancelTask(tasks.findIndex((t) => t.id === editingTaskId))
+          }
+        >
           <DialogContent className="w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {editingTask.id.startsWith("__new__") ? "Nueva tarea" : "Editar tarea"}
+                {editingTask.id.startsWith("__new__")
+                  ? "Nueva tarea"
+                  : "Editar tarea"}
               </DialogTitle>
             </DialogHeader>
             <TaskEditorInline
@@ -339,9 +433,11 @@ export const FactorCard = memo(function FactorCard({
               participants={editingTask.participants ?? []}
               onSave={(task, participants) => {
                 onSaveTask(task, participants);
-                onCancelTask(tasks.findIndex(t => t.id === editingTaskId));
+                onCancelTask(tasks.findIndex((t) => t.id === editingTaskId));
               }}
-              onCancel={() => onCancelTask(tasks.findIndex(t => t.id === editingTaskId))}
+              onCancel={() =>
+                onCancelTask(tasks.findIndex((t) => t.id === editingTaskId))
+              }
               businessUnitId={businessUnitId}
             />
           </DialogContent>
@@ -351,4 +447,4 @@ export const FactorCard = memo(function FactorCard({
   );
 });
 
-FactorCard.displayName = 'FactorCard';
+FactorCard.displayName = "FactorCard";
