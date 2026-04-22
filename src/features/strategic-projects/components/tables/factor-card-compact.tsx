@@ -114,6 +114,7 @@ export function FactorCardCompact({
   ).length;
   const totalTareas = (factor.tasks ?? []).length;
   const progreso = totalTareas > 0 ? tareasCompletadas / totalTareas : 0;
+  const progressColor = progreso === 1 ? "border-l-green-500" : progreso > 0 ? "border-l-yellow-400" : "border-l-gray-300";
 
   const handleChange = (field: keyof Factor, value: any) => {
     setEditedFactor({ ...editedFactor, [field]: value });
@@ -168,7 +169,7 @@ export function FactorCardCompact({
       <div
         ref={setNodeRef}
         style={sortableStyle}
-        className="grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50 border-t border-gray-200"
+        className={`grid grid-cols-[35%_35%_20%_10%] bg-white hover:bg-gray-50 border-t border-gray-200 border-l-4 ${progressColor}`}
       >
         <div className="flex items-center gap-2 px-3 py-3">
           <div

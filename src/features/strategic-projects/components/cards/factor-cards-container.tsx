@@ -151,6 +151,7 @@ export function FactorCardsContainer({
               onSaveTask={(task, participants) => saveTask(factor.id, task, participants)}
               onCancelTask={(taskIndex) => cancelTask(factor.id, taskIndex)}
               onSaveFactor={(factor) => saveFactor(factor)}
+              onCancelFactor={() => cancelFactor(factor.id)}
               reorderTasks={(factorId, newOrder) => reorderTasks(factorId, newOrder)}
               canUpdate={permissions.factorsUpdate}
               canDelete={permissions.factorsDelete}

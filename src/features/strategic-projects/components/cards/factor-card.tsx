@@ -49,6 +49,7 @@ interface FactorCardProps {
   onSaveTask: (task: Task, participants: TaskParticipant[]) => void;
   onCancelTask: (taskIndex: number) => void;
   onSaveFactor: (factor: Factor) => void;
+  onCancelFactor: () => void;
   reorderTasks: (factorId: string, newOrder: Task[]) => void;
   canUpdate: boolean;
   canDelete: boolean;
@@ -82,6 +83,7 @@ export const FactorCard = memo(function FactorCard({
   onSaveTask,
   onCancelTask,
   onSaveFactor,
+  onCancelFactor,
   reorderTasks,
   canUpdate,
   canDelete,
@@ -385,7 +387,10 @@ export const FactorCard = memo(function FactorCard({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowEditFactor(false)}
+                onClick={() => {
+                  setShowEditFactor(false);
+                  onCancelFactor();
+                }}
               >
                 Cancelar
               </Button>

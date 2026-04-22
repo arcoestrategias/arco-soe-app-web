@@ -44,9 +44,6 @@ import {
   parseYmdOrIsoToLocalDate,
 } from "@/shared/utils/dateFormatters";
 
-// 🆕 overlay + hook
-import { BlockingProgressOverlay } from "@/shared/components/blocking-progress-overlay";
-import { useBlockingProgress } from "@/shared/hooks/use-blocking-progress";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 import { usePermissions } from "@/shared/auth/access-control";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
@@ -68,7 +65,7 @@ export function ModalFactorsTasks({
 }: ModalFactorsTasksProps) {
   const qc = useQueryClient();
   const { data, isPending, isError, error } = useProjectStructure(projectId);
-  const blocking = useBlockingProgress();
+  const [isOperationActive, setIsOperationActive] = useState(false);
 
   const [factors, setFactors] = useState<Factor[]>([]);
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
@@ -98,6 +95,16 @@ export function ModalFactorsTasks({
   };
 
   const confirmViewChangeAction = () => {
+    setFactors((prev) => prev.filter((f) => !f.id.startsWith("__new__")));
+    setExpandedMap((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const key in prev) {
+        if (!key.startsWith("__new__")) {
+          next[key] = prev[key];
+        }
+      }
+      return next;
+    });
     setEditingFactorId(null);
     setEditingTaskByFactor({});
     setViewMode(confirmViewChange.targetMode);
@@ -130,20 +137,7 @@ export function ModalFactorsTasks({
     if (isError) toast.error(getHumanErrorMessage(error));
   }, [isError, error]);
 
-  // 🆕 Mostrar overlay en carga inicial/refresh (sin invadir overlays de acciones)
-  useEffect(() => {
-    if (isPending) {
-      if (!blocking.open) blocking.start("Cargando factores y tareas…");
-    } else {
-      if (blocking.open && blocking.label.startsWith("Cargando")) {
-        // cerramos sólo si lo abrió este ciclo de carga
-        blocking.stop();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPending]);
-
-  // 🆕 Al llegar factores: preserva expandido/colapsado; nuevos factores → abiertos
+  // Al llegar factores: preserva expandido/colapsado; nuevos factores → abiertos
   useEffect(() => {
     const fs = data?.project?.factors ?? [];
     const sorted = [...fs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -216,7 +210,8 @@ export function ModalFactorsTasks({
 
   /* ---------------- REORDEN ---------------- */
   async function handleReorderFactors(newOrder: Factor[]) {
-    await blocking.withBlocking("Guardando orden de factores…", async () => {
+    setIsOperationActive(true);
+    try {
       const items = newOrder.map((f, i) => ({
         id: f.id,
         order: i + 1,
@@ -225,11 +220,14 @@ export function ModalFactorsTasks({
       await reorderProjectFactors(projectId, items);
       await refetch();
       toast.success("Orden de factores actualizado");
-    });
+    } finally {
+      setIsOperationActive(false);
+    }
   }
 
   async function handleReorderTasks(factorId: string, next: Task[]) {
-    await blocking.withBlocking("Guardando orden de tareas…", async () => {
+    setIsOperationActive(true);
+    try {
       const items = next.map((t, i) => ({
         id: t.id,
         order: i + 1,
@@ -238,11 +236,19 @@ export function ModalFactorsTasks({
       await reorderProjectTasks(factorId, items);
       await refetch();
       toast.success("Orden de tareas actualizado");
-    });
+    } finally {
+      setIsOperationActive(false);
+    }
   }
 
   /* ---------------- FACTOR CRUD ---------------- */
   function startCreateFactor() {
+    const hasNewFactor = factors.some((f) => f.id.startsWith("__new__")) || (editingFactorId?.startsWith("__new__") ?? false);
+    if (hasNewFactor) {
+      toast.error("Ya hay un factor en proceso de creación");
+      return;
+    }
+
     const draft: Factor = {
       id: `__new__:${crypto.randomUUID()}`,
       name: "",
@@ -286,38 +292,36 @@ export function ModalFactorsTasks({
       return;
     }
 
-    // 2) Llamada al API con overlay y manejo de error sin cerrar edición
+    // 2) Llamada al API con manejo de error sin cerrar edición
     const isCreate = factor.id.startsWith("__new__");
     let success = false;
 
+    setIsOperationActive(true);
     try {
-      await blocking.withBlocking(
-        isCreate ? "Creando factor…" : "Actualizando factor…",
-        async () => {
-          if (isCreate) {
-            await createProjectFactor({
-              projectId,
-              name, // <- ya viene trimmed
-              result: (factor.result ?? "").trim(),
-            });
-            toast.success("Factor creado");
-          } else {
-            await updateProjectFactor(factor.id, {
-              name, // <- trimmed
-              result: (factor.result ?? "").trim(),
-            });
-            toast.success("Factor actualizado");
-          }
-          await refetch();
-          success = true;
-        },
-      );
+      if (isCreate) {
+        await createProjectFactor({
+          projectId,
+          name, // <- ya viene trimmed
+          result: (factor.result ?? "").trim(),
+        });
+        toast.success("Factor creado");
+      } else {
+        await updateProjectFactor(factor.id, {
+          name, // <- trimmed
+          result: (factor.result ?? "").trim(),
+        });
+        toast.success("Factor actualizado");
+      }
+      await refetch();
+      success = true;
     } catch (e) {
       // Mostramos el mensaje real del backend (ej: "Factor name must be unique within the project")
       toast.error(getHumanErrorMessage(e));
       // Mantener edición abierta:
       setEditingFactorId(factor.id);
       return;
+    } finally {
+      setIsOperationActive(false);
     }
 
     // 3) Si salió bien, ya puedes cerrar edición
@@ -362,15 +366,23 @@ export function ModalFactorsTasks({
       toast.error("No puedes eliminar mientras hay una edición en progreso");
       return;
     }
-    await blocking.withBlocking("Inactivando factor…", async () => {
+    setIsOperationActive(true);
+    try {
       await setProjectFactorActive(factorId, false);
       await refetch();
       toast.success("Factor inactivado");
-    });
+    } finally {
+      setIsOperationActive(false);
+    }
   }
 
   /* ---------------- TAREA CRUD ---------------- */
   function startCreateTask(factorId: string) {
+    if (editingTaskByFactor[factorId]?.startsWith("__new__")) {
+      toast.error("Ya hay una tarea en proceso de creación");
+      return;
+    }
+
     const draftId = `__new__:${crypto.randomUUID()}`;
     const ymdToday = todayClampedYmd(projectMin, projectMax);
 
@@ -415,62 +427,59 @@ export function ModalFactorsTasks({
     task: Task,
     participants: TaskParticipant[],
   ) {
-    await blocking.withBlocking(
-      task.id.startsWith("__new__") ? "Creando tarea…" : "Actualizando tarea…",
-      async () => {
-        // Validación fechas proyecto
-        assertDatesWithinProject(
-          task.fromAt ?? undefined,
-          task.untilAt ?? undefined,
-        );
+    // Validación fechas proyecto
+    assertDatesWithinProject(
+      task.fromAt ?? undefined,
+      task.untilAt ?? undefined,
+    );
 
-        const toNull = (v?: string | null) =>
-          (typeof v === "string" ? v.trim() : v) || null;
+    const toNull = (v?: string | null) =>
+      (typeof v === "string" ? v.trim() : v) || null;
 
-        // Preparar participantes para enviar al API
-        const participantsPayload: ParticipantInput[] = participants
-          .filter((p) => p.isActive)
-          .map((p) => {
-            if (p.positionId) {
-              return { positionId: p.positionId };
-            } else if (p.externalUserId) {
-              return { externalUserId: p.externalUserId };
-            } else if (p.externalUserEmail) {
-              return {
-                email: p.externalUserEmail,
-                name: p.externalUserName ?? undefined,
-              };
-            }
-            return {};
-          })
-          .filter((p) => Object.keys(p).length > 0);
-
-        if (!task.id.startsWith("__new__")) {
-          await updateProjectTask(task.id, {
-            name: task.name,
-            description: toNull(task.description),
-            result: toNull(task.result),
-            limitation: toNull(task.limitation),
-            methodology: toNull(task.methodology),
-            comments: toNull(task.comments),
-            props: toNull(task.props),
-            fromAt: task.fromAt,
-            untilAt: task.untilAt,
-            status: task.status,
-            budget: task.budget,
-            finishedAt: task.finishedAt ?? null,
-          });
-
-          // Actualizar participantes usando PATCH (reemplazar todos, incluso si está vacío)
-          const { replaceTaskParticipants } =
-            await import("@/features/strategic-projects/services/projectTasksService");
-          await replaceTaskParticipants(task.id, participantsPayload);
-
-          await refetch();
-          toast.success("Tarea actualizada");
-          return;
+    // Preparar participantes para enviar al API
+    const participantsPayload: ParticipantInput[] = participants
+      .filter((p) => p.isActive)
+      .map((p) => {
+        if (p.positionId) {
+          return { positionId: p.positionId };
+        } else if (p.externalUserId) {
+          return { externalUserId: p.externalUserId };
+        } else if (p.externalUserEmail) {
+          return {
+            email: p.externalUserEmail,
+            name: p.externalUserName ?? undefined,
+          };
         }
+        return {};
+      })
+      .filter((p) => Object.keys(p).length > 0);
 
+    setIsOperationActive(true);
+    try {
+      if (!task.id.startsWith("__new__")) {
+        await updateProjectTask(task.id, {
+          name: task.name,
+          description: toNull(task.description),
+          result: toNull(task.result),
+          limitation: toNull(task.limitation),
+          methodology: toNull(task.methodology),
+          comments: toNull(task.comments),
+          props: toNull(task.props),
+          fromAt: task.fromAt,
+          untilAt: task.untilAt,
+          status: task.status,
+          budget: task.budget,
+          finishedAt: task.finishedAt ?? null,
+        });
+
+        // Actualizar participantes usando PATCH (reemplazar todos, incluso si está vacío)
+        const { replaceTaskParticipants } =
+          await import("@/features/strategic-projects/services/projectTasksService");
+        await replaceTaskParticipants(task.id, participantsPayload);
+
+        await refetch();
+        toast.success("Tarea actualizada");
+      } else {
         if (!task.name?.trim()) {
           toast.error("El nombre de la tarea es obligatorio.");
           return;
@@ -496,8 +505,10 @@ export function ModalFactorsTasks({
 
         await refetch();
         toast.success("Tarea creada");
-      },
-    );
+      }
+    } finally {
+      setIsOperationActive(false);
+    }
 
     setExpandedMap((prev) => ({ ...prev, [factorId]: true })); // mantener abierto
     setEditingTaskByFactor((prev) => ({ ...prev, [factorId]: null }));
@@ -548,11 +559,14 @@ export function ModalFactorsTasks({
       toast.error("No puedes eliminar mientras hay una edición en progreso");
       return;
     }
-    await blocking.withBlocking("Inactivando tarea…", async () => {
+    setIsOperationActive(true);
+    try {
       await setProjectTaskActive(taskId, false);
       await refetch();
       toast.success("Tarea inactivada");
-    });
+    } finally {
+      setIsOperationActive(false);
+    }
   }
 
   /* ---------------- expandir ---------------- */
@@ -595,12 +609,12 @@ export function ModalFactorsTasks({
   const isAnyFactorEditing = !!editingFactorId;
 
   const dragDisabled =
-    blocking.open ||
+    isOperationActive ||
     isAnyFactorEditing ||
     isAnyTaskEditing ||
     !permissions.factorsReorder;
-  const dragDisabledReason = blocking.open
-    ? blocking.label || "Operación en curso…"
+  const dragDisabledReason = isOperationActive
+    ? "Operación en curso…"
     : isAnyFactorEditing
       ? "No puedes reordenar mientras editas un factor."
       : isAnyTaskEditing
@@ -661,7 +675,7 @@ export function ModalFactorsTasks({
                   variant="outline"
                   className="gap-2"
                   onClick={toggleExpandAll}
-                  disabled={blocking.open}
+                  disabled={isOperationActive}
                 >
                   {factors.length > 0 &&
                   factors.every((f) => expandedMap[f.id]) ? (
@@ -682,7 +696,7 @@ export function ModalFactorsTasks({
                 <Button
                   className="bg-orange-600 hover:bg-orange-700 text-white"
                   onClick={startCreateFactor}
-                  disabled={blocking.open}
+                  disabled={isOperationActive || (editingFactorId?.startsWith("__new__") ?? false) || Object.values(editingTaskByFactor).some(Boolean)}
                 >
                   + Nuevo Factor
                 </Button>
@@ -726,15 +740,6 @@ export function ModalFactorsTasks({
               </div>
             </PlanRangeProvider>
           </div>
-
-          {/* 🆕 Overlay bloqueante y con porcentaje */}
-          <BlockingProgressOverlay
-            open={blocking.open || isPending}
-            label={
-              blocking.open ? blocking.label : "Cargando factores y tareas…"
-            }
-            progress={blocking.open ? blocking.progress : 60}
-          />
 
           {/* ConfirmModal para cambio de vista */}
           <ConfirmModal

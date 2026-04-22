@@ -193,8 +193,13 @@ export function TaskItemRow({
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
           <PopoverTrigger asChild disabled={!canUpdate || isEditingActive}>
             <button
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${!canUpdate || isEditingActive ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100 cursor-pointer"} ${isFinished ? "border-green-200 bg-green-50 text-green-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}
+              className={`text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border h-5 ${
+                !canUpdate || isEditingActive ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100 cursor-pointer"
+              } border-gray-200 bg-gray-50 text-gray-600`}
             >
+              <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
               {safeRangeLabel}
             </button>
           </PopoverTrigger>
@@ -328,21 +333,17 @@ function ParticipantBadges({ participants }: ParticipantBadgesProps) {
           key={p.id}
           data-badge
           variant="secondary"
-          className={`text-[10px] px-1.5 py-0.5 whitespace-nowrap shrink-0 ${
-            p.positionId
-              ? "bg-blue-50 text-blue-700"
-              : "bg-purple-50 text-purple-700"
-          }`}
+          className="text-[9px] px-1.5 py-0.5 h-5 bg-gray-100 text-gray-600 flex items-center"
         >
           {p.positionId
             ? (p.positionName ?? "Cargo")
-            : (p.externalUserName ?? "Ext.")}
+            : (p.externalUserName ?? "Externo")}
         </Badge>
       ))}
       {hiddenCount > 0 && (
         <Badge
           variant="secondary"
-          className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 shrink-0"
+          className="text-[9px] px-1.5 py-0.5 h-5 bg-gray-200 text-gray-600 cursor-default flex items-center"
         >
           +{hiddenCount}
         </Badge>
