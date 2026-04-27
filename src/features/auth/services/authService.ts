@@ -19,6 +19,17 @@ export interface LoginDto {
 export interface LoginResult {
   accessToken: string;
   refreshToken?: string;
+  needsTermsAcceptance?: boolean;
+  terms?: {
+    id: string;
+    version: string;
+    content: string;
+  };
+}
+export interface TermsData {
+  id: string;
+  version: string;
+  content: string;
 }
 export interface BusinessUnitLite {
   id: string;
@@ -64,6 +75,11 @@ export interface ConfirmEmailRes {
 
 export interface ResetPasswordRes {
   message?: string;
+}
+
+export interface AcceptTermsRes {
+  alreadyAccepted: boolean;
+  acceptedAt: string;
 }
 
 export const authService = {
@@ -151,5 +167,17 @@ export const authService = {
       newPassword,
     });
     return unwrapAny<ResetPasswordRes>(res);
+  },
+
+  async acceptTerms(): Promise<AcceptTermsRes> {
+    const res = await http.post(routes.auth.acceptTerms(), {});
+    const data = unwrapAny<AcceptTermsRes>(res);
+    return data;
+  },
+
+  async getCurrentTerms(): Promise<TermsData> {
+    const res = await http.get(routes.auth.currentTerms());
+    const data = unwrapAny<TermsData>(res);
+    return data;
   },
 };

@@ -51,8 +51,17 @@ export interface LoginDto {
   password: string;
 }
 
+/** Términos y condiciones */
+export interface TermsData {
+  id: string;
+  version: string;
+  content: string;
+}
+
 /** Respuesta de /auth/login dentro de { data } */
 export interface LoginData {
   accessToken: string;
   refreshToken: string;
+  needsTermsAcceptance?: boolean;
+  terms?: TermsData;
 }

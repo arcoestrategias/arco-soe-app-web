@@ -69,6 +69,8 @@ export const routes = {
     resetPassword: () => prefixed(Modules.AUTH, "reset-password"),
     sendConfirmationEmail: (id: string) =>
       prefixed(Modules.USERS, id, "send-confirmation-email"),
+    acceptTerms: () => prefixed(Modules.AUTH, "terms", "accept"),
+    currentTerms: () => prefixed(Modules.AUTH, "terms", "current"),
   },
 
   roles: {
