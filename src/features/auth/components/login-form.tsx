@@ -30,6 +30,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import {
   getAccessToken,
+  setTokens,
   setBusinessUnitId,
   setPositionId,
   getBusinessUnitId,
@@ -375,6 +376,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         return;
       }
 
+      setTokens(loginResult.accessToken, loginResult.refreshToken ?? null);
       await login({ email: form.email.trim(), password: form.password });
       toast.success("Inicio de sesión exitoso");
       setUiLocked(false);

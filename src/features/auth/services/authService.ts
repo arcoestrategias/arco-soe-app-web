@@ -86,7 +86,6 @@ export const authService = {
   async login(dto: LoginDto): Promise<LoginResult> {
     const res = await http.post(routes.auth.login(), dto);
     const payload = unwrapAny<LoginResult>(res);
-    setTokens(payload.accessToken, payload.refreshToken ?? null);
     return payload;
   },
 

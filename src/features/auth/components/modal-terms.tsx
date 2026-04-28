@@ -151,9 +151,9 @@ export function AcceptTermsModal({
       const { authService } = await import("../services/authService");
       const { setTokens } = await import("@/shared/auth/storage");
 
-      await authService.acceptTerms();
-
       setTokens(accessToken, refreshToken ?? null);
+
+      await authService.acceptTerms();
 
       toast.success("Términos y condiciones aceptados");
       onAccepted();
