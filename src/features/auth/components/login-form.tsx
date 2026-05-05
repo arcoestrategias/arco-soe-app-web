@@ -41,7 +41,7 @@ import {
 
 import { authService } from "../services/authService";
 import { ActionButton } from "@/components/ui/action-button";
-import { ModalTerms, AcceptTermsModal, type TermsData } from "./modal-terms";
+import { AcceptTermsModal, type TermsData } from "./modal-terms";
 
 type Props = {
   defaultRedirectTo?: string;
@@ -541,6 +541,57 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 </div>
               )}
             </div>
+
+            {/* Separador */}
+            {mode === "login" && !isLogged && !inSelectionPhase && (
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    O
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Botón Google */}
+            {mode === "login" && !isLogged && !inSelectionPhase && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 text-base"
+                onClick={() => {
+                  const baseUrl =
+                    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(
+                      /\/+$/,
+                      ""
+                    ) || "http://localhost:3000";
+                  window.location.href = `${baseUrl}/api/v1/auth/google`;
+                }}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 4.19v3.37h3.57c2.09-1.93 3.27-4.77 3.27-8.57z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.64l-3.57-3.37c-.98.66-2.23 1.05-3.71 1.05-2.86 0-5.29-1.93-6.16-4.53H2.18v3.44C3.97 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V6.47H2.18C1.43 8.07 1 9.93 1 12s.43 3.93 1.18 5.53l3.66-3.44z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.25-3.16C17.45 2.09 14.97 1 12 1 7.7 1 3.97 3.47 2.18 6.47l3.66 3.44C6.71 7.31 9.14 5.38 12 5.38z"
+                    fill="#EA4335"
+                  />
+                </svg>
+                Ingresar con Google
+              </Button>
+            )}
 
             {adminNeedsSelector && (
               <div className="grid grid-cols-1 gap-5 pt-2">

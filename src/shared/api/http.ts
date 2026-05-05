@@ -37,13 +37,13 @@ export const http: AxiosInstance = axios.create({
     "Content-Type": "application/json",
     Accept: "application/json",
   }),
-  withCredentials: false, // true si usas cookies HttpOnly
+  withCredentials: true, // ← CAMBIADO A TRUE para cookies HttpOnly
 });
 
 /** Normaliza headers a AxiosHeaders */
 function toAxiosHeaders(h?: unknown): AxiosHeaders {
   if (h instanceof AxiosHeaders) return h;
-  return new AxiosHeaders(h as any);
+  return new AxiosHeaders(h as Record<string, string>);
 }
 
 /** Evita bucles de refresh en endpoints auth */
@@ -87,7 +87,7 @@ async function doRefresh(): Promise<string | null> {
       { refreshToken: refresh },
       {
         timeout: 15000,
-        withCredentials: false,
+        withCredentials: true, // ← CAMBIADO A TRUE para cookies HttpOnly
         headers: new AxiosHeaders({
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -104,7 +104,7 @@ async function doRefresh(): Promise<string | null> {
 
     setTokens(nextAccess, nextRefresh ?? refresh);
     return nextAccess;
-  } catch (e) {
+  } catch {
     clearTokens();
     return null;
   }

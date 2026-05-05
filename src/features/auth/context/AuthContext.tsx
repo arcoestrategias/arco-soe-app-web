@@ -20,7 +20,6 @@ import {
 import {
   clearBusinessUnit,
   clearTokens,
-  getAccessToken,
   setBusinessUnitId,
 } from "@/shared/auth/storage";
 
@@ -165,21 +164,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [reloadMe]
   );
 
-  // --- Hidratar sesión al montar: si hay token, intentamos /me ---
+  // --- Hidratar sesión al montar: intentamos /me siempre (soporta cookies y tokens) ---
   useEffect(() => {
     if (mountedRef.current) return; // evita doble invocación en Strict Mode
     mountedRef.current = true;
 
     (async () => {
       try {
-        if (getAccessToken()) {
-          await reloadMe(); // se llama una vez
-        }
+        await reloadMe(); // se llama una vez; con withCredentials: true envía cookies
       } finally {
         setInitializing(false);
       }
     })();
-  }, [reloadMe, setInitializing]);
+  }, [reloadMe]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
