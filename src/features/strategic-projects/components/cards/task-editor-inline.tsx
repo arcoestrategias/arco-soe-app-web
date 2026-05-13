@@ -74,6 +74,8 @@ export function TaskEditorInline({
   const handleSave = () => {
     const newErrors: Partial<Record<keyof Task, string>> = {};
     if (!editedTask.name?.trim()) newErrors.name = "Campo obligatorio";
+    if (!(editedTask.description || "").toString().trim())
+      newErrors.description = "Campo obligatorio";
     if (!(editedTask.result || "").toString().trim())
       newErrors.result = "Campo obligatorio";
     if (!editedTask.fromAt || !editedTask.untilAt)
@@ -103,7 +105,7 @@ export function TaskEditorInline({
         {task.id.startsWith("__new__") ? "Nueva tarea" : "Editando tarea"}
       </h4>
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
             Acción clave <span className="text-red-500">*</span>
@@ -116,6 +118,20 @@ export function TaskEditorInline({
           />
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Justificación <span className="text-red-500">*</span>
+          </label>
+          <TextareaWithCounter
+            value={editedTask.description ?? ""}
+            onValueChange={(val) => handleChange("description", val)}
+            maxLength={1000}
+            className="min-h-[60px]"
+          />
+          {errors.description && (
+            <p className="text-xs text-red-500 mt-1">{errors.description}</p>
           )}
         </div>
         <div>
@@ -134,7 +150,7 @@ export function TaskEditorInline({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-4 gap-3 mb-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
             Fechas <span className="text-red-500">*</span>
@@ -174,6 +190,17 @@ export function TaskEditorInline({
             <option value="OPE">En proceso</option>
             <option value="CLO">Terminado</option>
           </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">
+            Inversión
+          </label>
+          <CurrencyInput
+            value={Number(editedTask.budget ?? 0)}
+            onChange={(val) => handleChange("budget", val)}
+            className="h-8 text-sm"
+          />
         </div>
 
         <div>
@@ -257,6 +284,17 @@ export function TaskEditorInline({
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">
+              Apoyos Requeridos
+            </label>
+            <TextareaWithCounter
+              value={editedTask.props ?? ""}
+              onValueChange={(val) => handleChange("props", val)}
+              maxLength={1000}
+              className="min-h-[40px]"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">
               Comentarios
             </label>
             <TextareaWithCounter
@@ -264,16 +302,6 @@ export function TaskEditorInline({
               onValueChange={(val) => handleChange("comments", val)}
               maxLength={1000}
               className="min-h-[40px]"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">
-              Inversión
-            </label>
-            <CurrencyInput
-              value={Number(editedTask.budget ?? 0)}
-              onChange={(val) => handleChange("budget", val)}
-              className="h-8 text-sm"
             />
           </div>
         </div>
