@@ -14,7 +14,7 @@ export async function getPositions(): Promise<Position[]> {
 }
 
 export async function getPosition(positionId: string): Promise<Position> {
-  const { data } = await http.get(routes.positions.byId(positionId)); // /positions/:id
+  const { data } = await http.get(routes.positions.byId(positionId));
   return unwrapAny<Position>(data);
 }
 
@@ -59,4 +59,24 @@ export async function inactivatePosition(
     isActive: false,
   });
   return unwrapAny<Position>(data);
+}
+
+export async function getPositionsOverview(params: {
+  positionId?: string;
+  businessUnitId?: string;
+  strategicPlanId?: string;
+  month?: number;
+  year?: number;
+}) {
+  const { data } = await http.get(routes.positions.overview(), { params });
+  return unwrapAny<{
+    listPositions: Array<{
+      idPosition: string;
+      ico?: number;
+      icp?: number;
+      performance?: number;
+      generalAverageProjects?: number;
+    }>;
+    annualTrend?: any[];
+  }>(data);
 }

@@ -3,91 +3,36 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Pencil, Trash, Loader2 } from "lucide-react";
+import { Pencil, Trash, Loader2, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { getCompanyId } from "@/shared/auth/storage";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermission } from "@/shared/auth/access-control";
+import { PERMISSIONS } from "@/shared/auth/permissions.constant";
 
 import {
   useMyMeetingsQuery,
   useDeleteMeetingMutation,
 } from "../hooks/use-meetings";
-import type { Meeting } from "../types/meetings.types";
 
 interface MeetingListViewProps {
   onEdit: (meetingId: string) => void;
+  onGenerateMinutes: (meetingId: string) => void;
 }
 
-export function MeetingListView({ onEdit }: MeetingListViewProps) {
-  // 🚩 BANDERA: Activar para ver datos de prueba visualmente sin API
-  const SHOW_TEST_DATA = true;
-
+export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewProps) {
+  const { me } = useAuth();
+  const canManageAny = usePermission(PERMISSIONS.MEETINGS.MANAGE);
   const companyId = getCompanyId();
-  const { data: apiMeetings, isLoading: isLoadingApi } = useMyMeetingsQuery(
+  const { data: meetings, isLoading } = useMyMeetingsQuery(
     companyId ?? ""
   );
   const deleteMutation = useDeleteMeetingMutation();
   const [meetingToDelete, setMeetingToDelete] = useState<string | null>(null);
-
-  // Datos de prueba (Mock)
-  const mockMeetings: Meeting[] = [
-    {
-      id: "mock-1",
-      name: "Daily Standup - Equipo de Desarrollo",
-      frequency: "DAILY",
-      startDate: new Date().toISOString(),
-      endDate: new Date().toISOString(),
-      participants: Array(5).fill({}),
-      createdAt: "",
-      updatedAt: "",
-    } as Meeting,
-    {
-      id: "mock-2",
-      name: "Revisión Semanal de KPIs",
-      frequency: "WEEKLY",
-      startDate: new Date(Date.now() + 86400000 * 2).toISOString(),
-      endDate: new Date().toISOString(),
-      participants: Array(3).fill({}),
-      createdAt: "",
-      updatedAt: "",
-    } as Meeting,
-    {
-      id: "mock-5",
-      name: "Seguimiento Quincenal de Proyectos",
-      frequency: "BIWEEKLY",
-      startDate: new Date(Date.now() + 86400000 * 5).toISOString(),
-      endDate: new Date().toISOString(),
-      participants: Array(6).fill({}),
-      createdAt: "",
-      updatedAt: "",
-    } as Meeting,
-    {
-      id: "mock-3",
-      name: "Comité Mensual de Dirección",
-      frequency: "MONTHLY",
-      startDate: new Date(Date.now() + 86400000 * 10).toISOString(),
-      endDate: new Date().toISOString(),
-      participants: Array(12).fill({}),
-      createdAt: "",
-      updatedAt: "",
-    } as Meeting,
-    {
-      id: "mock-4",
-      name: "Planificación Trimestral (Q4)",
-      frequency: "ONCE",
-      startDate: new Date(Date.now() + 86400000 * 20).toISOString(),
-      endDate: new Date().toISOString(),
-      participants: Array(8).fill({}),
-      createdAt: "",
-      updatedAt: "",
-    } as Meeting,
-  ];
-
-  const meetings = SHOW_TEST_DATA ? mockMeetings : apiMeetings;
-  const isLoading = SHOW_TEST_DATA ? false : isLoadingApi;
 
   const handleDelete = () => {
     if (!meetingToDelete) return;
@@ -155,21 +100,42 @@ export function MeetingListView({ onEdit }: MeetingListViewProps) {
                 {meeting.participants.length}
               </td>
               <td className="px-4 py-3 text-center flex justify-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onEdit(meeting.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setMeetingToDelete(meeting.id)}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
+                {meeting.participants?.some(p => p.role === "CONVENER" && p.userId === me?.id) || canManageAny ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(meeting.id)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setMeetingToDelete(meeting.id)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onGenerateMinutes(meeting.id)}
+                      title="Generar acta"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onGenerateMinutes(meeting.id)}
+                    title="Ver acta"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                )}
               </td>
             </tr>
           ))}

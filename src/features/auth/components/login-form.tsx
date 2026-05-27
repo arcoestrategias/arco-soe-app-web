@@ -557,7 +557,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
             )}
 
             {/* Botón Google */}
-            {mode === "login" && !isLogged && !inSelectionPhase && (
+            {false && (
               <Button
                 type="button"
                 variant="outline"

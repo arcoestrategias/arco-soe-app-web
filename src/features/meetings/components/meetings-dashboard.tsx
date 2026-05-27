@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarView } from "./calendar-view";
 import { MeetingListView } from "./meeting-list-view";
 import { MeetingModal } from "./meeting-modal";
+import MeetingMinutesEditor from "./minutes/meeting-minutes-editor";
 import type { MeetingOccurrence } from "../types/meetings.types";
 
 export function MeetingsDashboard() {
@@ -17,6 +18,7 @@ export function MeetingsDashboard() {
   const [selectedOccurrence, setSelectedOccurrence] =
     useState<MeetingOccurrence | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [minutesMeetingId, setMinutesMeetingId] = useState<string | null>(null);
 
   // Abrir modal para crear
   const handleCreate = () => {
@@ -37,9 +39,18 @@ export function MeetingsDashboard() {
   // Abrir modal para editar (desde lista)
   const handleEditFromList = (meetingId: string) => {
     setSelectedMeetingId(meetingId);
-    setSelectedOccurrence(null); // No hay ocurrencia específica seleccionada
+    setSelectedOccurrence(null);
     setSelectedDate(null);
     setIsModalOpen(true);
+  };
+
+  // Abrir editor de actas
+  const handleGenerateMinutes = (meetingId: string) => {
+    setMinutesMeetingId(meetingId);
+  };
+
+  const handleCloseMinutes = () => {
+    setMinutesMeetingId(null);
   };
 
   // Abrir modal al hacer clic en un día del calendario
@@ -56,6 +67,16 @@ export function MeetingsDashboard() {
     setSelectedOccurrence(null);
     setSelectedDate(null);
   };
+
+  // Si estamos viendo el editor de actas
+  if (minutesMeetingId) {
+    return (
+      <MeetingMinutesEditor
+        meetingId={minutesMeetingId}
+        onBack={handleCloseMinutes}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -93,7 +114,10 @@ export function MeetingsDashboard() {
         </TabsContent>
 
         <TabsContent value="list" className="mt-0">
-          <MeetingListView onEdit={handleEditFromList} />
+          <MeetingListView
+            onEdit={handleEditFromList}
+            onGenerateMinutes={handleGenerateMinutes}
+          />
         </TabsContent>
       </Tabs>
 

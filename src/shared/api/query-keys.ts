@@ -186,6 +186,12 @@ export const QKEY = {
     ] as const,
   meetingsMy: (companyId: string) => ["meetings", "my", companyId] as const,
   meeting: (id: string) => ["meetings", id] as const,
+  meetingCandidates: (companyId: string) =>
+    ["meetings", "candidates", companyId] as const,
+  meetingMinutes: (meetingId: string) =>
+    ["meetings", "minutes", meetingId] as const,
+  participantsPerformance: (meetingId: string) =>
+    ["meetings", "participants-performance", meetingId] as const,
 
   externalUsers: ["external-users"] as const,
 };

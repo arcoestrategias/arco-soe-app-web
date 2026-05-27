@@ -62,7 +62,7 @@ export const navigationSections = [
         title: "Reuniones",
         url: "/meetings",
         icon: Calendar,
-        module: "meeting",
+        module: "meetings",
       },
       // {
       //   title: "Performance",

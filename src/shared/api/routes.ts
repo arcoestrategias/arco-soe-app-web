@@ -324,6 +324,21 @@ export const routes = {
     byId: (id: string) => prefixed(Modules.MEETINGS, id),
     execute: (id: string) =>
       prefixed(Modules.MEETINGS, "occurrences", id, "execute"),
+    candidates: (companyId: string) =>
+      prefixed(Modules.MEETINGS, "company", companyId, "candidates"),
+    minutes: (id: string) => prefixed(Modules.MEETINGS, id, "minutes"),
+    minutesFinalize: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "minutes", "finalize"),
+    minutesCompromisos: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "minutes", "compromisos"),
+    minutesPdf: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "minutes", "pdf"),
+    prioritiesToday: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "priorities-today"),
+    createPriority: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "priorities"),
+    participantsPerformance: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "participants-performance"),
   },
 } as const;
 
