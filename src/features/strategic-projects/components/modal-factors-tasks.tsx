@@ -459,7 +459,7 @@ export function ModalFactorsTasks({
       if (!task.id.startsWith("__new__")) {
         await updateProjectTask(task.id, {
           name: task.name,
-          description: toNull(task.description),
+          description: task.description?.trim() ?? "",
           result: toNull(task.result),
           limitation: toNull(task.limitation),
           methodology: toNull(task.methodology),
@@ -489,7 +489,7 @@ export function ModalFactorsTasks({
         await createProjectTask({
           projectFactorId: factorId,
           name: task.name,
-          description: toNull(task.description),
+          description: task.description?.trim() ?? "",
           result: toNull(task.result),
           limitation: toNull(task.limitation),
           methodology: toNull(task.methodology),
