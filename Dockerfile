@@ -10,7 +10,7 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 # instala TODAS las deps (incluye dev para poder compilar Next)
-RUN pnpm install --frozen-lockfile
+RUN pnpm config set ignore-scripts false && pnpm install --frozen-lockfile
 
 # ---------- builder: compila Next en modo standalone ----------
 FROM base AS builder
