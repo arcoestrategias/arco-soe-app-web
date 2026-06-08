@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { QKEY } from "@/shared/api/query-keys";
 import dayjs from "dayjs";
@@ -17,10 +17,26 @@ import {
   Upload,
   ChevronDown,
   ChevronRight,
+  Calendar as CalendarIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CellWithTooltip } from "@/shared/components/cell-with-tooltip";
+import { TextareaWithCounter } from "@/shared/components/textarea-with-counter";
+import { SingleDatePicker } from "@/shared/components/single-date-picker";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,14 +63,17 @@ import { useMeetingByIdQuery } from "../../hooks/use-meetings";
 import { StrategicPlanSelect } from "@/shared/filters/components/StrategicPlanSelect";
 import { getBusinessUnitId } from "@/shared/auth/storage";
 import { getStrategicPlansByBusinessUnit } from "@/features/strategic-plans/services/strategicPlansService";
+import ObjectiveSelect from "@/shared/components/objective-select";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useAnyPermission } from "@/shared/auth/access-control";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { cn } from "@/lib/utils";
 import type {
   MeetingMinutesData,
   MinutesResponse,
   MinutesPosition,
   MinutesAttendance,
+  MinutesPrioritySnapshot,
 } from "../../types/meeting-minutes.types";
 
 // ---- Helpers visuales (mismos que PrioritiesTable) ----
@@ -112,6 +131,74 @@ function formatDateBadge(s?: string | null) {
   return ymd ? dayjs(ymd).format("DD/MM/YYYY") : "-";
 }
 
+// ---- Helpers de fechas (mismos que PrioritiesTable) ----
+function parseYmdOrIsoToLocalDate(s?: string) {
+  if (!s) return undefined;
+  const ymd = s.includes("T") ? s.slice(0, 10) : s;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return undefined;
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function toYmd(d?: Date) {
+  return d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    : undefined;
+}
+
+// ---- DateEditor (mismo que PrioritiesTable) ----
+function DateEditor({
+  value,
+  onChange,
+  minDate,
+  disabled,
+  placeholder = "Seleccionar",
+  open,
+  onOpenChange,
+}: {
+  value?: string;
+  onChange: (val?: string) => void;
+  minDate?: Date;
+  disabled?: boolean;
+  placeholder?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const date = parseYmdOrIsoToLocalDate(value);
+
+  const isControlled = open !== undefined;
+  const effectiveOpen = isControlled ? open : internalOpen;
+  const effectiveOnOpenChange =
+    isControlled && onOpenChange ? onOpenChange : setInternalOpen;
+
+  return (
+    <Popover open={effectiveOpen} onOpenChange={effectiveOnOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal px-3",
+            !value && "text-muted-foreground",
+          )}
+          disabled={disabled}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value ? formatDateBadge(value) : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-4" align="start">
+        <SingleDatePicker
+          date={date}
+          minDate={minDate}
+          onClose={() => effectiveOnOpenChange(false)}
+          onApply={(d) => onChange(toYmd(d))}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface Props {
   meetingId: string;
   onBack: () => void;
@@ -144,10 +231,34 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
   const [version, setVersion] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [createModalPositionId, setCreateModalPositionId] = useState<string | null>(null);
+  const [createFromOpen, setCreateFromOpen] = useState(false);
+  const [createUntilOpen, setCreateUntilOpen] = useState(false);
+  useEffect(() => {
+    setCreateFromOpen(false);
+    setCreateUntilOpen(false);
+  }, [createModalPositionId]);
+
+  const otherPositions = useMemo(
+    () =>
+      data?.positions
+        ?.filter((p) => p.positionId !== createModalPositionId)
+        ?.map((p) => ({ id: p.positionId, name: p.positionName })) ?? [],
+    [data, createModalPositionId],
+  );
+
   const [newCommitment, setNewCommitment] = useState<
     Record<
       string,
-      { name: string; description: string; status: string; untilAt: string }
+      {
+        name: string;
+        description: string;
+        status: string;
+        fromAt: string;
+        untilAt: string;
+        objectiveId: string;
+        finishedAt: string;
+      }
     >
   >({});
   const [expandedPositions, setExpandedPositions] = useState<Set<string>>(
@@ -209,8 +320,6 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
     }
   }, [strategicPlanId, data]);
 
-  // Sync today's priorities from pos.priorities is done at render time
-
   const togglePosition = (positionId: string) => {
     setExpandedPositions((prev) => {
       const next = new Set(prev);
@@ -261,15 +370,56 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
     }
   };
 
+  function getMonthRange() {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    return { currentMonth, currentYear, nextMonth, nextYear };
+  }
+
+  function priorityInMonth(pr: MinutesPrioritySnapshot, month: number, year: number): boolean {
+    if (!pr.untilAt) return false;
+    const d = new Date(pr.untilAt);
+    return d.getMonth() + 1 === month && d.getFullYear() === year;
+  }
+
+  function mapPriority(pr: any) {
+    return {
+      id: pr.id,
+      name: pr.name,
+      description: pr.description,
+      status: pr.status,
+      monthlyClass: pr.monthlyClass,
+      untilAt: pr.untilAt?.slice(0, 10),
+      finishedAt: pr.finishedAt?.slice(0, 10),
+      canceledAt: pr.canceledAt?.slice(0, 10),
+      fromAt: pr.fromAt?.slice(0, 10),
+      createdAt: pr.createdAt,
+      objectiveName: pr.objectiveName,
+    };
+  }
+
+  function computeMonthlyClass(pr: { status: string; untilAt?: string }): string | undefined {
+    if (pr.status !== 'OPE' || !pr.untilAt) return undefined;
+    const { currentMonth, currentYear } = getMonthRange();
+    const d = new Date(pr.untilAt);
+    const m = d.getMonth() + 1;
+    const y = d.getFullYear();
+    if (y < currentYear || (y === currentYear && m < currentMonth)) {
+      return 'NO_CUMPLIDAS_ATRASADAS_MESES_ANTERIORES';
+    }
+    return undefined;
+  }
+
   const fetchAndSaveLiveData = async (currentData: MeetingMinutesData) => {
     try {
       const { getPositionsOverview } =
         await import("@/features/positions/services/positionsService");
       const { prioritiesService } =
         await import("@/features/priorities/services/prioritiesService");
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
+      const { currentMonth, currentYear, nextMonth, nextYear } = getMonthRange();
 
       const updated = {
         ...currentData,
@@ -283,45 +433,35 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                       positionId: pos.positionId,
                       businessUnitId: getBusinessUnitId()!,
                       strategicPlanId,
-                      month,
-                      year,
+                      month: currentMonth,
+                      year: currentYear,
                     }).catch(() => null)
                   : Promise.resolve(null);
 
-              const prioritiesPromise = prioritiesService
-                .getPriorities({
+              const [currentRes, nextRes] = await Promise.all([
+                prioritiesService.getPriorities({
                   positionId: pos.positionId,
-                  month,
-                  year,
+                  month: currentMonth,
+                  year: currentYear,
                   page: 1,
                   limit: 1000,
-                })
-                .catch(() => null);
-
-              const [overview, prioritiesRes] = await Promise.all([
-                overviewPromise,
-                prioritiesPromise,
+                }).catch(() => null),
+                prioritiesService.getPriorities({
+                  positionId: pos.positionId,
+                  month: nextMonth,
+                  year: nextYear,
+                  page: 1,
+                  limit: 1000,
+                }).catch(() => null),
               ]);
 
+              const [overview] = await Promise.all([overviewPromise]);
               const item = overview?.listPositions?.[0];
 
-              // Separate today's priorities from existing ones
-              let existingPriorities: any[] = [];
-              let todayPriorities: any[] = [];
-              if (prioritiesRes?.items) {
-                const startOfDay = new Date();
-                startOfDay.setHours(0, 0, 0, 0);
-                for (const pr of prioritiesRes.items) {
-                  const createdAt = pr.createdAt
-                    ? new Date(pr.createdAt)
-                    : null;
-                  if (createdAt && createdAt >= startOfDay) {
-                    todayPriorities.push(pr);
-                  } else {
-                    existingPriorities.push(pr);
-                  }
-                }
-              }
+              const allPriorities = [
+                ...(nextRes?.items ?? []),
+                ...(currentRes?.items ?? []),
+              ];
 
               return {
                 ...pos,
@@ -333,30 +473,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                       avance: item.generalAverageProjects ?? 0,
                     }
                   : null,
-                priorities: [
-                  ...existingPriorities.map((pr: any) => ({
-                    id: pr.id,
-                    name: pr.name,
-                    status: pr.status,
-                    monthlyClass: pr.monthlyClass,
-                    untilAt: pr.untilAt?.slice(0, 10),
-                    finishedAt: pr.finishedAt?.slice(0, 10),
-                    canceledAt: pr.canceledAt?.slice(0, 10),
-                    fromAt: pr.fromAt?.slice(0, 10),
-                    createdAt: pr.createdAt,
-                  })),
-                  ...todayPriorities.map((pr: any) => ({
-                    id: pr.id,
-                    name: pr.name,
-                    status: pr.status,
-                    monthlyClass: pr.monthlyClass,
-                    untilAt: pr.untilAt?.slice(0, 10),
-                    finishedAt: pr.finishedAt?.slice(0, 10),
-                    canceledAt: pr.canceledAt?.slice(0, 10),
-                    fromAt: pr.fromAt?.slice(0, 10),
-                    createdAt: pr.createdAt,
-                  })),
-                ],
+                priorities: allPriorities.map(mapPriority),
               };
             } catch {
               return pos;
@@ -428,9 +545,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
         await import("@/features/positions/services/positionsService");
       const { prioritiesService } =
         await import("@/features/priorities/services/prioritiesService");
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
+      const { currentMonth, currentYear, nextMonth, nextYear } = getMonthRange();
 
       const updated = { ...data, positions: [...data.positions] };
       for (let i = 0; i < updated.positions.length; i++) {
@@ -443,27 +558,36 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                   positionId: pos.positionId,
                   businessUnitId: getBusinessUnitId()!,
                   strategicPlanId,
-                  month,
-                  year,
+                  month: currentMonth,
+                  year: currentYear,
                 }).catch(() => null)
               : Promise.resolve(null);
 
-          const prioritiesPromise = prioritiesService
-            .getPriorities({
+          const [currentRes, nextRes] = await Promise.all([
+            prioritiesService.getPriorities({
               positionId: pos.positionId,
-              month,
-              year,
+              month: currentMonth,
+              year: currentYear,
               page: 1,
               limit: 1000,
-            })
-            .catch(() => null);
-
-          const [overview, prioritiesRes] = await Promise.all([
-            overviewPromise,
-            prioritiesPromise,
+            }).catch(() => null),
+            prioritiesService.getPriorities({
+              positionId: pos.positionId,
+              month: nextMonth,
+              year: nextYear,
+              page: 1,
+              limit: 1000,
+            }).catch(() => null),
           ]);
 
+          const [overview] = await Promise.all([overviewPromise]);
           const item = overview?.listPositions?.[0];
+
+          const allPriorities = [
+            ...(nextRes?.items ?? []),
+            ...(currentRes?.items ?? []),
+          ];
+
           updated.positions[i] = {
             ...pos,
             performance: item
@@ -474,17 +598,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                   avance: item.generalAverageProjects ?? 0,
                 }
               : null,
-            priorities:
-              prioritiesRes?.items?.map((pr: any) => ({
-                id: pr.id,
-                name: pr.name,
-                status: pr.status,
-                monthlyClass: pr.monthlyClass,
-                untilAt: pr.untilAt?.slice(0, 10),
-                finishedAt: pr.finishedAt?.slice(0, 10),
-                canceledAt: pr.canceledAt?.slice(0, 10),
-                fromAt: pr.fromAt?.slice(0, 10),
-              })) ?? [],
+            priorities: allPriorities.map(mapPriority),
           };
         } catch {
           // position may not have data
@@ -534,17 +648,49 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
       return;
     }
     try {
-      await createPriorityMut.mutateAsync({
+      const result = await createPriorityMut.mutateAsync({
         positionId,
         name: input.name.trim(),
         description: input.description?.trim() || undefined,
         status: (input.status as any) ?? "OPE",
+        fromAt: input.fromAt || undefined,
         untilAt: input.untilAt || undefined,
+        objectiveId: input.objectiveId || undefined,
       });
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const updatedPositions = prev.positions.map((pos) => {
+          if (pos.positionId !== positionId) return pos;
+          const alreadyExists = pos.priorities.some((p) => p.id === result.id);
+          if (alreadyExists) return pos;
+          return {
+            ...pos,
+            priorities: [
+              ...pos.priorities,
+              {
+                id: result.id,
+                name: result.name,
+                description: result.description,
+                status: result.status,
+                monthlyClass: computeMonthlyClass(result) ?? result.monthlyClass,
+                untilAt: result.untilAt?.slice(0, 10),
+                finishedAt: result.finishedAt?.slice(0, 10),
+                fromAt: result.fromAt?.slice(0, 10),
+                createdAt: result.createdAt,
+                objectiveName: result.objectiveName,
+              },
+            ],
+          };
+        });
+        return { ...prev, positions: updatedPositions };
+      });
+
       setNewCommitment((prev) => ({
         ...prev,
-        [positionId]: { name: "", description: "", status: "OPE", untilAt: "" },
+        [positionId]: { name: "", description: "", status: "OPE", fromAt: "", untilAt: "", objectiveId: "", finishedAt: "" },
       }));
+      setCreateModalPositionId(null);
       toast.success("Prioridad creada");
     } catch {
       toast.error("Error al crear prioridad");
@@ -674,41 +820,67 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
         </div>
       </div>
 
-      {/* Block 1: Agenda */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Agenda del día</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {data.agenda.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground w-6">
-                {i + 1}.
-              </span>
-              <Input
-                value={item}
-                onChange={(e) => updateAgendaItem(i, e.target.value)}
-                disabled={!isDraft}
-                placeholder="Punto de agenda..."
-              />
-              {isDraft && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeAgendaItem(i)}
+      {/* Block 1: Agenda + Attendance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Agenda del día</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.agenda.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground w-6">
+                  {i + 1}.
+                </span>
+                <Input
+                  value={item}
+                  onChange={(e) => updateAgendaItem(i, e.target.value)}
+                  disabled={!isDraft}
+                  placeholder="Punto de agenda..."
+                />
+                {isDraft && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeAgendaItem(i)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {isDraft && (
+              <Button variant="outline" size="sm" onClick={addAgendaItem}>
+                <Plus className="h-4 w-4 mr-2" /> Agregar punto
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Asistencia</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.attendance.map((a) => (
+              <div key={`att-${a.userId}`} className="flex items-center gap-3">
+                <Checkbox
+                  id={`att-${a.userId}`}
+                  checked={a.present}
+                  onCheckedChange={() => toggleAttendance(a.userId)}
+                  disabled={!isDraft}
+                />
+                <Label
+                  htmlFor={`att-${a.userId}`}
+                  className={a.present ? "" : "text-muted-foreground"}
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-          {isDraft && (
-            <Button variant="outline" size="sm" onClick={addAgendaItem}>
-              <Plus className="h-4 w-4 mr-2" /> Agregar punto
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+                  {a.userName}
+                </Label>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Block 2 & 3: Performance + Priorities per position */}
       <div className="flex items-center justify-between">
@@ -728,7 +900,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
       {data.positions.map((pos, i) => {
         const isExpanded = expandedPositions.has(pos.positionId);
         return (
-          <Card key={pos.positionId || i} className="overflow-hidden">
+          <Card key={pos.positionId + '-' + i} className="overflow-hidden">
             <button
               type="button"
               onClick={() => togglePosition(pos.positionId)}
@@ -750,7 +922,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                   {!isExpanded && pos.performance && (
                     <span className="text-xs text-muted-foreground">
                       ICO: {pos.performance.ico.toFixed(0)}% · ICP:{" "}
-                      {pos.performance.icp.toFixed(0)}% · Avance:{" "}
+                      {pos.performance.icp.toFixed(0)}% · Avance del Proyecto:{" "}
                       {pos.performance.avance.toFixed(0)}%
                     </span>
                   )}
@@ -787,7 +959,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                         {pos.performance.avance.toFixed(1)}%
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Avance
+                        Avance del Proyecto
                       </div>
                     </div>
                   </div>
@@ -799,19 +971,28 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
 
                 <Separator />
 
-                {/* Priorities table split by createdAt */}
+                {/* Priorities table split by month */}
                 <div>
                   <h4 className="text-sm font-medium mb-2">Prioridades</h4>
                   {(() => {
-                    const startOfDay = new Date();
-                    startOfDay.setHours(0, 0, 0, 0);
-                    const existing = pos.priorities.filter(
-                      (p) => !p.createdAt || new Date(p.createdAt) < startOfDay,
+                    const { currentMonth, currentYear, nextMonth, nextYear } = getMonthRange();
+
+                    const currentMonthPriorities = pos.priorities.filter(
+                      (p) => priorityInMonth(p, currentMonth, currentYear),
                     );
-                    const todayItems = pos.priorities.filter(
-                      (p) => p.createdAt && new Date(p.createdAt) >= startOfDay,
+                    const nextMonthPriorities = pos.priorities.filter(
+                      (p) => priorityInMonth(p, nextMonth, nextYear),
                     );
-                    const hasAny = existing.length > 0 || todayItems.length > 0;
+                    const otherPriorities = pos.priorities.filter(
+                      (p) =>
+                        !priorityInMonth(p, currentMonth, currentYear) &&
+                        !priorityInMonth(p, nextMonth, nextYear),
+                    );
+
+                    const hasAny =
+                      currentMonthPriorities.length > 0 ||
+                      nextMonthPriorities.length > 0 ||
+                      otherPriorities.length > 0;
 
                     if (!hasAny) {
                       return (
@@ -821,95 +1002,134 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                       );
                     }
 
-                    const renderTable = (items: typeof pos.priorities) => (
-                      <div className="border rounded-md overflow-hidden">
-                        <table className="w-full text-sm">
+                    const renderTable = (items: typeof pos.priorities) => {
+                      const uniqueItems = Array.from(
+                        new Map(items.map((item) => [item.id, item])).values(),
+                      );
+                      return (
+                      <div className="w-full overflow-x-auto">
+                        <table className="w-full table-auto text-sm">
                           <thead className="bg-muted/50">
                             <tr>
+                              <th className="px-3 py-2 text-center font-medium text-xs w-8">
+                                #
+                              </th>
                               <th className="px-3 py-2 text-left font-medium text-xs">
                                 Prioridad
                               </th>
-                              <th className="px-3 py-2 text-center font-medium text-xs w-28">
+                              <th className="px-3 py-2 text-left font-medium text-xs">
+                                Objetivo
+                              </th>
+                              <th className="px-3 py-2 text-center font-medium text-xs w-24">
                                 Estado
                               </th>
                               <th className="px-3 py-2 text-center font-medium text-xs w-44">
                                 Inicio / Fin
                               </th>
-                              <th className="px-3 py-2 text-center font-medium text-xs w-32">
-                                Terminado
+                              <th className="px-3 py-2 text-center font-medium text-xs w-40">
+                                Fecha Terminado
                               </th>
                             </tr>
                           </thead>
                           <tbody>
-                            {items.map((pr) => {
+                            {uniqueItems.map((pr, idx) => {
                               const monthlyLabel = resolveMonthlyLabel(
                                 pr.monthlyClass,
                               );
                               const monthlyStyle = resolveMonthlyStyle(
                                 pr.monthlyClass,
                               );
-                              const mainBadge = monthlyLabel ? (
-                                <Badge
-                                  className="whitespace-nowrap border-0"
-                                  style={monthlyStyle ?? {}}
-                                >
-                                  {monthlyLabel}
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant={
-                                    pr.status === "CLO"
-                                      ? "default"
-                                      : pr.status === "CAN"
-                                        ? "secondary"
-                                        : "outline"
+
+                              const objectiveName = pr.objectiveName ?? "-";
+                              const deliverableText = pr.description ?? "-";
+
+                              const renderClosure = () => {
+                                const finished = pr.finishedAt;
+                                const canceled = pr.canceledAt;
+                                if (!finished && !canceled) return null;
+                                let showFinished = Boolean(finished);
+                                let showCanceled = Boolean(canceled);
+                                if (finished && canceled) {
+                                  if (pr.status === "CLO") {
+                                    showFinished = true;
+                                    showCanceled = false;
+                                  } else if (pr.status === "CAN") {
+                                    showFinished = false;
+                                    showCanceled = true;
+                                  } else {
+                                    showFinished = true;
+                                    showCanceled = false;
                                   }
-                                  className="text-xs"
-                                >
-                                  {pr.status === "OPE"
-                                    ? "En proceso"
-                                    : pr.status === "CLO"
-                                      ? "Terminado"
-                                      : "Anulado"}
-                                </Badge>
-                              );
+                                }
+                                return (
+                                  <div className="flex items-center gap-2 justify-center">
+                                    {showFinished && (
+                                      <Badge variant="outline">{formatDateBadge(finished)}</Badge>
+                                    )}
+                                    {showCanceled && (
+                                      <Badge variant="outline">{formatDateBadge(canceled)}</Badge>
+                                    )}
+                                  </div>
+                                );
+                              };
+
                               return (
                                 <tr
                                   key={pr.id}
                                   className="border-t hover:bg-muted/30"
                                 >
-                                  <td className="px-3 py-2 whitespace-pre-wrap break-words">
-                                    {pr.name}
+                                  <td className="px-3 py-2 text-center align-top whitespace-nowrap">
+                                    {idx + 1}
                                   </td>
-                                  <td className="px-3 py-2 text-center">
-                                    {mainBadge}
+                                  <td className="px-3 py-2 align-top">
+                                    <CellWithTooltip
+                                      lines={[{ label: "Entregable", text: deliverableText }]}
+                                      side="top"
+                                    >
+                                      <div className="font-medium leading-6 break-words whitespace-pre-wrap">
+                                        {pr.name}
+                                      </div>
+                                    </CellWithTooltip>
                                   </td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap">
-                                    <span className="text-xs">
-                                      <Badge variant="outline" className="mr-1">
-                                        {formatDateBadge(pr.fromAt)}
+                                  <td className="px-3 py-2 align-top">
+                                    <div className="text-sm break-words whitespace-pre-wrap">
+                                      {objectiveName}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 text-center align-top whitespace-nowrap">
+                                    {monthlyLabel ? (
+                                      <Badge
+                                        className="whitespace-nowrap border-0"
+                                        style={monthlyStyle ?? {}}
+                                      >
+                                        {monthlyLabel}
                                       </Badge>
-                                      <Badge variant="outline">
-                                        {formatDateBadge(pr.untilAt)}
-                                      </Badge>
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap">
-                                    {pr.status === "CLO" && pr.finishedAt && (
-                                      <Badge variant="outline">
-                                        {formatDateBadge(pr.finishedAt)}
+                                    ) : (
+                                      <Badge
+                                        className={
+                                          pr.status === "OPE"
+                                            ? "bg-yellow-100 text-yellow-900 border border-yellow-300"
+                                            : pr.status === "CLO"
+                                              ? "bg-green-600 text-white"
+                                              : "bg-gray-200 text-gray-700"
+                                        }
+                                      >
+                                        {pr.status === "OPE"
+                                          ? "En proceso"
+                                          : pr.status === "CLO"
+                                            ? "Terminado"
+                                            : "Anulado"}
                                       </Badge>
                                     )}
-                                    {pr.status === "CAN" && pr.canceledAt && (
-                                      <Badge variant="outline">
-                                        {formatDateBadge(pr.canceledAt)}
-                                      </Badge>
-                                    )}
-                                    {pr.status === "OPE" && (
-                                      <span className="text-xs text-muted-foreground">
-                                        —
-                                      </span>
-                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-center align-top whitespace-nowrap">
+                                    <div className="space-x-2 whitespace-nowrap justify-center">
+                                      <Badge variant="outline">{formatDateBadge(pr.fromAt)}</Badge>
+                                      <Badge variant="outline">{formatDateBadge(pr.untilAt)}</Badge>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 text-center align-top whitespace-nowrap">
+                                    {renderClosure()}
                                   </td>
                                 </tr>
                               );
@@ -918,108 +1138,49 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                         </table>
                       </div>
                     );
+                  };
 
                     return (
                       <div className="space-y-3 mb-3">
-                        {existing.length > 0 && (
+                        {currentMonthPriorities.length > 0 && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1 font-medium">
-                              Existentes
+                              Prioridades del Mes actual
                             </p>
-                            {renderTable(existing)}
+                            {renderTable(currentMonthPriorities)}
                           </div>
                         )}
-                        {todayItems.length > 0 && (
+                        {nextMonthPriorities.length > 0 && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1 font-medium">
-                              Compromisos
+                              Prioridades del Próximo Mes
                             </p>
-                            {renderTable(todayItems)}
+                            {renderTable(nextMonthPriorities)}
+                          </div>
+                        )}
+                        {otherPriorities.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1 font-medium">
+                              Otras prioridades
+                            </p>
+                            {renderTable(otherPriorities)}
                           </div>
                         )}
                       </div>
                     );
                   })()}
 
-                  {/* Create form */}
+                  {/* Create priority button */}
                   {canCreate && (
-                    <div className="flex items-start gap-2 pt-1">
-                      <div className="flex-1 space-y-1">
-                        <Input
-                          placeholder="Nombre de la prioridad..."
-                          value={newCommitment[pos.positionId]?.name ?? ""}
-                          onChange={(e) =>
-                            setNewCommitment((prev) => ({
-                              ...prev,
-                              [pos.positionId]: {
-                                ...prev[pos.positionId],
-                                name: e.target.value,
-                                status: prev[pos.positionId]?.status ?? "OPE",
-                                untilAt: prev[pos.positionId]?.untilAt ?? "",
-                              },
-                            }))
-                          }
-                        />
-                        <div className="flex gap-2">
-                          <Select
-                            value={
-                              newCommitment[pos.positionId]?.status ?? "OPE"
-                            }
-                            onValueChange={(v) =>
-                              setNewCommitment((prev) => ({
-                                ...prev,
-                                [pos.positionId]: {
-                                  ...prev[pos.positionId],
-                                  status: v,
-                                  name: prev[pos.positionId]?.name ?? "",
-                                  untilAt: prev[pos.positionId]?.untilAt ?? "",
-                                },
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="h-9 w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="OPE">En proceso</SelectItem>
-                              <SelectItem value="CLO">Terminado</SelectItem>
-                              <SelectItem value="CAN">Anulado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="date"
-                            className="h-9 w-40"
-                            value={newCommitment[pos.positionId]?.untilAt ?? ""}
-                            onChange={(e) =>
-                              setNewCommitment((prev) => ({
-                                ...prev,
-                                [pos.positionId]: {
-                                  ...prev[pos.positionId],
-                                  untilAt: e.target.value,
-                                  name: prev[pos.positionId]?.name ?? "",
-                                  status: prev[pos.positionId]?.status ?? "OPE",
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleCreatePriority(pos.positionId)}
-                        disabled={
-                          createPriorityMut.isPending ||
-                          !newCommitment[pos.positionId]?.name?.trim()
-                        }
-                        className="shrink-0"
-                      >
-                        {createPriorityMut.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCreateModalPositionId(pos.positionId)}
+                      className="mt-3 w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva prioridad
+                    </Button>
                   )}
                 </div>
               </CardContent>
@@ -1028,32 +1189,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
         );
       })}
 
-      {/* Block 5: Attendance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Asistencia</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {data.attendance.map((a) => (
-            <div key={a.userId} className="flex items-center gap-3">
-              <Checkbox
-                id={`att-${a.userId}`}
-                checked={a.present}
-                onCheckedChange={() => toggleAttendance(a.userId)}
-                disabled={!isDraft}
-              />
-              <Label
-                htmlFor={`att-${a.userId}`}
-                className={a.present ? "" : "text-muted-foreground"}
-              >
-                {a.userName}
-              </Label>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Block 6: Observations + Documents */}
+      {/* Block 5: Observations + Documents */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Observaciones</CardTitle>
@@ -1112,6 +1248,222 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
           title={`Documentos del acta v${version}`}
         />
       )}
+
+      {/* Modal nueva prioridad */}
+      <Dialog
+        open={!!createModalPositionId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateModalPositionId(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Nueva prioridad</DialogTitle>
+          </DialogHeader>
+
+          {createModalPositionId && (
+            <div className="space-y-4 py-2">
+              {/* Fila 1: Nombre + Entregable */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div className="md:col-span-4">
+                  <Label className="text-xs text-muted-foreground block mb-1">
+                    Nombre
+                  </Label>
+                  <TextareaWithCounter
+                    value={newCommitment[createModalPositionId]?.name ?? ""}
+                    onChange={(e) =>
+                      setNewCommitment((prev) => ({
+                        ...prev,
+                        [createModalPositionId]: {
+                          ...prev[createModalPositionId],
+                          name: e.target.value,
+                          status: prev[createModalPositionId]?.status ?? "OPE",
+                          fromAt: prev[createModalPositionId]?.fromAt ?? "",
+                          untilAt: prev[createModalPositionId]?.untilAt ?? "",
+                          objectiveId: prev[createModalPositionId]?.objectiveId ?? "",
+                          description: prev[createModalPositionId]?.description ?? "",
+                          finishedAt: prev[createModalPositionId]?.finishedAt ?? "",
+                        },
+                      }))
+                    }
+                    maxLength={500}
+                    rows={2}
+                    placeholder="Nombre de la prioridad"
+                    className="w-full"
+                  />
+                </div>
+                <div className="md:col-span-8">
+                  <Label className="text-xs text-muted-foreground block mb-1">
+                    Entregable
+                  </Label>
+                  <TextareaWithCounter
+                    value={newCommitment[createModalPositionId]?.description ?? ""}
+                    onChange={(e) =>
+                      setNewCommitment((prev) => ({
+                        ...prev,
+                        [createModalPositionId]: {
+                          ...prev[createModalPositionId],
+                          description: e.target.value,
+                        },
+                      }))
+                    }
+                    maxLength={1000}
+                    rows={3}
+                    placeholder="Describe el entregable…"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Objetivo full width */}
+              <div>
+                <Label className="text-xs text-muted-foreground block mb-1">
+                  Objetivo
+                </Label>
+                <ObjectiveSelect
+                  planId={strategicPlanId ?? undefined}
+                  positionId={createModalPositionId}
+                  year={new Date().getFullYear()}
+                  value={newCommitment[createModalPositionId]?.objectiveId ?? undefined}
+                  onChange={(val) =>
+                    setNewCommitment((prev) => ({
+                      ...prev,
+                      [createModalPositionId]: {
+                        ...prev[createModalPositionId],
+                        objectiveId: val ?? "",
+                      },
+                    }))
+                  }
+                  otherPositions={otherPositions}
+                  stacked
+                />
+              </div>
+
+              {/* Estado + Desde + Hasta + Terminado */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground block mb-1">
+                    Estado
+                  </Label>
+                  <Select
+                    value={newCommitment[createModalPositionId]?.status ?? "OPE"}
+                    onValueChange={(v) =>
+                      setNewCommitment((prev) => ({
+                        ...prev,
+                        [createModalPositionId]: {
+                          ...prev[createModalPositionId],
+                          status: v,
+                          finishedAt:
+                            v === "CLO" && !prev[createModalPositionId]?.finishedAt
+                              ? dayjs().format("YYYY-MM-DD")
+                              : prev[createModalPositionId]?.finishedAt ?? "",
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="OPE">En proceso</SelectItem>
+                      <SelectItem value="CLO">Terminado</SelectItem>
+                      <SelectItem value="CAN">Anulado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground block mb-1">
+                    Desde
+                  </Label>
+                  <DateEditor
+                    value={newCommitment[createModalPositionId]?.fromAt || undefined}
+                    open={createFromOpen}
+                    onOpenChange={setCreateFromOpen}
+                    onChange={(val) => {
+                      setNewCommitment((prev) => ({
+                        ...prev,
+                        [createModalPositionId]: {
+                          ...prev[createModalPositionId],
+                          fromAt: val ?? "",
+                        },
+                      }));
+                      if (val) setCreateUntilOpen(true);
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground block mb-1">
+                    Hasta
+                  </Label>
+                  <DateEditor
+                    value={newCommitment[createModalPositionId]?.untilAt || undefined}
+                    minDate={parseYmdOrIsoToLocalDate(newCommitment[createModalPositionId]?.fromAt)}
+                    open={createUntilOpen}
+                    onOpenChange={setCreateUntilOpen}
+                    onChange={(val) =>
+                      setNewCommitment((prev) => ({
+                        ...prev,
+                        [createModalPositionId]: {
+                          ...prev[createModalPositionId],
+                          untilAt: val ?? "",
+                        },
+                      }))
+                    }
+                  />
+                </div>
+                {newCommitment[createModalPositionId]?.status === "CLO" && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground block mb-1">
+                      Terminado
+                    </Label>
+                    <DateEditor
+                      value={newCommitment[createModalPositionId]?.finishedAt || undefined}
+                      onChange={(val) =>
+                        setNewCommitment((prev) => ({
+                          ...prev,
+                          [createModalPositionId]: {
+                            ...prev[createModalPositionId],
+                            finishedAt: val ?? "",
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateModalPositionId(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (createModalPositionId) {
+                  handleCreatePriority(createModalPositionId);
+                }
+              }}
+              disabled={
+                createPriorityMut.isPending ||
+                !newCommitment[createModalPositionId ?? ""]?.name?.trim()
+              }
+            >
+              {createPriorityMut.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

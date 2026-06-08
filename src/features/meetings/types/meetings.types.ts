@@ -1,7 +1,5 @@
-export type MeetingFrequency = "ONCE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
 export type MeetingRole = "CONVENER" | "PARTICIPANT";
-export type UpdateScope = "ONLY_THIS" | "THIS_AND_FUTURE" | "SERIES";
-export type DeleteScope = "ONLY_THIS" | "SERIES";
+export type MeetingFrequency = "ONCE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
 
 export interface MeetingParticipant {
   userId: string;
@@ -23,27 +21,13 @@ export interface Meeting {
   purpose?: string;
   location?: string;
   tools?: string;
-  frequency: MeetingFrequency;
-  startDate: string; // ISO
-  endDate: string; // ISO
-  seriesEndDate?: string;
-  dayValue?: number;
+  startDate: string;
+  endDate: string;
   participants: MeetingParticipant[];
   createdAt: string;
   updatedAt: string;
-  daysOfWeek?: number[];
   agenda?: string[];
-}
-
-export interface MeetingOccurrence {
-  id: string;
-  meetingId: string;
-  title: string;
-  start: string;
-  end: string;
-  location?: string;
-  isExecuted: boolean;
-  isCancelled: boolean;
+  parentId?: string;
 }
 
 export interface CreateMeetingPayload {
@@ -51,11 +35,8 @@ export interface CreateMeetingPayload {
   purpose?: string;
   location?: string;
   tools?: string;
-  frequency: MeetingFrequency;
   startDate: string;
   endDate: string;
-  seriesEndDate?: string;
-  dayValue?: number;
   participants: {
     userId: string;
     role: MeetingRole;
@@ -63,16 +44,19 @@ export interface CreateMeetingPayload {
   }[];
   companyId: string;
   businessUnitId?: string;
-  daysOfWeek?: number[];
   agenda?: string[];
 }
 
-export interface UpdateMeetingPayload extends Partial<CreateMeetingPayload> {
-  scope?: UpdateScope;
-  occurrenceDate?: string;
-}
+export interface UpdateMeetingPayload extends Partial<CreateMeetingPayload> {}
 
-export type CalendarViewMode = "month" | "week" | "list";
+export interface MeetingCalendarEvent {
+  id: string;
+  meetingId: string;
+  title: string;
+  start: string;
+  end: string;
+  location?: string;
+}
 
 export interface MeetingCandidateUser {
   id: string;

@@ -1,48 +1,48 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   Clock,
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCalendarOccurrencesQuery } from "../hooks/use-meetings";
+import { useCalendarEventsQuery } from "../hooks/use-meetings";
 import { getCompanyId, getBusinessUnitId } from "@/shared/auth/storage";
-import type { MeetingOccurrence } from "../types/meetings.types";
+import type { MeetingCalendarEvent } from "../types/meetings.types";
 import { cn } from "@/lib/utils";
 
 interface CalendarViewProps {
-  onEventClick: (occurrence: MeetingOccurrence) => void;
+  onEventClick: (event: MeetingCalendarEvent) => void;
   onDateClick?: (date: Date) => void;
 }
 
 export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
-  // Estado para la fecha actual (mes visible)
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const [todayStr, setTodayStr] = useState<string>("");
 
-  // IDs de contexto para multi-empresa
   const companyId = getCompanyId();
   const businessUnitId = getBusinessUnitId();
 
-  // Calcular rango para la API (inicio y fin de mes)
+  useEffect(() => {
+    setCurrentDate(new Date());
+    setTodayStr(new Date().toDateString());
+  }, []);
+
   const { fromStr, toStr } = useMemo(() => {
+    if (!currentDate) return { fromStr: "", toStr: "" };
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    // Primer día del mes
     const firstDay = new Date(year, month, 1);
-    // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
-
     return {
       fromStr: firstDay.toISOString().split("T")[0],
       toStr: lastDay.toISOString().split("T")[0],
     };
   }, [currentDate]);
 
-  const { data: occurrences, isLoading } = useCalendarOccurrencesQuery(
+  const { data: events, isLoading } = useCalendarEventsQuery(
     fromStr,
     toStr,
     companyId ?? "",
@@ -51,11 +51,13 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
 
   // Navegación
   const prevMonth = () => {
+    if (!currentDate) return;
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
     );
   };
   const nextMonth = () => {
+    if (!currentDate) return;
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
     );
@@ -64,6 +66,7 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
 
   // Generar días del calendario
   const calendarDays = useMemo(() => {
+    if (!currentDate) return [];
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDayOfMonth = new Date(year, month, 1);
@@ -88,15 +91,17 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
 
   // Agrupar eventos por día
   const eventsByDay = useMemo(() => {
-    if (!occurrences) return {};
-    const map: Record<string, MeetingOccurrence[]> = {};
-    occurrences.forEach((occ) => {
-      const dateKey = new Date(occ.start).getDate();
+    if (!events) return {};
+    const map: Record<string, MeetingCalendarEvent[]> = {};
+    events.forEach((evt) => {
+      const dateKey = new Date(evt.start).getDate();
       if (!map[dateKey]) map[dateKey] = [];
-      map[dateKey].push(occ);
+      map[dateKey].push(evt);
     });
     return map;
-  }, [occurrences]);
+  }, [events]);
+
+  if (!currentDate) return null;
 
   const monthName = new Intl.DateTimeFormat("es-ES", {
     month: "long",
@@ -176,7 +181,7 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
           }
 
           const dayEvents = eventsByDay[date.getDate()] || [];
-          const isToday = new Date().toDateString() === date.toDateString();
+          const isToday = todayStr && todayStr === date.toDateString();
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
           return (
@@ -214,33 +219,12 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
                       e.stopPropagation();
                       onEventClick(evt);
                     }}
-                    className={cn(
-                      "group/evt relative text-xs text-left pl-2.5 pr-2 py-1.5 rounded-md border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md w-full overflow-hidden",
-                      evt.isExecuted
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-                        : evt.isCancelled
-                        ? "bg-red-50 border-red-200 text-red-900 opacity-70 line-through decoration-red-900/50"
-                        : "bg-white border-border text-foreground hover:border-primary/40"
-                    )}
+                    className="group/evt relative text-xs text-left pl-2.5 pr-2 py-1.5 rounded-md border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md w-full overflow-hidden bg-white border-border text-foreground hover:border-primary/40"
                   >
-                    {/* Indicador lateral de color */}
-                    <div
-                      className={cn(
-                        "absolute left-0 top-0 bottom-0 w-1",
-                        evt.isExecuted
-                          ? "bg-emerald-500"
-                          : evt.isCancelled
-                          ? "bg-red-500"
-                          : "bg-primary"
-                      )}
-                    />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
 
                     <div className="flex items-center gap-1.5">
-                      {evt.isExecuted ? (
-                        <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-emerald-600" />
-                      ) : (
-                        <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground/70 group-hover/evt:text-primary" />
-                      )}
+                      <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground/70 group-hover/evt:text-primary" />
                       <span className="truncate font-medium leading-none">
                         {evt.title}
                       </span>

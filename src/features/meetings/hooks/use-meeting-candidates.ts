@@ -6,17 +6,11 @@ import { getCompanyId } from "@/shared/auth/storage";
 export function useMeetingCandidates() {
   const companyId = getCompanyId();
 
-  const { data, isLoading } = useQuery({
-    queryKey: QKEY.meetingCandidates(companyId || "none"),
-    queryFn: () => {
-      if (!companyId) return Promise.resolve([]);
-      return getMeetingCandidates(companyId);
-    },
+  const { data: groups = [], isLoading } = useQuery({
+    queryKey: QKEY.meetingCandidates(companyId ?? ""),
+    queryFn: () => getMeetingCandidates(companyId!),
     enabled: !!companyId,
   });
 
-  return {
-    groups: data ?? [],
-    isLoading,
-  };
+  return { groups, isLoading };
 }

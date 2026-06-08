@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { Loader2, Plus, Trash, X } from "lucide-react";
-import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
-
+import type { ReactNode } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Loader2, Plus, Trash, X, Calendar, Clock, MapPin, Wrench, Users,
+  ListChecks, AlertTriangle, Sparkles, UserRound, ClipboardList, CalendarDays,
+  CheckCircle2, Circle,
+} from "lucide-react";
+import { toast } from "sonner";
+import { format, addDays, addWeeks, addMonths } from "date-fns";
+
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -23,11 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmModal } from "@/shared/components/confirm-modal";
+import { SelectInput } from "@/shared/components/select-input";
 
 import {
   useMeetingByIdQuery,
@@ -40,64 +40,105 @@ import { getCompanyId, getBusinessUnitId } from "@/shared/auth/storage";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { usePermission } from "@/shared/auth/access-control";
 import { PERMISSIONS } from "@/shared/auth/permissions.constant";
+import { routes } from "@/shared/api/routes";
+import { http } from "@/shared/api/http";
+import { unwrapAny } from "@/shared/api/response";
+import { QKEY } from "@/shared/api/query-keys";
 
-import type {
-  MeetingOccurrence,
-  MeetingFrequency,
-  MeetingRole,
-} from "../types/meetings.types";
+import type { MeetingRole, MeetingFrequency } from "../types/meetings.types";
 
 interface MeetingModalProps {
   isOpen: boolean;
   onClose: () => void;
   meetingId: string | null;
-  occurrence: MeetingOccurrence | null;
   initialDate?: Date | null;
 }
-
-const WEEK_DAYS = [
-  { label: "L", value: 1 },
-  { label: "M", value: 2 },
-  { label: "X", value: 3 },
-  { label: "J", value: 4 },
-  { label: "V", value: 5 },
-  { label: "S", value: 6 },
-  { label: "D", value: 0 },
-];
 
 type FormValues = {
   name: string;
   purpose: string;
   location: string;
   tools: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  participants: { userId: string; role: MeetingRole; isRequired: boolean }[];
   frequency: MeetingFrequency;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  seriesEndDate: string; // YYYY-MM-DD
-  participants: {
-    userId: string;
-    role: MeetingRole;
-    isRequired: boolean;
-  }[];
-  scope: "ONLY_THIS" | "THIS_AND_FUTURE";
   daysOfWeek: number[];
+  repeatUntil: string;
   agenda: string[];
+  applyToGroup: boolean;
 };
+
+function addFrequency(
+  baseDate: Date,
+  frequency: MeetingFrequency,
+  count: number,
+): Date {
+  switch (frequency) {
+    case "DAILY":
+      return addDays(baseDate, count);
+    case "WEEKLY":
+      return addWeeks(baseDate, count);
+    case "BIWEEKLY":
+      return addWeeks(baseDate, count * 2);
+    case "MONTHLY":
+      return addMonths(baseDate, count);
+    default:
+      return baseDate;
+  }
+}
+
+function safeParseDate(d: Date | string | undefined | null): Date {
+  if (!d) return new Date();
+  if (typeof d === "string") return new Date(d);
+  return d;
+}
+
+function SectionCard({
+  icon,
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`overflow-hidden rounded-2xl border bg-card/80 shadow-sm ${className}`}
+    >
+      <div className="flex items-start gap-3 border-b bg-muted/30 px-4 py-3">
+        <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl border bg-background text-muted-foreground shadow-sm">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold leading-tight">{title}</h3>
+          {description && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
 
 export function MeetingModal({
   isOpen,
   onClose,
   meetingId,
-  occurrence,
   initialDate,
 }: MeetingModalProps) {
   const { me } = useAuth();
   const canManageAny = usePermission(PERMISSIONS.MEETINGS.MANAGE);
   const isEditing = !!meetingId;
-  const isOccurrenceEdit = !!occurrence;
-
-  // Queries y Mutaciones
   const { data: meetingData, isLoading: isLoadingMeeting } =
     useMeetingByIdQuery(meetingId);
   const isConvenerUser =
@@ -109,25 +150,14 @@ export function MeetingModal({
   const updateMutation = useUpdateMeetingMutation();
   const deleteMutation = useDeleteMeetingMutation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [convenerConflict, setConvenerConflict] = useState<{
-    fromIndex: number;
-    toIndex: number;
-    fromName: string;
-    toName: string;
-  } | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Usuarios para el selector
   const { groups } = useMeetingCandidates();
-  const allUsers = useMemo(() => {
-    return groups.flatMap((g) => g.users);
-  }, [groups]);
-
-  // Combinar usuarios del catálogo con los que vienen en la reunión
-  // para asegurar que se muestren aunque no estén en la lista cargada (ej. inactivos o de otra BU)
+  const allUsers = useMemo(() => groups.flatMap((g) => g.users), [groups]);
   const selectableUsers = useMemo(() => {
     const users = [...allUsers];
     const existingIds = new Set(users.map((u) => u.id));
-
     if (meetingData?.participants) {
       meetingData.participants.forEach((p) => {
         if (p.user && p.user.id && !existingIds.has(p.user.id)) {
@@ -145,23 +175,24 @@ export function MeetingModal({
     handleSubmit,
     reset,
     watch,
-    getValues,
     setValue,
-    formState: { errors, isSubmitting },
+    getValues,
+    formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
       name: "",
       purpose: "",
       location: "",
       tools: "",
-      frequency: "ONCE",
       date: format(new Date(), "yyyy-MM-dd"),
       startTime: "09:00",
       endTime: "10:00",
       participants: [],
-      scope: "ONLY_THIS",
+      frequency: "ONCE",
       daysOfWeek: [],
+      repeatUntil: "",
       agenda: [],
+      applyToGroup: false,
     },
   });
 
@@ -170,108 +201,222 @@ export function MeetingModal({
     name: "participants",
   });
 
-  // Cargar datos al editar
+  const frequency = watch("frequency");
+  const applyToGroup = watch("applyToGroup");
+  const repeatUntil = watch("repeatUntil");
+  const watchDate = watch("date");
+  const watchName = watch("name");
+  const watchParticipants = watch("participants");
+  const watchAgenda = watch("agenda");
+
+  const generatedCount = useMemo(() => {
+    if (frequency === "ONCE" || !repeatUntil) return 0;
+    const start = new Date(watchDate);
+    const end = new Date(repeatUntil);
+    if (end <= start) return 0;
+    const diffDays = Math.floor(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    switch (frequency) {
+      case "DAILY":
+        return diffDays + 1;
+      case "WEEKLY":
+        return Math.floor(diffDays / 7) + 1;
+      case "BIWEEKLY":
+        return Math.floor(diffDays / 14) + 1;
+      case "MONTHLY":
+        return Math.floor(diffDays / 30) + 1;
+      default:
+        return 0;
+    }
+  }, [frequency, repeatUntil, watchDate]);
+
+  // Auto-asignar día de la semana al elegir WEEKLY
+  useEffect(() => {
+    if (
+      (frequency === "WEEKLY" || frequency === "BIWEEKLY") &&
+      watchDate &&
+      !isEditing
+    ) {
+      setValue("daysOfWeek", [new Date(watchDate).getDay()]);
+    }
+  }, [frequency, watchDate, isEditing, setValue]);
+
   useEffect(() => {
     if (isOpen && meetingData) {
-      // Si editamos una ocurrencia, usamos su fecha. Si no, la de la serie.
-      const baseDate =
-        isOccurrenceEdit && occurrence
-          ? parseISO(occurrence.start)
-          : parseISO(meetingData.startDate);
-
-      const endDate =
-        isOccurrenceEdit && occurrence
-          ? parseISO(occurrence.end)
-          : parseISO(meetingData.endDate);
-
       reset({
         name: meetingData.name,
         purpose: meetingData.purpose || "",
         location: meetingData.location || "",
         tools: meetingData.tools || "",
-        frequency: meetingData.frequency,
-        date: format(baseDate, "yyyy-MM-dd"),
-        startTime: format(baseDate, "HH:mm"),
-        endTime: format(endDate, "HH:mm"),
-        seriesEndDate: meetingData.seriesEndDate
-          ? format(parseISO(meetingData.seriesEndDate), "yyyy-MM-dd")
-          : "",
+        date: format(safeParseDate(meetingData.startDate), "yyyy-MM-dd"),
+        startTime: format(safeParseDate(meetingData.startDate), "HH:mm"),
+        endTime: format(safeParseDate(meetingData.endDate), "HH:mm"),
         participants: (meetingData.participants || []).map((p) => ({
           userId: p.userId,
           role: p.role,
           isRequired: p.isRequired,
         })),
-        scope: "ONLY_THIS",
-        daysOfWeek: meetingData.daysOfWeek ?? [],
+        frequency: "ONCE",
+        daysOfWeek: [],
+        repeatUntil: "",
         agenda: meetingData.agenda ?? [],
+        applyToGroup: false,
       });
     } else if (isOpen && !isEditing) {
       reset({
         name: "",
-        frequency: "ONCE",
+        purpose: "",
+        location: "",
+        tools: "",
         date: initialDate
           ? format(initialDate, "yyyy-MM-dd")
           : format(new Date(), "yyyy-MM-dd"),
         startTime: "09:00",
         endTime: "10:00",
-        participants: [],
+        participants: me?.id
+          ? [{ userId: me.id, role: "CONVENER" as MeetingRole, isRequired: true }]
+          : [],
+        frequency: "ONCE",
         daysOfWeek: [],
+        repeatUntil: "",
         agenda: [],
+        applyToGroup: false,
       });
     }
-  }, [
-    isOpen,
-    meetingData,
-    isEditing,
-    isOccurrenceEdit,
-    occurrence,
-    reset,
-    initialDate,
-  ]);
+  }, [isOpen, meetingData, isEditing, reset, initialDate]);
 
-  const onSubmit = (values: FormValues) => {
-    if (readOnly) {
-      onClose();
-      return;
-    }
-
-    // IDs de contexto
-    const companyId = getCompanyId();
-    const businessUnitId = getBusinessUnitId();
-
-    // Construir fechas ISO
-    const startIso = `${values.date}T${values.startTime}:00.000Z`;
-    const endIso = `${values.date}T${values.endTime}:00.000Z`;
-
-    // Payload base
-    const payload: any = {
+  const buildPayloadBase = (values: FormValues) => {
+    const startIso = `${values.date}T${values.startTime}:00`;
+    const endIso = `${values.date}T${values.endTime}:00`;
+    return {
       name: values.name,
       purpose: values.purpose,
       location: values.location,
       tools: values.tools,
-      frequency: values.frequency,
       startDate: new Date(startIso).toISOString(),
       endDate: new Date(endIso).toISOString(),
-      seriesEndDate: values.seriesEndDate
-        ? new Date(values.seriesEndDate).toISOString()
-        : undefined,
       participants: values.participants,
-      // 👇 NUEVOS CAMPOS REQUERIDOS
-      companyId: companyId,
-      businessUnitId: businessUnitId,
-      daysOfWeek: values.frequency === "WEEKLY" ? values.daysOfWeek : undefined,
-      agenda: values.agenda?.length ? values.agenda : undefined,
+      agenda: values.agenda?.length
+        ? values.agenda.filter((a) => a.trim() !== "")
+        : undefined,
     };
+  };
+
+  const validateBeforeSubmit = (values: FormValues) => {
+    if (!values.name.trim()) {
+      toast.error("Ingresa el nombre de la reunión");
+      return false;
+    }
+    if (!values.date) {
+      toast.error("Selecciona la fecha de la reunión");
+      return false;
+    }
+    if (!values.startTime || !values.endTime) {
+      toast.error("Selecciona la hora de inicio y fin");
+      return false;
+    }
+    if (
+      new Date(`${values.date}T${values.endTime}:00`) <=
+      new Date(`${values.date}T${values.startTime}:00`)
+    ) {
+      toast.error("La hora de fin debe ser mayor a la hora de inicio");
+      return false;
+    }
+    const dupes = values.participants
+      .map((p) => p.userId)
+      .filter(Boolean)
+      .filter((uid, i, arr) => arr.indexOf(uid) !== i);
+    if (dupes.length > 0) {
+      toast.error("Hay participantes duplicados");
+      return false;
+    }
+    if (values.participants.length === 0) {
+      toast.error("Agrega al menos un participante");
+      return false;
+    }
+    if (values.participants.some((p) => !p.userId)) {
+      toast.error("Selecciona el usuario en todos los participantes");
+      return false;
+    }
+    const cc = values.participants.filter((p) => p.role === "CONVENER").length;
+    if (cc === 0) {
+      toast.error("Debe haber al menos un convocante");
+      return false;
+    }
+    if (cc > 1) {
+      toast.error("Solo puede haber un convocante");
+      return false;
+    }
+    if (values.frequency !== "ONCE" && !values.repeatUntil && !isEditing) {
+      toast.error("Selecciona hasta cuándo se repetirá la reunión");
+      return false;
+    }
+    return true;
+  };
+
+  const onSubmit = async (values: FormValues) => {
+    if (readOnly) {
+      onClose();
+      return;
+    }
+    if (!validateBeforeSubmit(values)) return;
+    const companyId = getCompanyId();
+    const businessUnitId = getBusinessUnitId();
 
     if (isEditing && meetingId) {
-      // Si es edición de ocurrencia, agregamos scope y occurrenceDate
-      if (isOccurrenceEdit && occurrence) {
-        payload.scope = values.scope;
-        payload.occurrenceDate = occurrence.start; // Fecha original para identificar la ocurrencia
+      const fullPayload = buildPayloadBase(values);
+      if (applyToGroup && meetingData?.parentId) {
+        try {
+          const baseDate = new Date(meetingData.startDate);
+          const [sH, sM] = values.startTime.split(":").map(Number);
+          const [eH, eM] = values.endTime.split(":").map(Number);
+          const sibs =
+            unwrapAny<any[]>(
+              (await http.get(routes.meetings.siblings(meetingData.parentId)))
+                .data,
+            ) ?? [];
+          const { startDate, endDate, ...common } = fullPayload;
+          const ids = [
+            meetingId,
+            ...sibs
+              .filter(
+                (m: any) =>
+                  m.id !== meetingId && new Date(m.startDate) >= baseDate,
+              )
+              .map((m: any) => m.id),
+          ];
+          if (ids.length === 0) {
+            toast.info("No hay reuniones futuras");
+            onClose();
+            return;
+          }
+          await Promise.all(
+            ids.map((id: string) => {
+              const s =
+                id === meetingId ? null : sibs.find((x: any) => x.id === id);
+              const od = s ? new Date(s.startDate) : baseDate;
+              const ns = new Date(od);
+              ns.setHours(sH, sM, 0, 0);
+              const ne = new Date(od);
+              ne.setHours(eH, eM, 0, 0);
+              return http.patch(routes.meetings.byId(id), {
+                ...common,
+                startDate: ns.toISOString(),
+                endDate: ne.toISOString(),
+              });
+            }),
+          );
+          queryClient.invalidateQueries({ queryKey: QKEY.meetings });
+          toast.success(`${ids.length} reuniones actualizadas`);
+          onClose();
+        } catch {
+          toast.error("Error al actualizar el grupo");
+        }
+        return;
       }
-
       updateMutation.mutate(
-        { id: meetingId, payload },
+        { id: meetingId, payload: fullPayload },
         {
           onSuccess: () => {
             toast.success("Reunión actualizada");
@@ -280,562 +425,639 @@ export function MeetingModal({
           onError: () => toast.error("Error al actualizar"),
         },
       );
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => {
-          toast.success("Reunión creada");
-          onClose();
-        },
-        onError: () => toast.error("Error al crear"),
-      });
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const mkPayload = (overrides: any = {}) => {
+        const { startDate, endDate, ...rest } = buildPayloadBase(values);
+        return {
+          ...rest,
+          startDate: overrides.startDate ?? startDate,
+          endDate: overrides.endDate ?? endDate,
+          companyId: companyId ?? "",
+          businessUnitId: businessUnitId ?? undefined,
+          ...overrides,
+        };
+      };
+      if (values.frequency === "ONCE") {
+        await createMutation.mutateAsync(mkPayload());
+        toast.success("Reunión creada");
+        onClose();
+      } else {
+        const bd = new Date(`${values.date}T${values.startTime}:00`);
+        const be = new Date(`${values.date}T${values.endTime}:00`);
+        const dur = be.getTime() - bd.getTime();
+        const cnt = generatedCount || 4;
+        const first = await createMutation.mutateAsync(mkPayload());
+        const pid = first.id;
+        const proms = [];
+        for (let i = 1; i < cnt; i++) {
+          const nd = addFrequency(bd, values.frequency, i);
+          proms.push(
+            http.post(
+              routes.meetings.base(),
+              mkPayload({
+                parentId: pid,
+                startDate: nd.toISOString(),
+                endDate: new Date(nd.getTime() + dur).toISOString(),
+              }),
+            ),
+          );
+        }
+        await Promise.all(proms);
+        queryClient.invalidateQueries({ queryKey: QKEY.meetings });
+        toast.success(`${cnt} reuniones creadas`);
+        onClose();
+      }
+    } catch {
+      toast.error("Error al crear reuniones");
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleDelete = () => {
     if (!meetingId) return;
-
-    // Si estamos editando una ocurrencia específica, por defecto eliminamos solo esa.
-    // Si es la serie completa (o no es recurrente), eliminamos la serie.
-    const scope = isOccurrenceEdit ? "ONLY_THIS" : "SERIES";
-    const occurrenceDate =
-      isOccurrenceEdit && occurrence ? occurrence.start : undefined;
-
-    deleteMutation.mutate(
-      {
-        id: meetingId,
-        params: { scope, occurrenceDate },
+    deleteMutation.mutate(meetingId, {
+      onSuccess: () => {
+        toast.success("Reunión eliminada");
+        onClose();
       },
-      {
-        onSuccess: () => {
-          toast.success("Reunión eliminada");
-          onClose();
-        },
-        onError: () => toast.error("Error al eliminar la reunión"),
-      },
-    );
+      onError: () => toast.error("Error al eliminar"),
+    });
   };
 
-  const frequency = watch("frequency");
-  const daysOfWeek = watch("daysOfWeek");
+  const isBusy = isSubmitting || isCreating;
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-        <div className="sticky top-0 bg-background z-10 border-b px-6 py-4">
-          <DialogHeader>
-            <DialogTitle className="text-xl">
-              {isEditing ? "Editar Reunión" : "Nueva Reunión"}
-            </DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isEditing
-                ? "Modifica los datos de la reunión"
-                : "Configura los detalles de la nueva reunión"}
-            </p>
-          </DialogHeader>
-        </div>
-
-        {isLoadingMeeting && isEditing ? (
-          <div className="flex justify-center p-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="px-6 py-4 space-y-6"
-          >
-            <div
-              className={
-                readOnly ? "pointer-events-none opacity-70 select-none" : ""
-              }
-            >
-              {/* Section: Meeting Details */}
-              <div className="rounded-lg border bg-card p-5 space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="h-1 w-4 rounded-full bg-primary" />
-                  Información general
-                </div>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-span-4 space-y-1.5">
-                    <Label className="text-sm font-medium">
-                      Nombre de la reunión
-                    </Label>
-                    <Input
-                      {...register("name", { required: true })}
-                      placeholder="Ej: Comité de Riesgo Q2"
-                      className="h-10"
-                    />
-                    {errors.name && (
-                      <span className="text-xs text-red-500">
-                        El nombre es requerido
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="col-span-4 space-y-1.5">
-                    <Label className="text-sm font-medium">Propósito</Label>
-                    <Textarea
-                      {...register("purpose")}
-                      placeholder="Describe el propósito de la reunión..."
-                      className="min-h-[80px]"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Ubicación</Label>
-                    <Input
-                      {...register("location")}
-                      placeholder="Ej: Sala Ejecutiva 3 / Google Meet"
-                      className="h-10"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Herramientas</Label>
-                    <Input
-                      {...register("tools")}
-                      placeholder="Ej: Jira, Miro, Power BI"
-                      className="h-10"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Date & Time */}
-              <div className="rounded-lg border bg-card p-5 space-y-4 mt-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="h-1 w-4 rounded-full bg-primary" />
-                  Fecha y hora
-                </div>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Fecha</Label>
-                    <Input
-                      type="date"
-                      {...register("date", { required: true })}
-                      className="h-10"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Hora inicio</Label>
-                    <Input
-                      type="time"
-                      {...register("startTime", { required: true })}
-                      className="h-10"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Hora fin</Label>
-                    <Input
-                      type="time"
-                      {...register("endTime", { required: true })}
-                      className="h-10"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Frecuencia</Label>
-                    <Controller
-                      control={control}
-                      name="frequency"
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <SelectTrigger className="h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ONCE">Una vez</SelectItem>
-                            <SelectItem value="DAILY">Diario</SelectItem>
-                            <SelectItem value="WEEKLY">Semanal</SelectItem>
-                            <SelectItem value="BIWEEKLY">Quincenal</SelectItem>
-                            <SelectItem value="MONTHLY">Mensual</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {frequency === "WEEKLY" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">
-                      Días de la semana
-                    </Label>
-                    <div className="flex gap-1.5">
-                      {WEEK_DAYS.map((day) => {
-                        const isSelected = (daysOfWeek || []).includes(
-                          day.value,
-                        );
-                        return (
-                          <Button
-                            key={day.value}
-                            type="button"
-                            variant={isSelected ? "default" : "outline"}
-                            size="sm"
-                            className={`w-9 h-9 p-0 text-xs font-medium ${
-                              isSelected ? "" : "text-muted-foreground"
-                            }`}
-                            onClick={() => {
-                              const current = getValues("daysOfWeek") || [];
-                              const newDays = isSelected
-                                ? current.filter((d) => d !== day.value)
-                                : [...current, day.value];
-                              setValue("daysOfWeek", newDays);
-                            }}
-                          >
-                            {day.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {frequency !== "ONCE" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">
-                      Repetir hasta{" "}
-                      {frequency === "DAILY" ? (
-                        <span className="text-destructive">(obligatorio)</span>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          (opcional)
-                        </span>
-                      )}
-                    </Label>
-                    <Input
-                      type="date"
-                      {...register("seriesEndDate", {
-                        required: frequency === "DAILY",
-                      })}
-                      className="h-10 w-56"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Section: Agenda */}
-              <div className="rounded-lg border bg-card p-5 space-y-3 mt-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="h-1 w-4 rounded-full bg-primary" />
-                  Agenda del día
-                </div>
-                <Controller
-                  control={control}
-                  name="agenda"
-                  render={({ field }) => (
-                    <div className="space-y-2">
-                      {(field.value ?? []).map((item, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs font-medium text-muted-foreground shrink-0">
-                            {i + 1}
-                          </div>
-                          <Input
-                            value={item}
-                            onChange={(e) => {
-                              const next = [...(field.value ?? [])];
-                              next[i] = e.target.value;
-                              field.onChange(next);
-                            }}
-                            placeholder="Punto de agenda..."
-                            className="h-9"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            onClick={() => {
-                              const next = (field.value ?? []).filter(
-                                (_, j) => j !== i,
-                              );
-                              field.onChange(next);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() =>
-                          field.onChange([...(field.value ?? []), ""])
-                        }
-                      >
-                        <Plus className="h-4 w-4 mr-2" /> Agregar punto
-                      </Button>
-                    </div>
+      <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 sm:max-w-6xl rounded-2xl">
+        <div className="flex max-h-[92vh] flex-col overflow-hidden">
+          <div className="relative border-b bg-gradient-to-br from-background via-background to-muted/50 px-6 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="rounded-full px-2.5">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {isEditing ? "Edición de reunión" : "Nueva reunión"}
+                  </Badge>
+                  {readOnly && (
+                    <Badge variant="outline" className="rounded-full">
+                      Solo lectura
+                    </Badge>
                   )}
-                />
-              </div>
-
-              {/* Section: Participants */}
-              <div className="rounded-lg border bg-card p-5 space-y-3 mt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    <div className="h-1 w-4 rounded-full bg-primary" />
-                    Participantes
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {fields.length} participante{fields.length !== 1 ? "s" : ""}
-                  </span>
+                  {meetingData?.parentId && (
+                    <Badge variant="outline" className="rounded-full">
+                      Serie
+                    </Badge>
+                  )}
                 </div>
+                <DialogTitle className="text-xl font-semibold tracking-tight">
+                  {watchName?.trim() || "Configura los detalles de la reunión"}
+                </DialogTitle>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  Define la información principal, repetición, participantes y
+                  agenda.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-9 w-9 rounded-full shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      className="flex items-center gap-2 p-2 rounded-lg border bg-muted/20"
-                    >
-                      <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-xs font-semibold text-primary shrink-0">
-                        {index + 1}
+          {isLoadingMeeting && isEditing ? (
+            <div className="flex min-h-[420px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground ml-3">
+                Cargando reunión...
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div
+                className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 ${readOnly ? "pointer-events-none select-none opacity-70" : ""}`}
+              >
+                <div className="space-y-5">
+                  <SectionCard
+                    icon={<CalendarDays className="h-4 w-4" />}
+                    title="Información principal"
+                    description="Datos base para identificar, programar y justificar la reunión."
+                  >
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Título de la reunión
+                        </Label>
+                        <Input
+                          {...register("name", { required: true })}
+                          placeholder="Ej. Reunión semanal de seguimiento"
+                          className="h-11 text-base font-medium"
+                        />
                       </div>
-                      <Controller
-                        control={control}
-                        name={`participants.${index}.userId`}
-                        rules={{ required: true }}
-                        render={({ field: f }) => (
-                          <Select value={f.value} onValueChange={f.onChange}>
-                            <SelectTrigger className="flex-1 h-9 min-w-0">
-                              <SelectValue placeholder="Seleccionar usuario" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {selectableUsers.map((u) => (
-                                <SelectItem key={u.id} value={u.id}>
-                                  {u.firstName} {u.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+
+                      <div className="flex flex-wrap items-start gap-3">
+                        <div className="min-w-[130px] flex-1 space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Fecha
+                          </Label>
+                          <div className="relative">
+                            <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="date"
+                              {...register("date", { required: true })}
+                              className="h-10 pl-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-[110px] flex-1 space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Hora inicio
+                          </Label>
+                          <div className="relative">
+                            <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="time"
+                              {...register("startTime", { required: true })}
+                              className="h-10 pl-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-[110px] flex-1 space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Hora fin
+                          </Label>
+                          <div className="relative">
+                            <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="time"
+                              {...register("endTime", { required: true })}
+                              className="h-10 pl-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-[200px] flex-1 space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Frecuencia
+                          </Label>
+                          <SelectInput
+                            value={frequency}
+                            onChange={(v) =>
+                              setValue("frequency", v as MeetingFrequency)
+                            }
+                            options={[
+                              { value: "ONCE", label: "Una vez" },
+                              { value: "DAILY", label: "Diario" },
+                              { value: "WEEKLY", label: "Semanal" },
+                              { value: "BIWEEKLY", label: "Quincenal" },
+                              { value: "MONTHLY", label: "Mensual" },
+                            ]}
+                          />
+                        </div>
+
+                        {!isEditing && frequency !== "ONCE" && (
+                          <div className="min-w-[150px] flex-1 space-y-2">
+                            <Label className="text-xs font-medium text-muted-foreground">
+                              Repetir hasta
+                            </Label>
+                            <Input
+                              type="date"
+                              {...register("repeatUntil")}
+                              min={watchDate}
+                              className="h-10"
+                            />
+                          </div>
                         )}
-                      />
-                      <Controller
-                        control={control}
-                        name={`participants.${index}.role`}
-                        render={({ field: f }) => (
-                          <Select
-                            value={f.value}
-                            onValueChange={(value) => {
-                              if (value === "CONVENER") {
-                                const existingIdx = fields.findIndex(
-                                  (_, i) =>
-                                    i !== index &&
-                                    getValues(`participants.${i}.role`) ===
-                                      "CONVENER" &&
-                                    getValues(`participants.${i}.userId`),
-                                );
 
-                                if (existingIdx !== -1) {
-                                  const existingUserId = getValues(
-                                    `participants.${existingIdx}.userId`,
-                                  );
-                                  const existingUser = selectableUsers.find(
-                                    (u) => u.id === existingUserId,
-                                  );
-                                  const newUserId = getValues(
-                                    `participants.${index}.userId`,
-                                  );
-                                  const newUser = selectableUsers.find(
-                                    (u) => u.id === newUserId,
-                                  );
+                        {!isEditing &&
+                          frequency !== "ONCE" &&
+                          generatedCount > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium text-muted-foreground opacity-0">
+                                .
+                              </Label>
+                              <Badge
+                                variant="secondary"
+                                className="h-10 w-fit rounded-xl px-4 text-sm whitespace-nowrap"
+                              >
+                                {generatedCount} reuniones
+                              </Badge>
+                            </div>
+                          )}
+                      </div>
 
-                                  const existingName = existingUser
-                                    ? `${existingUser.firstName} ${existingUser.lastName}`
-                                    : "el usuario actual";
-                                  const newName = newUser
-                                    ? `${newUser.firstName} ${newUser.lastName}`
-                                    : "el nuevo usuario";
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Lugar o enlace
+                          </Label>
+                          <div className="relative">
+                            <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              {...register("location")}
+                              placeholder="Sala A, Google Meet, Zoom..."
+                              className="h-10 pl-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium text-muted-foreground">
+                            Herramientas
+                          </Label>
+                          <div className="relative">
+                            <Wrench className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              {...register("tools")}
+                              placeholder="Proyector, Miro, tablero..."
+                              className="h-10 pl-9"
+                            />
+                          </div>
+                        </div>
+                      </div>
 
-                                  setConvenerConflict({
-                                    fromIndex: existingIdx,
-                                    toIndex: index,
-                                    fromName: existingName,
-                                    toName: newName,
-                                  });
-                                  return;
-                                }
-                              }
-                              f.onChange(value);
-                            }}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Propósito
+                        </Label>
+                        <Textarea
+                          {...register("purpose")}
+                          placeholder="Ej. Revisar avances, bloqueos y compromisos de la semana."
+                          rows={3}
+                          className="min-h-[90px] resize-none"
+                        />
+                      </div>
+                    </div>
+                  </SectionCard>
+
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <SectionCard
+                      icon={<Users className="h-4 w-4" />}
+                      title="Participantes"
+                      description="Agrega convocantes y asistentes."
+                      className="min-h-[390px]"
+                    >
+                      <div className="flex min-h-[300px] flex-col">
+                        {fields.length === 0 ? (
+                          <div className="flex min-h-[230px] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+                            <UserRound className="mb-2 h-8 w-8 text-muted-foreground/70" />
+
+                            <p className="text-sm font-medium">
+                              Sin participantes agregados
+                            </p>
+
+                            <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">
+                              Agrega al menos un convocante o participante.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="max-h-[330px] space-y-2 overflow-y-auto pr-1">
+                            {fields.map((field, index) => {
+                              const participant = watchParticipants[index];
+
+                              const selectedUser = selectableUsers.find(
+                                (user) => user.id === participant?.userId,
+                              );
+
+                              const selectedUserName = selectedUser
+                                ? `${selectedUser.firstName} ${selectedUser.lastName}`.trim()
+                                : "";
+
+                              return (
+                                <div
+                                  key={field.id}
+                                  className="rounded-2xl border bg-background px-3 py-2 shadow-sm transition-colors hover:bg-muted/20"
+                                >
+                                  <div className="grid grid-cols-[minmax(150px,1fr)_120px_auto_40px] items-center gap-2">
+                                    <Select
+                                      value={participant?.userId || ""}
+                                      onValueChange={(value) => {
+                                        const existingIdx =
+                                          watchParticipants.findIndex(
+                                            (
+                                              currentParticipant,
+                                              currentIndex,
+                                            ) =>
+                                              currentIndex !== index &&
+                                              currentParticipant.userId ===
+                                                value,
+                                          );
+
+                                        if (existingIdx !== -1) {
+                                          toast.error(
+                                            "El usuario ya está agregado",
+                                          );
+                                          return;
+                                        }
+
+                                        setValue(
+                                          `participants.${index}.userId`,
+                                          value,
+                                        );
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-10 w-full min-w-0 rounded-xl px-3">
+                                        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+                                          {selectedUser ? (
+                                            <div className="flex min-w-0 flex-col items-start leading-tight">
+                                              <span className="block max-w-full truncate text-sm font-medium">
+                                                {selectedUserName ||
+                                                  selectedUser.email}
+                                              </span>
+
+                                              {selectedUser.email && (
+                                                <span className="block max-w-full truncate text-[11px] text-muted-foreground">
+                                                  {selectedUser.email}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <SelectValue placeholder="Seleccionar usuario" />
+                                          )}
+                                        </div>
+                                      </SelectTrigger>
+
+                                      <SelectContent>
+                                        {selectableUsers.map((user) => (
+                                          <SelectItem
+                                            key={user.id}
+                                            value={user.id}
+                                          >
+                                            <div className="flex min-w-0 flex-col">
+                                              <span className="truncate text-sm font-medium">
+                                                {user.firstName} {user.lastName}
+                                              </span>
+
+                                              <span className="truncate text-xs text-muted-foreground">
+                                                {user.email}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+
+                                    <Select
+                                      value={participant?.role || "PARTICIPANT"}
+                                      onValueChange={(value) =>
+                                        setValue(
+                                          `participants.${index}.role`,
+                                          value as MeetingRole,
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="h-10 w-[112px] rounded-xl px-2 text-xs">
+                                        <SelectValue placeholder="Tipo" />
+                                      </SelectTrigger>
+
+                                      <SelectContent>
+                                        <SelectItem value="PARTICIPANT">
+                                          Participante
+                                        </SelectItem>
+
+                                        <SelectItem value="CONVENER">
+                                          Convocante
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      title={
+                                        participant?.isRequired
+                                          ? "Participante obligatorio"
+                                          : "Participante no obligatorio"
+                                      }
+                                      className={`h-10 rounded-xl px-3 text-xs font-medium ${
+                                        participant?.isRequired
+                                          ? "border-primary/30 text-primary hover:bg-primary/10"
+                                          : "text-muted-foreground hover:bg-muted"
+                                      }`}
+                                      onClick={() =>
+                                        setValue(
+                                          `participants.${index}.isRequired`,
+                                          !participant?.isRequired,
+                                        )
+                                      }
+                                    >
+                                      {participant?.isRequired ? (
+                                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                      ) : (
+                                        <Circle className="mr-1.5 h-3.5 w-3.5" />
+                                      )}
+                                      Obligatorio
+                                    </Button>
+
+                                    {!readOnly && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        title="Eliminar participante"
+                                        className="h-10 w-10 rounded-xl text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                                        onClick={() => remove(index)}
+                                      >
+                                        <Trash className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {!readOnly && (
+                          <div className="mt-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-9 rounded-xl"
+                               onClick={() => append({ userId: "", role: "PARTICIPANT", isRequired: false })}
+                            >
+                              <Plus className="mr-1.5 h-4 w-4" />
+                              Agregar participante
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard
+                      icon={<ListChecks className="h-4 w-4" />}
+                      title="Agenda"
+                      description="Define los puntos que se tratarán."
+                      className="min-h-[390px]"
+                    >
+                      <div className="space-y-3">
+                        {(watchAgenda || []).length === 0 ? (
+                          <div className="flex min-h-[230px] flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+                            <ClipboardList className="mb-2 h-8 w-8 text-muted-foreground/70" />
+                            <p className="text-sm font-medium">
+                              Sin puntos de agenda
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Agrega los temas principales de la reunión.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                            {(watchAgenda || []).map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm"
+                              >
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                                  {idx + 1}
+                                </div>
+                                <Input
+                                  value={item}
+                                  onChange={(e) => {
+                                    const a = [...(getValues("agenda") || [])];
+                                    a[idx] = e.target.value;
+                                    setValue("agenda", a);
+                                  }}
+                                  placeholder={`Punto ${idx + 1}`}
+                                  className="h-9 border-0 px-0 shadow-none focus-visible:ring-0"
+                                />
+                                {!readOnly && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() => {
+                                      const a = getValues("agenda") || [];
+                                      setValue(
+                                        "agenda",
+                                        a.filter((_, i) => i !== idx),
+                                      );
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {!readOnly && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl"
+                            onClick={() =>
+                              setValue("agenda", [
+                                ...(getValues("agenda") || []),
+                                "",
+                              ])
+                            }
                           >
-                            <SelectTrigger className="w-[130px] h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="PARTICIPANT">
-                                Participante
-                              </SelectItem>
-                              <SelectItem value="CONVENER">
-                                Convocante
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                            <Plus className="mr-1.5 h-4 w-4" /> Agregar punto
+                          </Button>
                         )}
-                      />
-                      <Controller
-                        control={control}
-                        name={`participants.${index}.isRequired`}
-                        render={({ field: f }) => (
-                          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded border bg-background shrink-0">
+                      </div>
+                    </SectionCard>
+                  </div>
+
+                  {isEditing && meetingData?.parentId && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
                             <Checkbox
-                              id={`req-${index}`}
-                              checked={f.value}
-                              onCheckedChange={f.onChange}
-                              className="h-3.5 w-3.5"
+                              id="applyToGroup"
+                              checked={applyToGroup}
+                              onCheckedChange={(c) =>
+                                setValue("applyToGroup", !!c)
+                              }
                             />
                             <Label
-                              htmlFor={`req-${index}`}
-                              className="text-xs cursor-pointer text-muted-foreground"
+                              htmlFor="applyToGroup"
+                              className="cursor-pointer text-sm font-semibold"
                             >
-                              Oblig.
+                              Aplicar cambios a todas las reuniones futuras
                             </Label>
                           </div>
-                        )}
-                      />
-                      {!readOnly && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0 text-destructive"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      )}
+                          <p className="mt-1.5 pl-6 text-xs text-muted-foreground">
+                            Esta acción actualizará las reuniones futuras de la
+                            serie, manteniendo la fecha original de cada una.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
+              </div>
 
-                {!readOnly && (
+              <div className="flex shrink-0 items-center gap-2 border-t bg-background px-6 py-4">
+                {isEditing && !readOnly && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="mr-auto rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash className="mr-1.5 h-4 w-4" /> Eliminar
+                  </Button>
+                )}
+                <div className="ml-auto flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      append({
-                        userId: "",
-                        role: "PARTICIPANT",
-                        isRequired: false,
-                      })
-                    }
+                    onClick={onClose}
+                    className="rounded-xl"
                   >
-                    <Plus className="h-4 w-4 mr-2" /> Agregar participante
+                    Cancelar
                   </Button>
-                )}
-              </div>
-
-              {/* Section: Occurrence Scope */}
-              {isOccurrenceEdit && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 space-y-3 mt-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 uppercase tracking-wider">
-                    <div className="h-1 w-4 rounded-full bg-amber-500" />
-                    Aplicar cambios a
-                  </div>
-                  <Controller
-                    control={control}
-                    name="scope"
-                    render={({ field }) => (
-                      <RadioGroup
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex gap-6"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="ONLY_THIS" id="r1" />
-                          <Label
-                            htmlFor="r1"
-                            className="text-sm cursor-pointer"
-                          >
-                            Solo esta reunión
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="THIS_AND_FUTURE" id="r2" />
-                          <Label
-                            htmlFor="r2"
-                            className="text-sm cursor-pointer"
-                          >
-                            Esta y futuras
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    )}
-                  />
+                  {!readOnly && (
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={isBusy}
+                      className="rounded-xl"
+                    >
+                      {isBusy && (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      )}
+                      {isCreating
+                        ? "Creando..."
+                        : isEditing
+                          ? "Guardar cambios"
+                          : "Crear reunión"}
+                    </Button>
+                  )}
                 </div>
-              )}
-            </div>
-
-            <DialogFooter className="border-t pt-4 pb-2 sticky bottom-0 bg-background gap-2">
-              {isEditing && !readOnly && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="mr-auto"
-                >
-                  Eliminar reunión
-                </Button>
-              )}
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn-gradient"
-              >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {readOnly ? "Cerrar" : "Guardar cambios"}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        <ConfirmModal
-          open={showDeleteConfirm}
-          onCancel={() => setShowDeleteConfirm(false)}
-          onConfirm={handleDelete}
-          title="Eliminar Reunión"
-          message={
-            isOccurrenceEdit
-              ? "¿Estás seguro de eliminar esta ocurrencia de la reunión?"
-              : "¿Estás seguro de eliminar esta reunión? Si es una serie, se eliminarán todas las ocurrencias futuras."
-          }
-          confirmText="Eliminar"
-          isDestructive
-        />
-
-        <ConfirmModal
-          open={!!convenerConflict}
-          onCancel={() => setConvenerConflict(null)}
-          onConfirm={() => {
-            if (convenerConflict) {
-              setValue(
-                `participants.${convenerConflict.fromIndex}.role`,
-                "PARTICIPANT",
-              );
-              setValue(
-                `participants.${convenerConflict.toIndex}.role`,
-                "CONVENER",
-              );
-              setConvenerConflict(null);
-            }
-          }}
-          title="Cambiar convocante"
-          message={`${convenerConflict?.fromName} ya es convocante. ¿Quieres cambiar el convocante a ${convenerConflict?.toName}?`}
-          confirmText="Sí, cambiar"
-        />
+              </div>
+            </form>
+          )}
+        </div>
       </DialogContent>
+      <ConfirmModal
+        open={showDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Eliminar reunión"
+        message="¿Estás seguro de eliminar esta reunión?"
+        confirmText="Eliminar"
+        isDestructive
+      />
     </Dialog>
   );
 }

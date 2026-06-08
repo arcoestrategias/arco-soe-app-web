@@ -322,8 +322,8 @@ export const routes = {
     my: (params?: { companyId?: string }) =>
       prefixed(Modules.MEETINGS, "my") + qs(params),
     byId: (id: string) => prefixed(Modules.MEETINGS, id),
-    execute: (id: string) =>
-      prefixed(Modules.MEETINGS, "occurrences", id, "execute"),
+    siblings: (parentId: string) =>
+      prefixed(Modules.MEETINGS, "siblings", parentId),
     candidates: (companyId: string) =>
       prefixed(Modules.MEETINGS, "company", companyId, "candidates"),
     minutes: (id: string) => prefixed(Modules.MEETINGS, id, "minutes"),

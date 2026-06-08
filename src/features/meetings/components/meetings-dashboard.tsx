@@ -1,50 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar as CalendarIcon, List, Plus } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  ClipboardList,
+  List,
+  Plus,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { CalendarView } from "./calendar-view";
 import { MeetingListView } from "./meeting-list-view";
 import { MeetingModal } from "./meeting-modal";
 import MeetingMinutesEditor from "./minutes/meeting-minutes-editor";
-import type { MeetingOccurrence } from "../types/meetings.types";
+
+import type { MeetingCalendarEvent } from "../types/meetings.types";
+
+function meetingIdFromEvent(event: MeetingCalendarEvent | string): string {
+  return typeof event === "string" ? event : event.meetingId;
+}
 
 export function MeetingsDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
-    null
+    null,
   );
-  const [selectedOccurrence, setSelectedOccurrence] =
-    useState<MeetingOccurrence | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [minutesMeetingId, setMinutesMeetingId] = useState<string | null>(null);
 
-  // Abrir modal para crear
   const handleCreate = () => {
     setSelectedMeetingId(null);
-    setSelectedOccurrence(null);
     setSelectedDate(null);
     setIsModalOpen(true);
   };
 
-  // Abrir modal para editar (desde click en evento)
-  const handleEdit = (occurrence: MeetingOccurrence) => {
-    setSelectedMeetingId(occurrence.meetingId);
-    setSelectedOccurrence(occurrence);
-    setSelectedDate(null);
-    setIsModalOpen(true);
-  };
-
-  // Abrir modal para editar (desde lista)
   const handleEditFromList = (meetingId: string) => {
     setSelectedMeetingId(meetingId);
-    setSelectedOccurrence(null);
     setSelectedDate(null);
     setIsModalOpen(true);
   };
 
-  // Abrir editor de actas
   const handleGenerateMinutes = (meetingId: string) => {
     setMinutesMeetingId(meetingId);
   };
@@ -53,10 +50,8 @@ export function MeetingsDashboard() {
     setMinutesMeetingId(null);
   };
 
-  // Abrir modal al hacer clic en un día del calendario
   const handleDateClick = (date: Date) => {
     setSelectedMeetingId(null);
-    setSelectedOccurrence(null);
     setSelectedDate(date);
     setIsModalOpen(true);
   };
@@ -64,11 +59,9 @@ export function MeetingsDashboard() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedMeetingId(null);
-    setSelectedOccurrence(null);
     setSelectedDate(null);
   };
 
-  // Si estamos viendo el editor de actas
   if (minutesMeetingId) {
     return (
       <MeetingMinutesEditor
@@ -79,45 +72,56 @@ export function MeetingsDashboard() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Reuniones de Desempeño
-        </h1>
-        <Button onClick={handleCreate} className="btn-gradient">
+    <div className="flex h-full flex-col space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Reuniones de Desempeño
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Gestiona reuniones, calendario y actas de desempeño.
+          </p>
+        </div>
+
+        <Button onClick={handleCreate} className="btn-gradient shrink-0">
           <Plus className="mr-2 h-4 w-4" />
-          Nueva Reunión
+          Nueva reunión
         </Button>
       </div>
 
-      <Tabs defaultValue="calendar" className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <TabsList>
-            <TabsTrigger value="calendar">
-              <CalendarIcon className="mr-2 h-4 w-4" />
+      <Tabs defaultValue="calendar" className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between rounded-2xl border bg-background px-4 py-3 shadow-sm">
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="calendar" className="gap-2">
+              <CalendarIcon className="h-4 w-4" />
               Calendario
             </TabsTrigger>
-            <TabsTrigger value="list">
-              <List className="mr-2 h-4 w-4" />
-              Mis Reuniones
+
+            <TabsTrigger value="list" className="gap-2">
+              <List className="h-4 w-4" />
+              Mis reuniones
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="calendar" className="flex-1 h-full mt-0">
-          <div className="border rounded-md h-[calc(100vh-220px)] bg-background shadow-sm">
+        <TabsContent value="calendar" className="mt-4 min-h-0 flex-1">
+          <div className="h-[calc(100vh-220px)] min-h-[520px] overflow-hidden rounded-2xl border bg-background shadow-sm">
             <CalendarView
-              onEventClick={handleEdit}
+              onEventClick={(event) =>
+                handleEditFromList(meetingIdFromEvent(event))
+              }
               onDateClick={handleDateClick}
             />
           </div>
         </TabsContent>
 
-        <TabsContent value="list" className="mt-0">
-          <MeetingListView
-            onEdit={handleEditFromList}
-            onGenerateMinutes={handleGenerateMinutes}
-          />
+        <TabsContent value="list" className="mt-4">
+          <div className="rounded-2xl border bg-background p-4 shadow-sm">
+            <MeetingListView
+              onEdit={handleEditFromList}
+              onGenerateMinutes={handleGenerateMinutes}
+            />
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -126,7 +130,6 @@ export function MeetingsDashboard() {
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           meetingId={selectedMeetingId}
-          occurrence={selectedOccurrence}
           initialDate={selectedDate}
         />
       )}

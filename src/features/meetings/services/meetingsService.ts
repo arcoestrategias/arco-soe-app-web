@@ -3,10 +3,8 @@ import { routes } from "@/shared/api/routes";
 import { unwrapAny } from "@/shared/api/response";
 import type {
   Meeting,
-  MeetingOccurrence,
   CreateMeetingPayload,
   UpdateMeetingPayload,
-  DeleteScope,
   MeetingCandidatesGroup,
 } from "../types/meetings.types";
 import type {
@@ -15,15 +13,15 @@ import type {
   ParticipantPerformance,
 } from "../types/meeting-minutes.types";
 
-export async function getCalendarOccurrences(params: {
+export async function getCalendarEvents(params: {
   from: string;
   to: string;
   companyId: string;
   businessUnitId?: string;
   onlyMine?: boolean;
-}): Promise<MeetingOccurrence[]> {
+}) {
   const res = await http.get(routes.meetings.calendar(params));
-  return unwrapAny<MeetingOccurrence[]>(res.data);
+  return unwrapAny<any[]>(res.data);
 }
 
 export async function getMyMeetings(params: {
@@ -54,17 +52,9 @@ export async function updateMeeting(
 }
 
 export async function deleteMeeting(
-  id: string,
-  params: {
-    scope: DeleteScope;
-    occurrenceDate?: string;
-  }
+  id: string
 ): Promise<void> {
-  await http.delete(routes.meetings.byId(id), { params });
-}
-
-export async function executeOccurrence(id: string): Promise<void> {
-  await http.patch(routes.meetings.execute(id));
+  await http.delete(routes.meetings.byId(id));
 }
 
 export async function getMeetingCandidates(
@@ -119,14 +109,7 @@ export async function createPriorityFromMinutes(
   }
 ): Promise<any> {
   const res = await http.post(routes.meetings.createPriority(meetingId), payload);
-  return unwrapAny<MinutesCommitment>(res.data);
-}
-
-export async function getPrioritiesToday(
-  meetingId: string
-): Promise<any[]> {
-  const res = await http.get(routes.meetings.prioritiesToday(meetingId));
-  return unwrapAny<any[]>(res.data);
+  return unwrapAny<any>(res.data);
 }
 
 export async function getParticipantsPerformance(
