@@ -28,6 +28,8 @@ export interface Meeting {
   updatedAt: string;
   agenda?: string[];
   parentId?: string;
+  _count?: { minutes: number };
+  minutes?: { id: string; version: number; status: string; createdAt: string }[];
 }
 
 export interface CreateMeetingPayload {

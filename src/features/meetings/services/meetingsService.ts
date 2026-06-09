@@ -96,6 +96,13 @@ export async function finalizeMinutes(
   return unwrapAny<MinutesResponse>(res.data);
 }
 
+export async function getMinutesVersions(
+  meetingId: string
+): Promise<MinutesResponse[]> {
+  const res = await http.get(routes.meetings.minutesVersions(meetingId));
+  return unwrapAny<MinutesResponse[]>(res.data);
+}
+
 export async function createPriorityFromMinutes(
   meetingId: string,
   payload: {

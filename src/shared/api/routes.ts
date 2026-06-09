@@ -329,6 +329,8 @@ export const routes = {
     minutes: (id: string) => prefixed(Modules.MEETINGS, id, "minutes"),
     minutesFinalize: (id: string) =>
       prefixed(Modules.MEETINGS, id, "minutes", "finalize"),
+    minutesVersions: (id: string) =>
+      prefixed(Modules.MEETINGS, id, "minutes", "versions"),
     minutesCompromisos: (id: string) =>
       prefixed(Modules.MEETINGS, id, "minutes", "compromisos"),
     minutesPdf: (id: string) =>

@@ -49,8 +49,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { ConfirmModal } from "@/shared/components/confirm-modal";
 import { UploadFilesModal } from "@/shared/components/upload-files-modal";
+import { getMinutesVersions } from "../../services/meetingsService";
 import {
   useMeetingMinutesQuery,
   useCreateMinutesMutation,
@@ -202,6 +202,7 @@ function DateEditor({
 interface Props {
   meetingId: string;
   onBack: () => void;
+  initialMinutesId?: string;
 }
 
 export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
@@ -213,6 +214,12 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
     queryKey: QKEY.strategicPlansByBU(getBusinessUnitId() ?? ""),
     queryFn: () => getStrategicPlansByBusinessUnit(getBusinessUnitId()!),
     enabled: !!getBusinessUnitId(),
+  });
+
+  const { data: versions = [] } = useQuery({
+    queryKey: [...QKEY.meetingMinutes(meetingId), "versions"],
+    queryFn: () => getMinutesVersions(meetingId),
+    enabled: !!meetingId,
   });
 
   const createMinutesMut = useCreateMinutesMutation(meetingId);
@@ -231,6 +238,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
   const [version, setVersion] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [createModalPositionId, setCreateModalPositionId] = useState<string | null>(null);
   const [createFromOpen, setCreateFromOpen] = useState(false);
   const [createUntilOpen, setCreateUntilOpen] = useState(false);
@@ -367,6 +375,22 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
       toast.success("Borrador de acta creado");
     } catch {
       toast.error("Error al crear acta");
+    }
+  };
+
+  const handleCreateNewVersion = async () => {
+    try {
+      const result = await createMinutesMut.mutateAsync(
+        meeting?.agenda ?? undefined,
+      );
+      setData(result.data);
+      setMinutesId(result.id);
+      setStatus(result.status);
+      setVersion(result.version);
+      initialized.current = false;
+      toast.success("Nueva versión creada");
+    } catch {
+      toast.error("Error al crear nueva versión");
     }
   };
 
@@ -709,45 +733,11 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
     return <div className="p-8 text-center">Reunión no encontrada</div>;
   }
 
-  // No minutes yet - show create button
+  // Mostrar loader mientras se auto-crea el acta
   if (!data) {
     return (
-      <div className="p-8 space-y-6 w-full">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{meeting.name}</h1>
-            <p className="text-muted-foreground">
-              {new Date(meeting.startDate).toLocaleDateString("es-ES", {
-                dateStyle: "long",
-              })}{" "}
-              · {meeting.location ?? "Sin ubicación"}
-            </p>
-          </div>
-          <Button onClick={onBack} variant="outline">
-            Volver
-          </Button>
-        </div>
-        <Card>
-          <CardContent className="p-12 text-center space-y-4">
-            <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
-            <p className="text-lg font-medium">No hay acta para esta reunión</p>
-            <p className="text-muted-foreground">
-              Genera un acta para capturar el estado estratégico actual
-            </p>
-            <Button
-              onClick={handleCreate}
-              disabled={createMinutesMut.isPending}
-              size="lg"
-            >
-              {createMinutesMut.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4 mr-2" />
-              )}
-              Generar Acta
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -809,11 +799,34 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
             </>
           )}
           {minutesId && (
-            <Button variant="outline" onClick={handleDownloadPdf}>
-              <FileText className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
+            <>
+              {isFinalized && (
+                <Button
+                  variant="outline"
+                  onClick={handleCreateNewVersion}
+                  disabled={createMinutesMut.isPending}
+                >
+                  {createMinutesMut.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  Nueva versión
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleDownloadPdf}>
+                <FileText className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+            </>
           )}
+          <Button
+            variant="outline"
+            onClick={() => setShowVersionsModal(true)}
+            title="Ver todas las versiones"
+          >
+            Versiones
+          </Button>
           <Button variant="outline" onClick={onBack}>
             Volver
           </Button>
@@ -1231,14 +1244,6 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
         </CardContent>
       </Card>
 
-      <ConfirmModal
-        open={showDocsModal}
-        onCancel={() => setShowDocsModal(false)}
-        onConfirm={() => setShowDocsModal(false)}
-        title="Documentos"
-        message=""
-      />
-
       {showDocsModal && minutesId && (
         <UploadFilesModal
           open={showDocsModal}
@@ -1248,6 +1253,47 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
           title={`Documentos del acta v${version}`}
         />
       )}
+
+      {/* Modal versiones */}
+      <Dialog open={showVersionsModal} onOpenChange={setShowVersionsModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader><DialogTitle>Versiones del acta</DialogTitle></DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {versions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Sin versiones registradas</p>
+            ) : versions.map((v) => (
+              <div
+                key={v.id}
+                className={`cursor-pointer rounded-xl border p-3 transition-colors hover:bg-muted/50 ${
+                  v.id === minutesId ? "border-primary/50 bg-primary/5" : "bg-background"
+                }`}
+                onClick={() => {
+                  setData(v.data);
+                  setMinutesId(v.id);
+                  setStatus(v.status);
+                  setVersion(v.version);
+                  setShowVersionsModal(false);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Versi&oacute;n {v.version}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {v.status === "FINALIZED" ? "Finalizada" : "Borrador"} &middot; {formatDateBadge(v.createdAt)}
+                    </p>
+                  </div>
+                  <Badge variant={v.status === "FINALIZED" ? "default" : "secondary"}>
+                    {v.status === "FINALIZED" ? "Finalizada" : "Borrador"}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVersionsModal(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal nueva prioridad */}
       <Dialog

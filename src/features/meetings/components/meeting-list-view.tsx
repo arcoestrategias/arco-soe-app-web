@@ -239,6 +239,17 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
                     <Users className="h-3.5 w-3.5 shrink-0" />
                     <span>{participantCount} participante{participantCount === 1 ? "" : "s"}</span>
                   </div>
+                  {meeting._count && (
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                      <span>{meeting._count.minutes} acta{meeting._count.minutes === 1 ? "" : "s"}</span>
+                      {meeting.minutes && meeting.minutes.length > 0 && (
+                        <Badge variant="outline" className="rounded-full px-2 text-[10px]">
+                          v{meeting.minutes[0].version} · {meeting.minutes[0].status === "FINALIZED" ? "Finalizada" : "Borrador"}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                   {meeting.location && (
                     <div className="flex min-w-0 items-center gap-1.5">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />

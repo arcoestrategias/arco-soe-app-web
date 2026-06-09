@@ -1,21 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Calendar as CalendarIcon,
-  ClipboardList,
-  List,
-  Plus,
-} from "lucide-react";
-
+import { Loader2, Calendar as CalendarIcon, List, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import { CalendarView } from "./calendar-view";
 import { MeetingListView } from "./meeting-list-view";
 import { MeetingModal } from "./meeting-modal";
 import MeetingMinutesEditor from "./minutes/meeting-minutes-editor";
-
+import { getMinutes, createMinutes } from "../services/meetingsService";
 import type { MeetingCalendarEvent } from "../types/meetings.types";
 
 function meetingIdFromEvent(event: MeetingCalendarEvent | string): string {
@@ -28,7 +22,11 @@ export function MeetingsDashboard() {
     null,
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [minutesMeetingId, setMinutesMeetingId] = useState<string | null>(null);
+  const [minutesToOpen, setMinutesToOpen] = useState<{
+    meetingId: string;
+    minutesId: string;
+  } | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
 
   const handleCreate = () => {
     setSelectedMeetingId(null);
@@ -42,12 +40,20 @@ export function MeetingsDashboard() {
     setIsModalOpen(true);
   };
 
-  const handleGenerateMinutes = (meetingId: string) => {
-    setMinutesMeetingId(meetingId);
+  const handleGenerateMinutes = async (meetingId: string) => {
+    setIsPreparing(true);
+    try {
+      const existing = await getMinutes(meetingId);
+      const created = existing ?? (await createMinutes(meetingId));
+      setMinutesToOpen({ meetingId, minutesId: created.id });
+    } catch {
+      toast.error("Error al preparar el acta");
+    }
+    setIsPreparing(false);
   };
 
   const handleCloseMinutes = () => {
-    setMinutesMeetingId(null);
+    setMinutesToOpen(null);
   };
 
   const handleDateClick = (date: Date) => {
@@ -62,10 +68,19 @@ export function MeetingsDashboard() {
     setSelectedDate(null);
   };
 
-  if (minutesMeetingId) {
+  if (isPreparing) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (minutesToOpen) {
     return (
       <MeetingMinutesEditor
-        meetingId={minutesMeetingId}
+        meetingId={minutesToOpen.meetingId}
+        initialMinutesId={minutesToOpen.minutesId}
         onBack={handleCloseMinutes}
       />
     );
