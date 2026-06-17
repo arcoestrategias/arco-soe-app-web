@@ -12,10 +12,6 @@ import MeetingMinutesEditor from "./minutes/meeting-minutes-editor";
 import { getMinutes, createMinutes } from "../services/meetingsService";
 import type { MeetingCalendarEvent } from "../types/meetings.types";
 
-function meetingIdFromEvent(event: MeetingCalendarEvent | string): string {
-  return typeof event === "string" ? event : event.meetingId;
-}
-
 export function MeetingsDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
@@ -59,6 +55,12 @@ export function MeetingsDashboard() {
   const handleDateClick = (date: Date) => {
     setSelectedMeetingId(null);
     setSelectedDate(date);
+    setIsModalOpen(true);
+  };
+
+  const handleCalendarEventClick = (event: MeetingCalendarEvent) => {
+    setSelectedMeetingId(event.meetingId);
+    setSelectedDate(null);
     setIsModalOpen(true);
   };
 
@@ -122,9 +124,7 @@ export function MeetingsDashboard() {
         <TabsContent value="calendar" className="mt-4 min-h-0 flex-1">
           <div className="h-[calc(100vh-220px)] min-h-[520px] overflow-hidden rounded-2xl border bg-background shadow-sm">
             <CalendarView
-              onEventClick={(event) =>
-                handleEditFromList(meetingIdFromEvent(event))
-              }
+              onEventClick={handleCalendarEventClick}
               onDateClick={handleDateClick}
             />
           </div>

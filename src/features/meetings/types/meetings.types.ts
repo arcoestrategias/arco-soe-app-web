@@ -51,7 +51,17 @@ export interface CreateMeetingPayload {
   agenda?: string[];
 }
 
-export interface UpdateMeetingPayload extends Partial<CreateMeetingPayload> {}
+export interface UpdateMeetingPayload extends Partial<CreateMeetingPayload> {
+  applyToGroup?: boolean;
+}
+
+export interface SiblingMeeting {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  _count: { minutes: number };
+}
 
 export interface MeetingCalendarEvent {
   id: string;

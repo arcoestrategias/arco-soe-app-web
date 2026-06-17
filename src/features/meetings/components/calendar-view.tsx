@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Pencil,
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -219,7 +220,7 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
                       e.stopPropagation();
                       onEventClick(evt);
                     }}
-                    className="group/evt relative text-xs text-left pl-2.5 pr-2 py-1.5 rounded-md border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md w-full overflow-hidden bg-white border-border text-foreground hover:border-primary/40"
+                    className="group/evt relative text-xs text-left pl-2.5 pr-2 py-1.5 rounded-md border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md w-full overflow-hidden bg-white border-border text-foreground hover:border-primary/40 cursor-pointer"
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
 
@@ -228,6 +229,7 @@ export function CalendarView({ onEventClick, onDateClick }: CalendarViewProps) {
                       <span className="truncate font-medium leading-none">
                         {evt.title}
                       </span>
+                      <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/50 opacity-0 group-hover/evt:opacity-100 transition-opacity ml-auto" />
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-0.5 pl-4.5 truncate opacity-80">
                       {new Date(evt.start).toLocaleTimeString([], {

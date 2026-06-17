@@ -45,7 +45,7 @@ import { http } from "@/shared/api/http";
 import { unwrapAny } from "@/shared/api/response";
 import { QKEY } from "@/shared/api/query-keys";
 
-import type { MeetingRole, MeetingFrequency } from "../types/meetings.types";
+import type { MeetingRole, MeetingFrequency, SiblingMeeting } from "../types/meetings.types";
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -150,6 +150,7 @@ export function MeetingModal({
   const updateMutation = useUpdateMeetingMutation();
   const deleteMutation = useDeleteMeetingMutation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showGroupMinutesConfirm, setShowGroupMinutesConfirm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const queryClient = useQueryClient();
 
@@ -171,6 +172,21 @@ export function MeetingModal({
 
   const belongsToGroup =
     !!meetingData?.parentId || (meetingData as any)?._count?.children > 0;
+
+  const [siblings, setSiblings] = useState<SiblingMeeting[]>([]);
+
+  useEffect(() => {
+    if (!isEditing || !isOpen || !meetingData) return;
+    const pid = meetingData.parentId ?? meetingId!;
+    http.get(routes.meetings.siblings(pid)).then((res: any) => {
+      setSiblings(unwrapAny<any[]>(res.data) ?? []);
+    }).catch(() => { /* ignore */ });
+  }, [isEditing, isOpen, meetingData, meetingId]);
+
+  const hasSiblingsWithMinutes = siblings.some((s) => s._count.minutes > 0);
+  const hasFutureSiblingsWithMinutes = siblings.some(
+    (s) => new Date(s.startDate) >= new Date() && s._count.minutes > 0,
+  );
 
   const {
     control,
@@ -371,49 +387,20 @@ export function MeetingModal({
     if (isEditing && meetingId) {
       const fullPayload = buildPayloadBase(values);
       if (applyToGroup && belongsToGroup) {
+        if (
+          hasFutureSiblingsWithMinutes &&
+          values.frequency !== meetingData?.frequency
+        ) {
+          setShowGroupMinutesConfirm(true);
+          return;
+        }
         try {
-          const baseDate = new Date(meetingData!.startDate);
-          const [sH, sM] = values.startTime.split(":").map(Number);
-          const [eH, eM] = values.endTime.split(":").map(Number);
-          const parentId = meetingData?.parentId ?? meetingId!;
-          const sibs =
-            unwrapAny<any[]>(
-              (await http.get(routes.meetings.siblings(parentId)))
-                .data,
-            ) ?? [];
-          const { startDate, endDate, ...common } = fullPayload;
-          const ids = [
-            meetingId,
-            ...sibs
-              .filter(
-                (m: any) =>
-                  m.id !== meetingId && new Date(m.startDate) >= baseDate,
-              )
-              .map((m: any) => m.id),
-          ];
-          if (ids.length === 0) {
-            toast.info("No hay reuniones futuras");
-            onClose();
-            return;
-          }
-          await Promise.all(
-            ids.map((id: string) => {
-              const s =
-                id === meetingId ? null : sibs.find((x: any) => x.id === id);
-              const od = s ? new Date(s.startDate) : baseDate;
-              const ns = new Date(od);
-              ns.setHours(sH, sM, 0, 0);
-              const ne = new Date(od);
-              ne.setHours(eH, eM, 0, 0);
-              return http.patch(routes.meetings.byId(id), {
-                ...common,
-                startDate: ns.toISOString(),
-                endDate: ne.toISOString(),
-              });
-            }),
-          );
+          await http.patch(routes.meetings.byId(meetingId), {
+            ...fullPayload,
+            applyToGroup: true,
+          });
           queryClient.invalidateQueries({ queryKey: QKEY.meetings });
-          toast.success(`${ids.length} reuniones actualizadas`);
+          toast.success("Reuniones actualizadas");
           onClose();
         } catch {
           toast.error("Error al actualizar el grupo");
@@ -492,6 +479,24 @@ export function MeetingModal({
       },
       onError: () => toast.error("Error al eliminar"),
     });
+  };
+
+  const handleGroupMinutesConfirm = async () => {
+    if (!meetingId) return;
+    setShowGroupMinutesConfirm(false);
+    const values = getValues();
+    const fullPayload = buildPayloadBase(values);
+    try {
+      await http.patch(routes.meetings.byId(meetingId), {
+        ...fullPayload,
+        applyToGroup: true,
+      });
+      queryClient.invalidateQueries({ queryKey: QKEY.meetings });
+      toast.success("Reuniones actualizadas");
+      onClose();
+    } catch {
+      toast.error("Error al actualizar el grupo");
+    }
   };
 
   const isBusy = isSubmitting || isCreating;
@@ -1002,6 +1007,11 @@ export function MeetingModal({
                             Esta acción actualizará las reuniones futuras de la
                             serie, manteniendo la fecha original de cada una.
                           </p>
+                          {applyToGroup && hasSiblingsWithMinutes && (
+                            <p className="mt-2 pl-6 text-xs font-medium text-amber-700">
+                              ⚠️ Algunas reuniones de esta serie tienen actas y no serán modificadas.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1062,6 +1072,14 @@ export function MeetingModal({
         message="¿Estás seguro de eliminar esta reunión?"
         confirmText="Eliminar"
         isDestructive
+      />
+      <ConfirmModal
+        open={showGroupMinutesConfirm}
+        onCancel={() => setShowGroupMinutesConfirm(false)}
+        onConfirm={handleGroupMinutesConfirm}
+        title="Cambiar frecuencia"
+        message="Hay reuniones futuras con actas en esta serie. Al cambiar la frecuencia, las reuniones con actas no serán modificadas. ¿Deseas continuar?"
+        confirmText="Sí, continuar"
       />
     </Dialog>
   );
