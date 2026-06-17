@@ -314,7 +314,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
       setHasAutoFetched(true);
       fetchAndSaveLiveData(data);
     }
-  }, [data?.positions?.length]);
+  }, [data?.positions?.length, hasAutoFetched]);
 
   // Re-fetch when strategicPlanId changes or data becomes available with a plan
   useEffect(() => {
@@ -343,13 +343,27 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
   // Load existing minutes (only once)
   useEffect(() => {
     if (minutes && !initialized.current) {
-      setData(minutes.data);
+      setData({
+        ...minutes.data,
+        agenda:
+          minutes.data.agenda?.length
+            ? minutes.data.agenda
+            : meeting?.agenda ?? [],
+        attendance: minutes.data.attendance.map((a) => {
+          const mp = meeting?.participants?.find((p) => p.userId === a.userId);
+          return {
+            ...a,
+            isRequired: a.isRequired ?? mp?.isRequired ?? false,
+            role: (a as any).role ?? mp?.role ?? "PARTICIPANT",
+          };
+        }),
+      });
       setMinutesId(minutes.id);
       setStatus(minutes.status);
       setVersion(minutes.version);
       initialized.current = true;
     }
-  }, [minutes]);
+  }, [minutes, meeting]);
 
   const isDraft = status === "DRAFT";
   const isFinalized = status === "FINALIZED";
@@ -388,6 +402,8 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
       setStatus(result.status);
       setVersion(result.version);
       initialized.current = false;
+      setHasAutoFetched(false);
+      fetchAndSaveLiveData(result.data);
       toast.success("Nueva versión creada");
     } catch {
       toast.error("Error al crear nueva versión");
@@ -527,13 +543,17 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
   };
 
   const handleFinalize = async () => {
+    if (!data) return;
+    setIsSaving(true);
     try {
+      await updateMinutesMut.mutateAsync(data);
       const result = await finalizeMut.mutateAsync();
       setStatus(result.status);
       toast.success("Acta finalizada");
     } catch {
       toast.error("Error al finalizar");
     }
+    setIsSaving(false);
   };
 
   const handleDownloadPdf = async () => {
@@ -786,7 +806,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                 disabled={isSaving}
               >
                 <Save className="h-4 w-4 mr-2" />
-                Guardar
+                Guardar borrador
               </Button>
               <Button onClick={handleFinalize} disabled={finalizeMut.isPending}>
                 {finalizeMut.isPending ? (
@@ -816,7 +836,7 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
               )}
               <Button variant="outline" onClick={handleDownloadPdf}>
                 <FileText className="h-4 w-4 mr-2" />
-                PDF
+                Generar PDF
               </Button>
             </>
           )}
@@ -889,6 +909,16 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                 >
                   {a.userName}
                 </Label>
+                {a.role === "CONVENER" && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5">
+                    Convocante
+                  </Badge>
+                )}
+                {a.isRequired && (
+                  <Badge variant="outline" className="text-[10px] px-1.5">
+                    Obligatorio
+                  </Badge>
+                )}
               </div>
             ))}
           </CardContent>
@@ -990,22 +1020,23 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                   {(() => {
                     const { currentMonth, currentYear, nextMonth, nextYear } = getMonthRange();
 
+                    const overduePriorities = pos.priorities.filter(
+                      (p) =>
+                        !priorityInMonth(p, currentMonth, currentYear) &&
+                        !priorityInMonth(p, nextMonth, nextYear),
+                    );
+
                     const currentMonthPriorities = pos.priorities.filter(
                       (p) => priorityInMonth(p, currentMonth, currentYear),
                     );
                     const nextMonthPriorities = pos.priorities.filter(
                       (p) => priorityInMonth(p, nextMonth, nextYear),
                     );
-                    const otherPriorities = pos.priorities.filter(
-                      (p) =>
-                        !priorityInMonth(p, currentMonth, currentYear) &&
-                        !priorityInMonth(p, nextMonth, nextYear),
-                    );
 
                     const hasAny =
+                      overduePriorities.length > 0 ||
                       currentMonthPriorities.length > 0 ||
-                      nextMonthPriorities.length > 0 ||
-                      otherPriorities.length > 0;
+                      nextMonthPriorities.length > 0;
 
                     if (!hasAny) {
                       return (
@@ -1155,6 +1186,14 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
 
                     return (
                       <div className="space-y-3 mb-3">
+                        {overduePriorities.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1 font-medium">
+                              Prioridades Atrasadas
+                            </p>
+                            {renderTable(overduePriorities)}
+                          </div>
+                        )}
                         {currentMonthPriorities.length > 0 && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1 font-medium">
@@ -1169,14 +1208,6 @@ export default function MeetingMinutesEditor({ meetingId, onBack }: Props) {
                               Prioridades del Próximo Mes
                             </p>
                             {renderTable(nextMonthPriorities)}
-                          </div>
-                        )}
-                        {otherPriorities.length > 0 && (
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1 font-medium">
-                              Otras prioridades
-                            </p>
-                            {renderTable(otherPriorities)}
                           </div>
                         )}
                       </div>

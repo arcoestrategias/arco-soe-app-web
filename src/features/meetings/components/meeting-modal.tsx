@@ -169,6 +169,9 @@ export function MeetingModal({
     return users;
   }, [allUsers, meetingData]);
 
+  const belongsToGroup =
+    !!meetingData?.parentId || (meetingData as any)?._count?.children > 0;
+
   const {
     control,
     register,
@@ -257,7 +260,7 @@ export function MeetingModal({
           role: p.role,
           isRequired: p.isRequired,
         })),
-        frequency: "ONCE",
+        frequency: meetingData.frequency ?? "ONCE",
         daysOfWeek: [],
         repeatUntil: "",
         agenda: meetingData.agenda ?? [],
@@ -297,6 +300,7 @@ export function MeetingModal({
       startDate: new Date(startIso).toISOString(),
       endDate: new Date(endIso).toISOString(),
       participants: values.participants,
+      frequency: values.frequency,
       agenda: values.agenda?.length
         ? values.agenda.filter((a) => a.trim() !== "")
         : undefined,
@@ -366,14 +370,15 @@ export function MeetingModal({
 
     if (isEditing && meetingId) {
       const fullPayload = buildPayloadBase(values);
-      if (applyToGroup && meetingData?.parentId) {
+      if (applyToGroup && belongsToGroup) {
         try {
-          const baseDate = new Date(meetingData.startDate);
+          const baseDate = new Date(meetingData!.startDate);
           const [sH, sM] = values.startTime.split(":").map(Number);
           const [eH, eM] = values.endTime.split(":").map(Number);
+          const parentId = meetingData?.parentId ?? meetingId!;
           const sibs =
             unwrapAny<any[]>(
-              (await http.get(routes.meetings.siblings(meetingData.parentId)))
+              (await http.get(routes.meetings.siblings(parentId)))
                 .data,
             ) ?? [];
           const { startDate, endDate, ...common } = fullPayload;
@@ -508,7 +513,7 @@ export function MeetingModal({
                       Solo lectura
                     </Badge>
                   )}
-                  {meetingData?.parentId && (
+                  {belongsToGroup && (
                     <Badge variant="outline" className="rounded-full">
                       Serie
                     </Badge>
@@ -973,7 +978,7 @@ export function MeetingModal({
                     </SectionCard>
                   </div>
 
-                  {isEditing && meetingData?.parentId && (
+                  {isEditing && belongsToGroup && (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <div className="flex items-start gap-3">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />

@@ -60,6 +60,14 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isClientReady, setIsClientReady] = useState(false);
 
+  const meetingToDeleteInfo = useMemo(() => {
+    if (!meetingToDelete) return null;
+    return meetings?.find((m) => m.id === meetingToDelete) ?? null;
+  }, [meetingToDelete, meetings]);
+
+  const deleteHasMinutes = (meetingToDeleteInfo?._count?.minutes ?? 0) > 0;
+  const deleteMinutesCount = meetingToDeleteInfo?._count?.minutes ?? 0;
+
   // Inicializar filtro al mes actual solo en cliente (evita hydration error)
   useEffect(() => {
     setFilterMonth(format(new Date(), "yyyy-MM"));
@@ -68,7 +76,7 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
 
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
-    for (let i = -5; i <= 6; i++) {
+    for (let i = -12; i <= 12; i++) {
       const d = new Date();
       d.setMonth(d.getMonth() + i);
       opts.push({ value: format(d, "yyyy-MM"), label: format(d, "MMMM yyyy", { locale: es }) });
@@ -111,8 +119,16 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
     });
   };
 
-  const prevMonth = () => setFilterMonth(format(subMonths(new Date(filterMonth + "-01"), 1), "yyyy-MM"));
-  const nextMonth = () => setFilterMonth(format(addMonths(new Date(filterMonth + "-01"), 1), "yyyy-MM"));
+  const prevMonth = () => {
+    const [y, m] = filterMonth.split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    setFilterMonth(format(d, "yyyy-MM"));
+  };
+  const nextMonth = () => {
+    const [y, m] = filterMonth.split("-").map(Number);
+    const d = new Date(y, m, 1);
+    setFilterMonth(format(d, "yyyy-MM"));
+  };
 
   if (isLoading) {
     return (
@@ -211,7 +227,7 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
                       <div className="min-w-0">
                         <div className="mb-2 flex flex-wrap items-center gap-1.5">
                           <Badge variant="secondary" className="rounded-full px-2">Reunión</Badge>
-                          {meeting.parentId && <Badge variant="outline" className="rounded-full px-2">Serie</Badge>}
+                          {(meeting.parentId || (meeting._count?.children ?? 0) > 0) && <Badge variant="outline" className="rounded-full px-2">Serie</Badge>}
                         </div>
                         <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{meeting.name}</h3>
                       </div>
@@ -282,8 +298,10 @@ export function MeetingListView({ onEdit, onGenerateMinutes }: MeetingListViewPr
         open={!!meetingToDelete}
         onCancel={() => setMeetingToDelete(null)}
         onConfirm={handleDelete}
-        title="Eliminar reunión"
-        message="¿Estás seguro de eliminar esta reunión? Esta acción no se puede deshacer."
+        title={deleteHasMinutes ? "¿Eliminar reunión?" : "Eliminar reunión"}
+        message={deleteHasMinutes
+          ? `Esta reunión tiene ${deleteMinutesCount} acta${deleteMinutesCount === 1 ? "" : "s"} registrada${deleteMinutesCount === 1 ? "" : "s"}. Si la eliminas no podrás acceder a ellas.`
+          : "¿Estás seguro de eliminar esta reunión? Esta acción no se puede deshacer."}
         confirmText="Eliminar"
         isDestructive
       />

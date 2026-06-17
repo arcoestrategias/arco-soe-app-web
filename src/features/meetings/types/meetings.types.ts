@@ -23,12 +23,13 @@ export interface Meeting {
   tools?: string;
   startDate: string;
   endDate: string;
+  frequency?: MeetingFrequency;
   participants: MeetingParticipant[];
   createdAt: string;
   updatedAt: string;
   agenda?: string[];
   parentId?: string;
-  _count?: { minutes: number };
+  _count?: { minutes: number; children?: number };
   minutes?: { id: string; version: number; status: string; createdAt: string }[];
 }
 
@@ -39,6 +40,7 @@ export interface CreateMeetingPayload {
   tools?: string;
   startDate: string;
   endDate: string;
+  frequency?: MeetingFrequency;
   participants: {
     userId: string;
     role: MeetingRole;
