@@ -5,9 +5,23 @@ import type { ReactNode } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Loader2, Plus, Trash, X, Calendar, Clock, MapPin, Wrench, Users,
-  ListChecks, AlertTriangle, Sparkles, UserRound, ClipboardList, CalendarDays,
-  CheckCircle2, Circle,
+  Loader2,
+  Plus,
+  Trash,
+  X,
+  Calendar,
+  Clock,
+  MapPin,
+  Wrench,
+  Users,
+  ListChecks,
+  AlertTriangle,
+  Sparkles,
+  UserRound,
+  ClipboardList,
+  CalendarDays,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
@@ -45,7 +59,11 @@ import { http } from "@/shared/api/http";
 import { unwrapAny } from "@/shared/api/response";
 import { QKEY } from "@/shared/api/query-keys";
 
-import type { MeetingRole, MeetingFrequency, SiblingMeeting } from "../types/meetings.types";
+import type {
+  MeetingRole,
+  MeetingFrequency,
+  SiblingMeeting,
+} from "../types/meetings.types";
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -93,6 +111,11 @@ function safeParseDate(d: Date | string | undefined | null): Date {
   if (!d) return new Date();
   if (typeof d === "string") return new Date(d);
   return d;
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function SectionCard({
@@ -151,6 +174,7 @@ export function MeetingModal({
   const deleteMutation = useDeleteMeetingMutation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showGroupMinutesConfirm, setShowGroupMinutesConfirm] = useState(false);
+  const [showGroupConfirm, setShowGroupConfirm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const queryClient = useQueryClient();
 
@@ -178,14 +202,39 @@ export function MeetingModal({
   useEffect(() => {
     if (!isEditing || !isOpen || !meetingData) return;
     const pid = meetingData.parentId ?? meetingId!;
-    http.get(routes.meetings.siblings(pid)).then((res: any) => {
-      setSiblings(unwrapAny<any[]>(res.data) ?? []);
-    }).catch(() => { /* ignore */ });
+    http
+      .get(routes.meetings.siblings(pid))
+      .then((res: any) => {
+        const data = unwrapAny<any[]>(res.data) ?? [];
+        setSiblings(data);
+        const maxSibDate =
+          data.length > 0
+            ? format(
+                new Date(
+                  Math.max(
+                    ...data.map((s: any) => new Date(s.startDate).getTime()),
+                  ),
+                ),
+                "yyyy-MM-dd",
+              )
+            : null;
+        if (maxSibDate && !getValues("repeatUntil")) {
+          setValue("repeatUntil", maxSibDate);
+        }
+      })
+      .catch(() => {
+        /* ignore */
+      });
   }, [isEditing, isOpen, meetingData, meetingId]);
 
-  const hasSiblingsWithMinutes = siblings.some((s) => s._count.minutes > 0);
+  const hasSiblingsWithMinutes = siblings.some(
+    (s) => (s._count?.minutes ?? 0) > 0,
+  );
   const hasFutureSiblingsWithMinutes = siblings.some(
-    (s) => new Date(s.startDate) >= new Date() && s._count.minutes > 0,
+    (s) => new Date(s.startDate) >= new Date() && (s._count?.minutes ?? 0) > 0,
+  );
+  const siblingsWithMinutes = siblings.filter(
+    (s) => (s._count?.minutes ?? 0) > 0,
   );
 
   const {
@@ -228,6 +277,72 @@ export function MeetingModal({
   const watchParticipants = watch("participants");
   const watchAgenda = watch("agenda");
 
+  const preview = useMemo(() => {
+    if (!applyToGroup || !meetingData || frequency === "ONCE") return null;
+    const meetingDateObj = parseLocalDate(watchDate);
+    const freq = frequency as MeetingFrequency;
+    const siblingMax =
+      siblings.length > 0
+        ? new Date(
+            Math.max(...siblings.map((s) => new Date(s.startDate).getTime())),
+          )
+        : meetingDateObj;
+    const repeatUntilDate = repeatUntil ? parseLocalDate(repeatUntil) : null;
+    const maxSiblingDate =
+      repeatUntilDate && repeatUntilDate > siblingMax
+        ? repeatUntilDate
+        : siblingMax;
+
+    const expectedDates: Date[] = [];
+    let current = new Date(meetingDateObj);
+    while (current <= maxSiblingDate) {
+      expectedDates.push(new Date(current));
+      current = addFrequency(current, freq, 1);
+    }
+
+    const futureSiblings = siblings.filter(
+      (s) => s.id !== meetingId && new Date(s.startDate) > meetingDateObj,
+    );
+    const keptSiblings = futureSiblings.filter((s) =>
+      expectedDates.some(
+        (ed) => ed.toDateString() === new Date(s.startDate).toDateString(),
+      ),
+    );
+    const cancelledSiblings = futureSiblings.filter(
+      (s) =>
+        !expectedDates.some(
+          (ed) => ed.toDateString() === new Date(s.startDate).toDateString(),
+        ),
+    );
+    const newDates = expectedDates.filter(
+      (ed) =>
+        ed.toDateString() !== meetingDateObj.toDateString() &&
+        !siblings.some(
+          (s) =>
+            s.id !== meetingId &&
+            new Date(s.startDate).toDateString() === ed.toDateString(),
+        ),
+    );
+
+    return {
+      keptSiblings,
+      cancelledSiblings,
+      newDates,
+      hasAnyChange:
+        keptSiblings.length > 0 ||
+        cancelledSiblings.length > 0 ||
+        newDates.length > 0,
+    };
+  }, [
+    applyToGroup,
+    meetingData,
+    frequency,
+    watchDate,
+    siblings,
+    meetingId,
+    repeatUntil,
+  ]);
+
   const generatedCount = useMemo(() => {
     if (frequency === "ONCE" || !repeatUntil) return 0;
     const start = new Date(watchDate);
@@ -263,6 +378,12 @@ export function MeetingModal({
 
   useEffect(() => {
     if (isOpen && meetingData) {
+      const siblingMaxDate =
+        siblings.length > 0
+          ? new Date(
+              Math.max(...siblings.map((s) => new Date(s.startDate).getTime())),
+            )
+          : null;
       reset({
         name: meetingData.name,
         purpose: meetingData.purpose || "",
@@ -278,9 +399,9 @@ export function MeetingModal({
         })),
         frequency: meetingData.frequency ?? "ONCE",
         daysOfWeek: [],
-        repeatUntil: "",
+        repeatUntil: siblingMaxDate ? format(siblingMaxDate, "yyyy-MM-dd") : "",
         agenda: meetingData.agenda ?? [],
-        applyToGroup: false,
+        applyToGroup: isEditing && belongsToGroup,
       });
     } else if (isOpen && !isEditing) {
       reset({
@@ -294,7 +415,13 @@ export function MeetingModal({
         startTime: "09:00",
         endTime: "10:00",
         participants: me?.id
-          ? [{ userId: me.id, role: "CONVENER" as MeetingRole, isRequired: true }]
+          ? [
+              {
+                userId: me.id,
+                role: "CONVENER" as MeetingRole,
+                isRequired: true,
+              },
+            ]
           : [],
         frequency: "ONCE",
         daysOfWeek: [],
@@ -394,21 +521,14 @@ export function MeetingModal({
           setShowGroupMinutesConfirm(true);
           return;
         }
-        try {
-          await http.patch(routes.meetings.byId(meetingId), {
-            ...fullPayload,
-            applyToGroup: true,
-          });
-          queryClient.invalidateQueries({ queryKey: QKEY.meetings });
-          toast.success("Reuniones actualizadas");
-          onClose();
-        } catch {
-          toast.error("Error al actualizar el grupo");
-        }
+        setShowGroupConfirm(true);
         return;
       }
+      const singlePayload = belongsToGroup
+        ? { ...fullPayload, repeatUntil: values.repeatUntil || undefined }
+        : fullPayload;
       updateMutation.mutate(
-        { id: meetingId, payload: fullPayload },
+        { id: meetingId, payload: singlePayload },
         {
           onSuccess: () => {
             toast.success("Reunión actualizada");
@@ -470,8 +590,29 @@ export function MeetingModal({
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!meetingId) return;
+    setShowDeleteConfirm(false);
+
+    if (applyToGroup && belongsToGroup) {
+      try {
+        await http.delete(
+          `${routes.meetings.byId(meetingId)}?applyToGroup=true`,
+        );
+        queryClient.invalidateQueries({ queryKey: QKEY.meetings });
+        toast.success("Serie cancelada");
+        onClose();
+      } catch {
+        toast.error("Error al cancelar la serie");
+      }
+      return;
+    }
+
+    const minutesCount = (meetingData as any)?._count?.minutes ?? 0;
+    if (minutesCount > 0) {
+      toast.error("No se puede eliminar porque tiene actas generadas.");
+      return;
+    }
     deleteMutation.mutate(meetingId, {
       onSuccess: () => {
         toast.success("Reunión eliminada");
@@ -490,6 +631,26 @@ export function MeetingModal({
       await http.patch(routes.meetings.byId(meetingId), {
         ...fullPayload,
         applyToGroup: true,
+        repeatUntil: values.repeatUntil || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: QKEY.meetings });
+      toast.success("Reuniones actualizadas");
+      onClose();
+    } catch {
+      toast.error("Error al actualizar el grupo");
+    }
+  };
+
+  const handleGroupConfirm = async () => {
+    if (!meetingId) return;
+    setShowGroupConfirm(false);
+    const values = getValues();
+    const fullPayload = buildPayloadBase(values);
+    try {
+      await http.patch(routes.meetings.byId(meetingId), {
+        ...fullPayload,
+        applyToGroup: true,
+        repeatUntil: values.repeatUntil || undefined,
       });
       queryClient.invalidateQueries({ queryKey: QKEY.meetings });
       toast.success("Reuniones actualizadas");
@@ -636,21 +797,22 @@ export function MeetingModal({
                           />
                         </div>
 
-                        {!isEditing && frequency !== "ONCE" && (
-                          <div className="min-w-[150px] flex-1 space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">
-                              Repetir hasta
-                            </Label>
-                            <Input
-                              type="date"
-                              {...register("repeatUntil")}
-                              min={watchDate}
-                              className="h-10"
-                            />
-                          </div>
-                        )}
+                        {(!isEditing || (isEditing && belongsToGroup)) &&
+                          frequency !== "ONCE" && (
+                            <div className="min-w-[150px] flex-1 space-y-2">
+                              <Label className="text-xs font-medium text-muted-foreground">
+                                Repetir hasta
+                              </Label>
+                              <Input
+                                type="date"
+                                {...register("repeatUntil")}
+                                min={watchDate}
+                                className="h-10"
+                              />
+                            </div>
+                          )}
 
-                        {!isEditing &&
+                        {(!isEditing || (isEditing && belongsToGroup)) &&
                           frequency !== "ONCE" &&
                           generatedCount > 0 && (
                             <div className="space-y-2">
@@ -895,7 +1057,13 @@ export function MeetingModal({
                               variant="outline"
                               size="sm"
                               className="h-9 rounded-xl"
-                               onClick={() => append({ userId: "", role: "PARTICIPANT", isRequired: false })}
+                              onClick={() =>
+                                append({
+                                  userId: "",
+                                  role: "PARTICIPANT",
+                                  isRequired: false,
+                                })
+                              }
                             >
                               <Plus className="mr-1.5 h-4 w-4" />
                               Agregar participante
@@ -1005,12 +1173,113 @@ export function MeetingModal({
                           </div>
                           <p className="mt-1.5 pl-6 text-xs text-muted-foreground">
                             Esta acción actualizará las reuniones futuras de la
-                            serie, manteniendo la fecha original de cada una.
+                            serie a partir de esta fecha.
                           </p>
                           {applyToGroup && hasSiblingsWithMinutes && (
-                            <p className="mt-2 pl-6 text-xs font-medium text-amber-700">
-                              ⚠️ Algunas reuniones de esta serie tienen actas y no serán modificadas.
-                            </p>
+                            <div className="mt-2 pl-6">
+                              <p className="text-xs font-medium text-amber-700">
+                                ⚠️ Las siguientes reuniones tienen actas y no
+                                serán modificadas:
+                              </p>
+                              <ul className="mt-0.5 space-y-0.5 text-xs text-amber-600">
+                                {siblingsWithMinutes.map((s) => (
+                                  <li key={s.id}>
+                                    {new Date(s.startDate).toLocaleDateString(
+                                      "es-ES",
+                                      { day: "numeric", month: "short" },
+                                    )}{" "}
+                                    · {s.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {applyToGroup && preview && preview.hasAnyChange && (
+                            <div className="mt-3 pl-6 space-y-2 text-xs">
+                              {preview.keptSiblings.length > 0 && (
+                                <div>
+                                  <p className="font-semibold text-green-700">
+                                    ✓ Se mantendrán (
+                                    {preview.keptSiblings.length}):
+                                  </p>
+                                  <ul className="mt-0.5 space-y-0.5 text-green-600 max-h-[80px] overflow-y-auto">
+                                    {preview.keptSiblings
+                                      .slice(0, 5)
+                                      .map((s: any) => (
+                                        <li key={s.id}>
+                                          {new Date(
+                                            s.startDate,
+                                          ).toLocaleDateString("es-ES", {
+                                            day: "numeric",
+                                            month: "short",
+                                          })}{" "}
+                                          · {s.name}
+                                        </li>
+                                      ))}
+                                    {preview.keptSiblings.length > 5 && (
+                                      <li className="text-muted-foreground">
+                                        ... y {preview.keptSiblings.length - 5}{" "}
+                                        más
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              {preview.cancelledSiblings.length > 0 && (
+                                <div>
+                                  <p className="font-semibold text-red-600">
+                                    ✕ Se cancelarán (
+                                    {preview.cancelledSiblings.length}):
+                                  </p>
+                                  <ul className="mt-0.5 space-y-0.5 text-red-500 max-h-[80px] overflow-y-auto">
+                                    {preview.cancelledSiblings
+                                      .slice(0, 5)
+                                      .map((s: any) => (
+                                        <li key={s.id}>
+                                          {new Date(
+                                            s.startDate,
+                                          ).toLocaleDateString("es-ES", {
+                                            day: "numeric",
+                                            month: "short",
+                                          })}{" "}
+                                          · {s.name}
+                                        </li>
+                                      ))}
+                                    {preview.cancelledSiblings.length > 5 && (
+                                      <li className="text-muted-foreground">
+                                        ... y{" "}
+                                        {preview.cancelledSiblings.length - 5}{" "}
+                                        más
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              {preview.newDates.length > 0 && repeatUntil && (
+                                <div>
+                                  <p className="font-semibold text-blue-700">
+                                    + Se crearán ({preview.newDates.length}):
+                                  </p>
+                                  <ul className="mt-0.5 space-y-0.5 text-blue-600 max-h-[80px] overflow-y-auto">
+                                    {preview.newDates
+                                      .slice(0, 5)
+                                      .map((d: Date, i: number) => (
+                                        <li key={i}>
+                                          {d.toLocaleDateString("es-ES", {
+                                            day: "numeric",
+                                            month: "short",
+                                          })}
+                                        </li>
+                                      ))}
+                                    {preview.newDates.length > 5 && (
+                                      <li className="text-muted-foreground">
+                                        ... y {preview.newDates.length - 5} más
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1028,7 +1297,10 @@ export function MeetingModal({
                     onClick={() => setShowDeleteConfirm(true)}
                     className="mr-auto rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <Trash className="mr-1.5 h-4 w-4" /> Eliminar
+                    <Trash className="mr-1.5 h-4 w-4" />
+                    {applyToGroup && belongsToGroup
+                      ? "Eliminar serie"
+                      : "Eliminar"}
                   </Button>
                 )}
                 <div className="ml-auto flex gap-2">
@@ -1054,7 +1326,9 @@ export function MeetingModal({
                       {isCreating
                         ? "Creando..."
                         : isEditing
-                          ? "Guardar cambios"
+                          ? applyToGroup && belongsToGroup
+                            ? "Aplicar cambios al grupo"
+                            : "Guardar cambios"
                           : "Crear reunión"}
                     </Button>
                   )}
@@ -1068,17 +1342,129 @@ export function MeetingModal({
         open={showDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
-        title="Eliminar reunión"
-        message="¿Estás seguro de eliminar esta reunión?"
-        confirmText="Eliminar"
+        title={
+          applyToGroup && belongsToGroup ? "Eliminar serie" : "Eliminar reunión"
+        }
+        message={
+          applyToGroup && belongsToGroup
+            ? `Se cancelarán todas las reuniones futuras de la serie. Las reuniones con actas no serán afectadas. ¿Deseas continuar?`
+            : "¿Estás seguro de eliminar esta reunión?"
+        }
+        confirmText={
+          applyToGroup && belongsToGroup ? "Eliminar serie" : "Eliminar"
+        }
         isDestructive
       />
+      <ConfirmModal
+        open={showGroupConfirm}
+        onCancel={() => setShowGroupConfirm(false)}
+        onConfirm={handleGroupConfirm}
+        title="Aplicar cambios al grupo"
+        message="¿Estás seguro de aplicar estos cambios a todas las reuniones futuras de la serie?"
+        confirmText="Aplicar cambios"
+      >
+        {preview && (
+          <div className="space-y-2 text-xs">
+            {preview.keptSiblings.length > 0 && (
+              <div>
+                <p className="font-semibold text-green-700">
+                  ✓ Se mantendrán ({preview.keptSiblings.length}):
+                </p>
+                <ul className="mt-0.5 space-y-0.5 text-green-600 max-h-[80px] overflow-y-auto pl-2">
+                  {preview.keptSiblings.slice(0, 5).map((s: any) => (
+                    <li key={s.id}>
+                      {new Date(s.startDate).toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · {s.name}
+                    </li>
+                  ))}
+                  {preview.keptSiblings.length > 5 && (
+                    <li className="text-muted-foreground">
+                      ... y {preview.keptSiblings.length - 5} más
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {preview.cancelledSiblings.length > 0 && (
+              <div>
+                <p className="font-semibold text-red-600">
+                  ✕ Se cancelarán ({preview.cancelledSiblings.length}):
+                </p>
+                <ul className="mt-0.5 space-y-0.5 text-red-500 max-h-[80px] overflow-y-auto pl-2">
+                  {preview.cancelledSiblings.slice(0, 5).map((s: any) => (
+                    <li key={s.id}>
+                      {new Date(s.startDate).toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · {s.name}
+                    </li>
+                  ))}
+                  {preview.cancelledSiblings.length > 5 && (
+                    <li className="text-muted-foreground">
+                      ... y {preview.cancelledSiblings.length - 5} más
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {preview.newDates.length > 0 && (
+              <div>
+                <p className="font-semibold text-blue-700">
+                  + Se crearán ({preview.newDates.length}):
+                </p>
+                <ul className="mt-0.5 space-y-0.5 text-blue-600 max-h-[80px] overflow-y-auto pl-2">
+                  {preview.newDates.slice(0, 5).map((d: Date, i: number) => (
+                    <li key={i}>
+                      {d.toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </li>
+                  ))}
+                  {preview.newDates.length > 5 && (
+                    <li className="text-muted-foreground">
+                      ... y {preview.newDates.length - 5} más
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {siblingsWithMinutes.length > 0 && (
+              <div>
+                <p className="font-semibold text-amber-700">
+                  ⚠️ Con actas (no se modificarán):
+                </p>
+                <ul className="mt-0.5 space-y-0.5 text-amber-600 max-h-[80px] overflow-y-auto pl-2">
+                  {siblingsWithMinutes.map((s) => (
+                    <li key={s.id}>
+                      {new Date(s.startDate).toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · {s.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </ConfirmModal>
       <ConfirmModal
         open={showGroupMinutesConfirm}
         onCancel={() => setShowGroupMinutesConfirm(false)}
         onConfirm={handleGroupMinutesConfirm}
         title="Cambiar frecuencia"
-        message="Hay reuniones futuras con actas en esta serie. Al cambiar la frecuencia, las reuniones con actas no serán modificadas. ¿Deseas continuar?"
+        message={`Hay reuniones futuras con actas en esta serie y no serán modificadas:\n${siblingsWithMinutes
+          .map(
+            (s) =>
+              `  • ${new Date(s.startDate).toLocaleDateString("es-ES", { day: "numeric", month: "short" })} · ${s.name}`,
+          )
+          .join("\n")}\n\n¿Deseas continuar?`}
         confirmText="Sí, continuar"
       />
     </Dialog>

@@ -62,6 +62,7 @@ export function useFinalizeMinutesMutation(meetingId: string | undefined) {
       if (meetingId) {
         qc.invalidateQueries({ queryKey: QKEY.meetingMinutes(meetingId) });
       }
+      qc.invalidateQueries({ queryKey: QKEY.meetings });
     },
   });
 }

@@ -57,6 +57,7 @@ export interface UpdateMeetingPayload extends Partial<CreateMeetingPayload> {
 
 export interface SiblingMeeting {
   id: string;
+  name: string;
   startDate: string;
   endDate: string;
   status: string;
