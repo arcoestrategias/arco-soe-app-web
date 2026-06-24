@@ -267,7 +267,7 @@ export const routes = {
     base: () => prefixed(Modules.FILES),
     byQuery: (params: { type: "logo" | "document"; referenceId: string }) =>
       prefixed(Modules.FILES) + qs(params),
-
+    byId: (id: string) => prefixed(Modules.FILES, id),
     list: (params: { type: "logo" | "document"; referenceId: string }) =>
       prefixed(Modules.FILES) + qs(params),
     upload: (params: { type: "logo" | "document"; referenceId: string }) =>

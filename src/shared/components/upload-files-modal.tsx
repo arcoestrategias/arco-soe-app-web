@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Upload, Eye, Download } from "lucide-react";
-import { listFiles, uploadFiles } from "@/shared/files/filesService";
+import { Upload, Eye, Download, Trash2 } from "lucide-react";
+import { listFiles, uploadFiles, deleteFile } from "@/shared/files/filesService";
 import type { UploadType, FileItem } from "@/shared/files/types";
 import { getHumanErrorMessage } from "@/shared/api/response";
 import { ActionButton } from "@/components/ui/action-button";
+import { ConfirmModal } from "./confirm-modal";
 
 const fmtDate = new Intl.DateTimeFormat("es-EC", {
   dateStyle: "medium",
@@ -62,6 +63,11 @@ export function UploadFilesModal({
   const [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<FileItem[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    fileId: string;
+    fileName: string;
+  }>({ open: false, fileId: "", fileName: "" });
 
   // Carga inicial al abrir
   useEffect(() => {
@@ -161,6 +167,18 @@ export function UploadFilesModal({
     setDragOver(true);
   };
   const onDragLeave = () => setDragOver(false);
+
+  const handleDeleteConfirm = async () => {
+    const { fileId } = confirmDelete;
+    setConfirmDelete({ open: false, fileId: "", fileName: "" });
+    try {
+      await deleteFile(fileId);
+      setItems((prev) => prev.filter((item) => !item.publicUrl.includes(fileId)));
+      toast.success("Documento eliminado");
+    } catch (e) {
+      toast.error(getHumanErrorMessage(e));
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
@@ -283,6 +301,20 @@ export function UploadFilesModal({
                       <Download className="h-4 w-4" />
                     </a>
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Eliminar"
+                    onClick={() =>
+                      setConfirmDelete({
+                        open: true,
+                        fileId: d.publicUrl.split("/").pop()?.split(".")[0] ?? "",
+                        fileName: d.originalName ?? "Documento",
+                      })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               </div>
             ))
@@ -299,6 +331,18 @@ export function UploadFilesModal({
           />
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmModal
+        open={confirmDelete.open}
+        onCancel={() =>
+          setConfirmDelete({ open: false, fileId: "", fileName: "" })
+        }
+        onConfirm={handleDeleteConfirm}
+        title="Eliminar documento"
+        message={`¿Estás seguro de eliminar "${confirmDelete.fileName}"?`}
+        confirmText="Eliminar"
+        isDestructive
+      />
     </Dialog>
   );
 }

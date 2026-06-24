@@ -132,13 +132,29 @@ export default function PerformanceMap({
 
   const ticks10 = [0, 20, 40, 60, 80, 100];
 
+  const maxIco = React.useMemo(() => {
+    const rawMax = Math.max(
+      100,
+      ...positions.map((d) => d.ico ?? 0),
+    );
+    return Math.ceil(rawMax / 20) * 20;
+  }, [positions]);
+
+  const icoTicks = React.useMemo(() => {
+    const ticks: number[] = [];
+    for (let i = 0; i <= maxIco; i += 20) ticks.push(i);
+    return ticks;
+  }, [maxIco]);
+
   const renderVividShape = (props: any) => {
     const { cx, cy, payload } = props;
     // Resaltar si el ID hovereado está dentro de este grupo
     const isHovered =
       hoveredId && payload?.items?.some((i: Point) => i.id === hoveredId);
     const r = isHovered ? 8 : 6;
-    const fill = getVividColor(payload.x); // Color basado en ICP
+    const fill = getVividColor(
+      payload.items?.[0]?.performance ?? payload.x,
+    );
 
     return (
       <g>
@@ -160,8 +176,6 @@ export default function PerformanceMap({
   function CustomTooltip({ active, payload }: any) {
     if (!active || !payload?.length) return null;
     const group = payload[0].payload as GroupedPoint;
-    const color = getVividColor(group.x);
-
     return (
       <div className="rounded-lg border border-gray-200 bg-white shadow-md px-4 py-3 max-h-[320px] overflow-y-auto max-w-[300px]">
         {group.items.length > 1 && (
@@ -187,19 +201,6 @@ export default function PerformanceMap({
                 Performance: {p.performance}%
               </div>
             )}
-            <div className="mt-1 text-sm font-medium flex items-center gap-2">
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-xs text-gray-600">
-                {p.x >= th.excellentMin
-                  ? lb.excellent
-                  : p.x >= th.acceptableMin
-                  ? lb.acceptable
-                  : lb.critical}
-              </span>
-            </div>
           </div>
         ))}
       </div>
@@ -260,8 +261,8 @@ export default function PerformanceMap({
                 dataKey="y"
                 name="ICO"
                 unit="%"
-                domain={[0, 100]}
-                ticks={ticks10}
+                domain={[0, maxIco]}
+                ticks={icoTicks}
                 tick={{ fontSize: 12, fill: "#374151" }}
                 label={{
                   value: "ICO (%)",
@@ -278,7 +279,7 @@ export default function PerformanceMap({
                 x1={0}
                 x2={100}
                 y1={0}
-                y2={100}
+                y2={maxIco}
                 fill="url(#heatmapGradient)"
                 stroke="none"
               />

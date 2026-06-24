@@ -38,3 +38,8 @@ export async function uploadFiles(
 
   return unwrapAny<PostFilesData>(res);
 }
+
+export async function deleteFile(id: string) {
+  const url = routes.files.byId(id);
+  await http.delete(url);
+}

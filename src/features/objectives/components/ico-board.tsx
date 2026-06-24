@@ -54,7 +54,15 @@ function formatPercent(n: number | null | undefined) {
   return typeof n === "number" ? `${n}%` : "0%";
 }
 
-function getAvgBadgeClass(value: number | null | undefined) {
+function getAvgBadgeClass(
+  value: number | null | undefined,
+  month: number,
+  measuredCount: number,
+) {
+  const currentMonth = new Date().getMonth() + 1;
+  if (month > currentMonth && measuredCount === 0) {
+    return "bg-gray-200 text-gray-600 border-gray-300 border";
+  }
   if (value == null) return "bg-gray-200 text-gray-600 border-gray-300 border";
   if (value >= 95) return "bg-green-50 text-green-700 border-green-200 border";
   if (value >= 85) return "bg-amber-50 text-amber-700 border-amber-200 border";
@@ -78,7 +86,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
     return objetivos.map(({ objective }) => {
       const title = objective?.indicator?.name ?? "";
       // Meta SIN porcentaje
-      const subtitle = `Meta: ${Math.round(Number(objective?.goalValue ?? 0))}`;
+      const subtitle = `Meta: ${Number(objective?.goalValue ?? 0)}`;
       // Nueva línea: Unidad (desde indicator.measurement)
       const unitLabel = `Medida: ${getMeasurementLabel(
         objective?.indicator?.measurement
@@ -306,7 +314,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                       </div>
                     </td>
 
-                    {footer.map(({ month, averageIco, lightColorHex }) => {
+                    {footer.map(({ month, averageIco, lightColorHex, measuredCount }) => {
                       const base =
                         "inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-bold min-w-[45px] border";
                       const style = lightColorHex
@@ -314,7 +322,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                         : undefined;
                       const className = lightColorHex
                         ? `${base} text-gray-900 border-gray-200`
-                        : `${base} ${getAvgBadgeClass(averageIco)}`;
+                        : `${base} ${getAvgBadgeClass(averageIco, month, measuredCount ?? 0)}`;
 
                       return (
                         <td
