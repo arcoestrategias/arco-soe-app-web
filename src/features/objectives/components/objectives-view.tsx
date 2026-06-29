@@ -10,6 +10,7 @@ import ObjectivesCompliance from "./objectives-compliance";
 import { DeploymentMatrix } from "./deployment-matrix";
 
 import { QKEY } from "@/shared/api/query-keys";
+import { useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { useUpdateObjectiveGoal } from "@/features/objectives/hooks/use-objective-goals";
 import { toast } from "sonner";
@@ -85,6 +86,8 @@ export default function ObjectivesView({
   const updateGoalMut = useUpdateObjectiveGoal(invalidateKeys);
 
   // --- handler que recibirá los "changes" desde la modal ---
+  const qc = useQueryClient();
+
   const handleComplianceUpdate = async (
     changes: ObjectiveComplianceChange[],
   ) => {
@@ -103,6 +106,7 @@ export default function ObjectivesView({
           }),
         ),
       );
+      qc.invalidateQueries({ queryKey: ["objectives", "ico-board"] });
       toast.success("Cumplimiento actualizado");
     } catch (e) {
       toast.error(getHumanErrorMessage(e));

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -298,9 +298,17 @@ export default function ObjectivesCompliance({
     [positions, positionId],
   );
 
-  const openComplianceFor = (objectiveId: string) => {
+  const qc = useQueryClient();
+
+  const openComplianceFor = async (objectiveId: string) => {
+    await qc.refetchQueries({ queryKey: ["objectives", "ico-board"] });
+    const allCached = qc.getQueriesData({ queryKey: ["objectives", "ico-board"] });
     const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
-    setSelected(item);
+    const cachedItem = allCached
+      .map(([, d]) => (d as any)?.listObjectives ?? [])
+      .flat()
+      .find((it: any) => it.objective?.id === objectiveId) ?? null;
+    setSelected(cachedItem || item);
     setOpenCompliance(true);
   };
 
@@ -394,8 +402,15 @@ export default function ObjectivesCompliance({
         reference: ind.reference ?? null,
         periodStart: ind.periodStart ?? null,
         periodEnd: ind.periodEnd ?? null,
+        weeklyConfigEnabled: ind.weeklyConfigEnabled ?? null,
+        periodicity: ind.periodicity ?? null,
+        measurementCount: ind.measurementCount ?? null,
+        calculationMethod: ind.calculationMethod ?? null,
       },
       months: monthsFromIcoMonthly(icoMonthly),
+      monthsWithPersonalizedCount: icoMonthly.filter(
+        (m: any) => m.measurementCount != null,
+      ).length,
       rangeExceptional: ranges?.rangeExceptional ?? undefined,
       rangeInacceptable: ranges?.rangeInacceptable ?? undefined,
       isNew: false,
@@ -441,6 +456,10 @@ export default function ObjectivesCompliance({
         reference: ind.reference ?? null,
         periodStart: ind.periodStart ?? null,
         periodEnd: ind.periodEnd ?? null,
+        weeklyConfigEnabled: ind.weeklyConfigEnabled ?? null,
+        periodicity: ind.periodicity ?? null,
+        measurementCount: ind.measurementCount ?? null,
+        calculationMethod: ind.calculationMethod ?? null,
       },
       months: u.months ?? undefined,
       rangeExceptional: u.rangeExceptional ?? undefined,

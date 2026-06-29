@@ -35,6 +35,7 @@ export type IcoMonthlyPoint = {
 
   // metadatos
   objectiveId?: string;
+  measurementCount?: number | null;
   isActive?: boolean;
   createdBy?: string | null;
   updatedBy?: string | null;
@@ -101,6 +102,10 @@ export type IcoBoardListItem = {
       reference?: string | null;
       periodStart?: string | null;
       periodEnd?: string | null;
+      weeklyConfigEnabled?: boolean | null;
+      periodicity?: string | null;
+      measurementCount?: number | null;
+      calculationMethod?: string | null;
       isActive?: boolean;
       createdBy?: string | null;
       updatedBy?: string | null;

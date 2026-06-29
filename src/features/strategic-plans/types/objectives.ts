@@ -77,6 +77,10 @@ export type UnconfiguredIndicator = {
 
   periodStart: string | null;
   periodEnd: string | null;
+  weeklyConfigEnabled: boolean | null;
+  periodicity: string | null;
+  measurementCount: number | null;
+  calculationMethod: string | null;
 
   isActive: boolean;
   createdBy: string | null;
@@ -113,6 +117,10 @@ export type ConfigureObjectiveDto = {
     reference?: string;
     periodStart?: string; // ISO (YYYY-MM-DD)
     periodEnd?: string; // ISO (YYYY-MM-DD)
+    weeklyConfigEnabled?: boolean;
+    periodicity?: "WEEKLY" | "CUSTOM";
+    measurementCount?: number;
+    calculationMethod?: "ACCUMULATIVE" | "AVERAGE" | "LAST_VALUE";
   };
   rangeExceptional?: number;
   rangeInacceptable?: number;

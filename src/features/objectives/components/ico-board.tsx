@@ -5,6 +5,8 @@ import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, Calendar, Target } from "lucide-react";
 import { IndicatorEvolutionModal } from "./indicator-evolution-modal";
+import { MeasurementChartModal } from "./measurement-chart-modal";
+import { getMeasurements } from "../services/objectiveGoalsService";
 import type {
   IcoBoardData,
   IcoBoardMonthlyAverage,
@@ -41,6 +43,15 @@ const MEASUREMENT_LABEL: Record<string, string> = {
   UNI: "Unidad",
   MON: "Moneda",
   UNC: "Único",
+};
+const PERIODICITY_LABEL: Record<string, string> = {
+  WEEKLY: "Semanal",
+  CUSTOM: "Personalizado",
+};
+const CALC_METHOD_LABEL: Record<string, string> = {
+  ACCUMULATIVE: "Acumulativo",
+  AVERAGE: "Promedio",
+  LAST_VALUE: "Último valor",
 };
 
 const getMeasurementLabel = (m?: string | null) => {
@@ -79,6 +90,19 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
   const canRead = usePermission(PERMISSIONS.OBJECTIVES.READ);
   const [selectedObj, setSelectedObj] = React.useState<any>(null);
   const [showEvolution, setShowEvolution] = React.useState(false);
+  const [chartGoal, setChartGoal] = React.useState<{
+    open: boolean;
+    goalId: string;
+    month: number;
+    year: number;
+    calcMethod?: string | null;
+    periodicity?: string | null;
+    measCount?: number | null;
+    goalValue?: number | null;
+  }>({ open: false, goalId: "", month: 0, year: 0 });
+  const [measCounts, setMeasCounts] = React.useState<
+    Record<string, { filled: number; total: number }>
+  >({});
 
   // Filas por objetivo (normalizadas al año)
   const rows = React.useMemo(() => {
@@ -89,25 +113,69 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
       const subtitle = `Meta: ${Number(objective?.goalValue ?? 0)}`;
       // Nueva línea: Unidad (desde indicator.measurement)
       const unitLabel = `Medida: ${getMeasurementLabel(
-        objective?.indicator?.measurement
+        objective?.indicator?.measurement,
       )}`;
 
       const cells = MONTH_INDEXES.map((m) => {
         const point = objective?.icoMonthly?.find(
-          (x) => x.month === m && String(x.year) === String(year)
+          (x) => x.month === m && String(x.year) === String(year),
         );
         return { month: m, point };
       });
+
+      const ind = objective?.indicator;
+      const periodicityLabel = ind?.weeklyConfigEnabled
+        ? (PERIODICITY_LABEL[ind.periodicity ?? ""] ?? ind.periodicity ?? "—")
+        : null;
+      const calcMethodLabel = ind?.weeklyConfigEnabled
+        ? (CALC_METHOD_LABEL[ind.calculationMethod ?? ""] ??
+          ind.calculationMethod ??
+          "—")
+        : null;
 
       return {
         title,
         subtitle,
         unitLabel,
+        periodicityLabel,
+        calcMethodLabel,
+        periodicity: ind?.periodicity ?? null,
+        calculationMethod: ind?.calculationMethod ?? null,
         cells,
         originalObjective: objective,
       };
     });
   }, [data, year]);
+
+  // Cargar conteo de mediciones para objetivos con weeklyConfigEnabled
+  React.useEffect(() => {
+    const map: Record<string, { filled: number; total: number }> = {};
+    const promises: Promise<void>[] = [];
+
+    (data?.listObjectives ?? []).forEach((item) => {
+      const ind = item.objective?.indicator;
+      if (!ind?.weeklyConfigEnabled) return;
+      (item.objective?.icoMonthly ?? []).forEach((p) => {
+        const pid = p.id;
+        if (!p.isMeasured || !pid) return;
+        const total = p.measurementCount ?? ind.measurementCount ?? 0;
+        map[pid] = { filled: 0, total };
+        promises.push(
+          getMeasurements(pid)
+            .then((rows: any) => {
+              const filled = (rows ?? []).filter(
+                (r: any) => r.result != null && !r.isIgnore,
+              ).length;
+              map[pid] = { filled, total };
+            })
+            .catch(() => {}),
+        );
+      });
+    });
+
+    if (promises.length === 0) return;
+    Promise.all(promises).then(() => setMeasCounts(map));
+  }, [data]);
 
   // Fila de promedios (usa color del back si viene)
   type AvgWithColor = IcoBoardMonthlyAverage & {
@@ -120,7 +188,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
       (data?.monthlyAverages as any) ?? [];
     return MONTH_INDEXES.map((m) => {
       const a = avgs.find(
-        (x) => x.month === m && String((x as any).year) === String(year)
+        (x) => x.month === m && String((x as any).year) === String(year),
       ) as AvgWithColor | undefined;
       return {
         month: m,
@@ -266,6 +334,11 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                           <p className="text-[11px] text-gray-500/90">
                             {row.unitLabel}
                           </p>
+                          {row.periodicityLabel && (
+                            <p className="text-[11px] text-blue-600 font-medium">
+                              {row.periodicityLabel} · {row.calcMethodLabel}
+                            </p>
+                          )}
                         </div>
                       </td>
 
@@ -295,6 +368,31 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                             <div className={className} style={style}>
                               {text}
                             </div>
+                            {row.periodicityLabel && point.id && (
+                              <div className="mt-5 flex justify-center">
+                                <span
+                                  className="inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[11px] font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setChartGoal({
+                                      open: true,
+                                      goalId: point.id!,
+                                      month,
+                                      year: point.year ?? year,
+                                      calcMethod: row.calculationMethod,
+                                      periodicity: row.periodicity,
+                                      measCount: point.measurementCount ?? null,
+                                      goalValue: point.goalValue ?? null,
+                                    });
+                                  }}
+                                >
+                                  {measCounts[point.id]?.filled ?? "?"}/
+                                  {measCounts[point.id]?.total ??
+                                    point.measurementCount ??
+                                    "?"}
+                                </span>
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -314,27 +412,29 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                       </div>
                     </td>
 
-                    {footer.map(({ month, averageIco, lightColorHex, measuredCount }) => {
-                      const base =
-                        "inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-bold min-w-[45px] border";
-                      const style = lightColorHex
-                        ? { backgroundColor: lightColorHex }
-                        : undefined;
-                      const className = lightColorHex
-                        ? `${base} text-gray-900 border-gray-200`
-                        : `${base} ${getAvgBadgeClass(averageIco, month, measuredCount ?? 0)}`;
+                    {footer.map(
+                      ({ month, averageIco, lightColorHex, measuredCount }) => {
+                        const base =
+                          "inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-bold min-w-[45px] border";
+                        const style = lightColorHex
+                          ? { backgroundColor: lightColorHex }
+                          : undefined;
+                        const className = lightColorHex
+                          ? `${base} text-gray-900 border-gray-200`
+                          : `${base} ${getAvgBadgeClass(averageIco, month, measuredCount ?? 0)}`;
 
-                      return (
-                        <td
-                          key={month}
-                          className="p-3 border-r border-blue-200 last:border-r-0 text-center w-20"
-                        >
-                          <div className={className} style={style}>
-                            {formatPercent(averageIco)}
-                          </div>
-                        </td>
-                      );
-                    })}
+                        return (
+                          <td
+                            key={month}
+                            className="p-3 border-r border-blue-200 last:border-r-0 text-center w-20"
+                          >
+                            <div className={className} style={style}>
+                              {formatPercent(averageIco)}
+                            </div>
+                          </td>
+                        );
+                      },
+                    )}
                   </tr>
                 </tbody>
               </table>
@@ -389,6 +489,17 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
         onClose={() => setShowEvolution(false)}
         objective={selectedObj}
         year={year}
+      />
+      <MeasurementChartModal
+        open={chartGoal.open}
+        onClose={() => setChartGoal((s) => ({ ...s, open: false }))}
+        goalId={chartGoal.goalId}
+        month={chartGoal.month}
+        year={chartGoal.year}
+        calculationMethod={chartGoal.calcMethod}
+        periodicity={chartGoal.periodicity}
+        measurementCount={chartGoal.measCount}
+        goalValue={chartGoal.goalValue}
       />
     </div>
   );

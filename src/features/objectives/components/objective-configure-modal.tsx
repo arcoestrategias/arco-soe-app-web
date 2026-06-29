@@ -15,6 +15,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -75,6 +77,10 @@ type IndicatorSeed = {
   reference?: string | null;
   periodStart?: string | null;
   periodEnd?: string | null;
+  weeklyConfigEnabled?: boolean | null;
+  periodicity?: "WEEKLY" | "CUSTOM" | null;
+  measurementCount?: number | null;
+  calculationMethod?: "ACCUMULATIVE" | "AVERAGE" | "LAST_VALUE" | null;
 };
 
 export type ObjectiveConfigureData = {
@@ -84,6 +90,7 @@ export type ObjectiveConfigureData = {
   rangeExceptional?: number | null;
   rangeInacceptable?: number | null;
   isNew?: boolean;
+  monthsWithPersonalizedCount?: number;
 };
 
 type Props = {
@@ -122,7 +129,7 @@ const sanitizeMonths = (arr: any): MonthItem[] =>
         Number.isInteger(m.month) &&
         m.month >= 1 &&
         m.month <= 12 &&
-        Number.isInteger(m.year)
+        Number.isInteger(m.year),
     );
 
 // agrega / quita un mes, evitando duplicados
@@ -155,7 +162,7 @@ export default function ObjectiveConfigureModal({
   }));
 
   const [indicator, setIndicator] = useState<IndicatorSeed>(
-    () => ({ ...data.indicator } as IndicatorSeed)
+    () => ({ ...data.indicator }) as IndicatorSeed,
   );
 
   // Normaliza a inicio de mes sólo una vez (si vienen con día 12 p.ej.)
@@ -175,7 +182,7 @@ export default function ObjectiveConfigureModal({
   >(() => sanitizeMonths(data.months));
 
   const [rangeExceptional, setRangeExceptional] = useState<number | undefined>(
-    data.rangeExceptional ?? undefined
+    data.rangeExceptional ?? undefined,
   );
   const [rangeInacceptable, setRangeInacceptable] = useState<
     number | undefined
@@ -187,6 +194,11 @@ export default function ObjectiveConfigureModal({
   const [confirm, setConfirm] = useState<
     { open: false } | { open: true; message: string }
   >({ open: false });
+  const [personalizedConfirm, setPersonalizedConfirm] = useState<{
+    open: boolean; applyToAll: boolean;
+  }>({ open: false, applyToAll: false });
+  const [applyForceAll, setApplyForceAll] = useState(false);
+  const personalizedCount = data.monthsWithPersonalizedCount ?? 0;
 
   const isDiffVal = (a: any, b: any) =>
     JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
@@ -201,6 +213,16 @@ export default function ObjectiveConfigureModal({
       changed.push("tendencia");
     if (isDiffVal(data.indicator?.measurement, indicator?.measurement))
       changed.push("medida");
+    if (
+      isDiffVal(data.indicator?.calculationMethod, indicator?.calculationMethod)
+    )
+      changed.push("método de cálculo");
+    if (isDiffVal(data.indicator?.periodicity, indicator?.periodicity))
+      changed.push("periodicidad de medición");
+    if (
+      isDiffVal(data.indicator?.measurementCount, indicator?.measurementCount)
+    )
+      changed.push("cantidad de mediciones");
     // const dPS = (data.indicator?.periodStart ?? "").slice(0, 10);
     // const iPS = (indicator?.periodStart ?? "").slice(0, 10);
     // const dPE = (data.indicator?.periodEnd ?? "").slice(0, 10);
@@ -213,13 +235,13 @@ export default function ObjectiveConfigureModal({
   // ------- Plan → límites selects
   const planQ = useStrategicPlan(strategicPlanId);
   const { startISO: planStartISO, endISO: planEndISO } = pickPlanDates(
-    planQ.data
+    planQ.data,
   );
 
   // Inicio: todos los meses del plan
   const startOptions = useMemo(
     () => enumerateMonths(planStartISO, planEndISO),
-    [planStartISO, planEndISO]
+    [planStartISO, planEndISO],
   );
 
   // Fin: desde periodStart (si hay) hasta fin del plan
@@ -228,9 +250,9 @@ export default function ObjectiveConfigureModal({
       enumerateEndMonthsByFrequency(
         indicator?.periodStart ?? undefined,
         planEndISO,
-        indicator?.frequency ?? undefined
+        indicator?.frequency ?? undefined,
       ),
-    [indicator?.periodStart, indicator?.frequency, planEndISO]
+    [indicator?.periodStart, indicator?.frequency, planEndISO],
   );
 
   // Autoderivar months para frecuencias ≠ PER
@@ -240,7 +262,7 @@ export default function ObjectiveConfigureModal({
     const derived = deriveMonthsForPayload(
       indicator.periodStart,
       indicator.periodEnd,
-      indicator.frequency ?? undefined
+      indicator.frequency ?? undefined,
     );
     setMonthsSelected(sanitizeMonths(derived));
   }, [indicator?.periodStart, indicator?.periodEnd, indicator?.frequency]);
@@ -264,7 +286,8 @@ export default function ObjectiveConfigureModal({
     const newEnd = ymToStr(last.year, last.month);
 
     setIndicator((prev) => {
-      if (prev.periodStart === newStart && prev.periodEnd === newEnd) return prev;
+      if (prev.periodStart === newStart && prev.periodEnd === newEnd)
+        return prev;
       return { ...prev, periodStart: newStart, periodEnd: newEnd };
     });
   }, [monthsSelected, indicator?.frequency]);
@@ -290,7 +313,8 @@ export default function ObjectiveConfigureModal({
         }
       }
 
-      if (Object.keys(objectiveDiff).length > 0) payload.objective = objectiveDiff as any;
+      if (Object.keys(objectiveDiff).length > 0)
+        payload.objective = objectiveDiff as any;
 
       const indicatorDiff = diff(data.indicator || {}, indicator || {});
       if (Object.keys(indicatorDiff).length > 0)
@@ -311,26 +335,18 @@ export default function ObjectiveConfigureModal({
         payload.months = deriveMonthsForPayload(
           indicator.periodStart,
           indicator.periodEnd,
-          indicator.frequency ?? undefined
+          indicator.frequency ?? undefined,
         );
       }
 
+      if (applyForceAll) (payload as any).forceAll = true;
       return configureObjective(objective.id, payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: QKEY.objectivesUnconfigured(strategicPlanId, positionId),
       });
-      if (year) {
-        qc.invalidateQueries({
-          queryKey: QKEY.objectivesIcoBoard(
-            strategicPlanId,
-            positionId,
-            year,
-            year
-          ),
-        });
-      }
+      qc.resetQueries({ queryKey: ["objectives", "ico-board"] });
       toast.success("Objetivo configurado correctamente");
       onClose();
     },
@@ -389,7 +405,7 @@ export default function ObjectiveConfigureModal({
     // 1) Siempre: PER requiere al menos un mes seleccionado
     if (isPer && (!monthsSelected || monthsSelected.length === 0)) {
       toast.error(
-        "Selecciona al menos un mes para la frecuencia personalizada."
+        "Selecciona al menos un mes para la frecuencia personalizada.",
       );
       return;
     }
@@ -413,31 +429,100 @@ export default function ObjectiveConfigureModal({
     if (tendence && typeof goal === "number" && typeof base === "number") {
       if (tendence === "POS" && base >= goal) {
         toast.error(
-          `En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`
+          `En tendencia CRECIENTE, la Meta (${goal}) debe ser mayor que la Línea Base (${base}).`,
         );
         return;
       }
       if (tendence === "NEG" && base < goal) {
         toast.error(
-          `En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`
+          `En tendencia DECRECIENTE, la Meta (${goal}) debe ser menor o igual que la Línea Base (${base}).`,
         );
         return;
       }
     }
 
+    // 2.5) Verificar meses con cantidad personalizada
+    if (personalizedCount > 0) {
+      setPersonalizedConfirm({ open: true, applyToAll: false });
+      return;
+    }
+
     // 3) Objetivo ya configurado: sólo confirmación si hay cambios críticos
     const changed = getCriticalChanges();
     if (changed.length > 0) {
+      const isMeasChange =
+        changed.includes("cantidad de mediciones") ||
+        changed.includes("periodicidad de medición");
+      const isCalcChange = changed.includes("método de cálculo");
+      const onlyMeasChange =
+        isMeasChange && !isCalcChange && changed.length === 1;
+      const onlyCalcChange =
+        isCalcChange && !isMeasChange && changed.length === 1;
       const list =
         changed.length === 1
           ? `la ${changed[0]}`
           : `los campos críticos (${changed.join(", ")})`;
-      setConfirm({
-        open: true,
-        message:
+
+      const oldCount = data.indicator?.measurementCount;
+      const newCount = indicator?.measurementCount;
+      const countDiff =
+        oldCount != null && newCount != null ? newCount - oldCount : 0;
+      const countReduced = countDiff < 0;
+      const countIncreased = countDiff > 0;
+
+      const methodLabels: Record<string, string> = {
+        ACCUMULATIVE: "Acumulativo",
+        AVERAGE: "Promedio",
+        LAST_VALUE: "Último valor",
+      };
+      const oldMethodLabel = data.indicator?.calculationMethod
+        ? (methodLabels[data.indicator.calculationMethod] ??
+          data.indicator.calculationMethod)
+        : null;
+      const newMethodLabel = indicator?.calculationMethod
+        ? (methodLabels[indicator.calculationMethod] ??
+          indicator.calculationMethod)
+        : null;
+
+      let message = "";
+      if (onlyMeasChange && countReduced) {
+        message = `Al reducir la cantidad de mediciones, se conservarán las últimas mediciones registradas y se eliminarán las sobrantes, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
+      } else if (onlyMeasChange && countIncreased) {
+        message = `La cantidad de mediciones aumentará. Aparecerán nuevas filas vacías para completar, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
+      } else if (onlyMeasChange && !countReduced && !countIncreased) {
+        message = `Se recalcularán los meses con mediciones con la nueva configuración. ¿Desea continuar?`;
+      } else if (onlyCalcChange && oldMethodLabel && newMethodLabel) {
+        message = `Se cambiará el método de cálculo de '${oldMethodLabel}' a '${newMethodLabel}'. Se recalcularán los meses con mediciones. ¿Desea continuar?`;
+      } else if (onlyCalcChange) {
+        message = `Se recalcularán los meses con mediciones con el nuevo método. ¿Desea continuar?`;
+      } else if (isMeasChange || isCalcChange) {
+        const parts: string[] = [];
+        if (countReduced)
+          parts.push(
+            `Al reducir la cantidad de mediciones, se conservarán las últimas registradas`,
+          );
+        else if (countIncreased)
+          parts.push(`La cantidad de mediciones aumentará`);
+        if (
+          oldMethodLabel &&
+          newMethodLabel &&
+          oldMethodLabel !== newMethodLabel
+        )
+          parts.push(
+            `se cambiará el método de cálculo de '${oldMethodLabel}' a '${newMethodLabel}'`,
+          );
+        message =
+          parts.length > 0
+            ? parts.join(", ") +
+              ", y se recalculará nuevamente los meses con medición. ¿Desea continuar?"
+            : `Se recalcularán los meses con mediciones. ¿Desea continuar?`;
+      } else {
+        message =
           `Está intentando actualizar ${list}. Al modificar estos campos, ` +
-          `se está alterando la naturaleza del objetivo, por lo que se perderán los cumplimientos asociados.`,
-      });
+          `se está alterando la naturaleza del objetivo, por lo que se perderán los cumplimientos asociados.`;
+      }
+
+      setConfirm({ open: true, message });
       return;
     }
 
@@ -505,86 +590,88 @@ export default function ObjectiveConfigureModal({
           {showMapFields && (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-4">
               <div className="md:col-span-6 min-w-0">
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Nivel
-                  </label>
-                  <Select
-                    value={objective.level ?? undefined}
-                    onValueChange={(v) =>
-                      setObjective((s) => ({ ...s, level: v as any, }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EST">Estratégico</SelectItem>
-                      <SelectItem value="OPE">Operativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Nivel
+                </label>
+                <Select
+                  value={objective.level ?? undefined}
+                  onValueChange={(v) =>
+                    setObjective((s) => ({ ...s, level: v as any }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EST">Estratégico</SelectItem>
+                    <SelectItem value="OPE">Operativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="md:col-span-6 min-w-0">
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Orientación
-                  </label>
-                  <Select
-                    value={objective.valueOrientation ?? undefined}
-                    onValueChange={(v) =>
-                      setObjective((s) => ({
-                        ...s,
-                        valueOrientation: v as any,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CRE">Crecimiento</SelectItem>
-                      <SelectItem value="REN">Rentabilidad</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Orientación
+                </label>
+                <Select
+                  value={objective.valueOrientation ?? undefined}
+                  onValueChange={(v) =>
+                    setObjective((s) => ({
+                      ...s,
+                      valueOrientation: v as any,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CRE">Crecimiento</SelectItem>
+                    <SelectItem value="REN">Rentabilidad</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="md:col-span-6 min-w-0">
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Perspectiva
-                  </label>
-                  <Select
-                    value={objective.perspective ?? undefined}
-                    onValueChange={(v) =>
-                      setObjective((s) => ({ ...s, perspective: v as any, }))
-                    }
-                    disabled={objective.level === "OPE"}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FIN">Financiera</SelectItem>
-                      <SelectItem value="CLI">Clientes</SelectItem>
-                      <SelectItem value="PRO">Procesos</SelectItem>
-                      <SelectItem value="PER">Personas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Perspectiva
+                </label>
+                <Select
+                  value={objective.perspective ?? undefined}
+                  onValueChange={(v) =>
+                    setObjective((s) => ({ ...s, perspective: v as any }))
+                  }
+                  disabled={objective.level === "OPE"}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIN">Financiera</SelectItem>
+                    <SelectItem value="CLI">Clientes</SelectItem>
+                    <SelectItem value="PRO">Procesos</SelectItem>
+                    <SelectItem value="PER">Personas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="md:col-span-6 min-w-0">
-                  <label className="mb-1 block text-xs font-medium text-foreground">
-                    Objetivo al que impacta
-                  </label>
-                  <ObjectiveStrategicSelect
-                    planId={strategicPlanId}
-                    value={objective.objectiveParentId ?? undefined}
-                    onChange={(val) =>
-                      setObjective((s) => ({ ...s, objectiveParentId: val ?? null, }))
-                    }
-                    currentObjectiveId={objective.id}
-                    disabled={objective.level === "OPE"}
-                  />
-                </div>
-
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Objetivo al que impacta
+                </label>
+                <ObjectiveStrategicSelect
+                  planId={strategicPlanId}
+                  value={objective.objectiveParentId ?? undefined}
+                  onChange={(val) =>
+                    setObjective((s) => ({
+                      ...s,
+                      objectiveParentId: val ?? null,
+                    }))
+                  }
+                  currentObjectiveId={objective.id}
+                  disabled={objective.level === "OPE"}
+                />
+              </div>
             </div>
           )}
         </section>
@@ -700,13 +787,13 @@ export default function ObjectiveConfigureModal({
                       // Mantener la selección previa, pero SOLO los que estén dentro del plan
                       const universe = enumerateMonths(
                         planStartISO,
-                        planEndISO
+                        planEndISO,
                       );
                       const allowed = new Set(
-                        universe.map((m) => `${m.year}-${m.month}`)
+                        universe.map((m) => `${m.year}-${m.month}`),
                       );
                       return prevClean.filter((m) =>
-                        allowed.has(`${m.year}-${m.month}`)
+                        allowed.has(`${m.year}-${m.month}`),
                       );
                     }
 
@@ -759,8 +846,8 @@ export default function ObjectiveConfigureModal({
                         deriveMonthsForPayload(
                           newStart,
                           indicator.periodEnd,
-                          indicator.frequency
-                        )
+                          indicator.frequency,
+                        ),
                       );
                     } else {
                       setMonthsSelected([]);
@@ -814,8 +901,8 @@ export default function ObjectiveConfigureModal({
                       deriveMonthsForPayload(
                         indicator.periodStart,
                         newEnd,
-                        indicator.frequency
-                      )
+                        indicator.frequency,
+                      ),
                     );
                   }
                 }}
@@ -957,6 +1044,119 @@ export default function ObjectiveConfigureModal({
           </div>
         </section>
 
+        {/* Configuración de Medición Mensual (solo para MES) */}
+        {indicator?.frequency === "MES" && (
+          <section className="space-y-3 mt-4">
+            <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="weeklyConfigEnabled"
+                  checked={indicator?.weeklyConfigEnabled ?? false}
+                  onCheckedChange={(c) =>
+                    setIndicator((s) => ({
+                      ...s,
+                      weeklyConfigEnabled: !!c,
+                      ...(c
+                        ? {}
+                        : {
+                            periodicity: undefined,
+                            measurementCount: undefined,
+                            calculationMethod: undefined,
+                          }),
+                    }))
+                  }
+                />
+                <Label
+                  htmlFor="weeklyConfigEnabled"
+                  className="cursor-pointer text-sm font-semibold"
+                >
+                  Configuración de Medición Mensual
+                </Label>
+              </div>
+
+              {indicator?.weeklyConfigEnabled && (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="mb-1 block text-xs font-medium text-foreground">
+                      Periodicidad de medición
+                    </Label>
+                    <Select
+                      value={indicator?.periodicity ?? undefined}
+                      onValueChange={(v) =>
+                        setIndicator((s) => ({
+                          ...s,
+                          periodicity: v as "WEEKLY" | "CUSTOM",
+                          measurementCount:
+                            v === "WEEKLY" ? 4 : (s.measurementCount ?? 2),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WEEKLY">Semanal</SelectItem>
+                        <SelectItem value="CUSTOM">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="mb-1 block text-xs font-medium text-foreground">
+                      Cantidad de Mediciones
+                    </Label>
+                    <Input
+                      type="number"
+                      min={2}
+                      max={50}
+                      value={indicator?.measurementCount ?? ""}
+                      disabled={indicator?.periodicity === "WEEKLY"}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (isNaN(v)) return;
+                        setIndicator((s) => ({
+                          ...s,
+                          measurementCount: Math.min(50, Math.max(2, v)),
+                        }));
+                      }}
+                      className="h-10"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="mb-1 block text-xs font-medium text-foreground">
+                      Método de Cálculo
+                    </Label>
+                    <Select
+                      value={indicator?.calculationMethod ?? undefined}
+                      onValueChange={(v) =>
+                        setIndicator((s) => ({
+                          ...s,
+                          calculationMethod: v as
+                            | "ACCUMULATIVE"
+                            | "AVERAGE"
+                            | "LAST_VALUE",
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACCUMULATIVE">
+                          Acumulativo
+                        </SelectItem>
+                        <SelectItem value="AVERAGE">Promedio</SelectItem>
+                        <SelectItem value="LAST_VALUE">Último valor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {indicator?.frequency === "PER" && (
           <section className="space-y-3 mt-4">
             <h3 className="text-sm font-semibold">Meses a medir</h3>
@@ -980,7 +1180,7 @@ export default function ObjectiveConfigureModal({
                   {universe.map((m) => {
                     const key = `${m.year}-${m.month}`;
                     const checked = selected.some(
-                      (x) => x && `${x.year}-${x.month}` === key
+                      (x) => x && `${x.year}-${x.month}` === key,
                     );
                     return (
                       <label key={key} className="flex items-center gap-2">
@@ -991,11 +1191,11 @@ export default function ObjectiveConfigureModal({
                             setMonthsSelected((prev) => {
                               const arr = Array.isArray(prev) ? prev : [];
                               const exists = arr.some(
-                                (x) => x && `${x.year}-${x.month}` === key
+                                (x) => x && `${x.year}-${x.month}` === key,
                               );
                               return exists
                                 ? arr.filter(
-                                    (x) => x && `${x.year}-${x.month}` !== key
+                                    (x) => x && `${x.year}-${x.month}` !== key,
                                   )
                                 : [...arr, { year: m.year, month: m.month }];
                             });
@@ -1029,7 +1229,7 @@ export default function ObjectiveConfigureModal({
               }
               onChange={(e) =>
                 setRangeInacceptable(
-                  e.target.value === "" ? undefined : Number(e.target.value)
+                  e.target.value === "" ? undefined : Number(e.target.value),
                 )
               }
               placeholder="p.ej. 75"
@@ -1047,7 +1247,7 @@ export default function ObjectiveConfigureModal({
               }
               onChange={(e) =>
                 setRangeExceptional(
-                  e.target.value === "" ? undefined : Number(e.target.value)
+                  e.target.value === "" ? undefined : Number(e.target.value),
                 )
               }
               placeholder="p.ej. 99"
@@ -1076,6 +1276,57 @@ export default function ObjectiveConfigureModal({
           doConfigure();
         }}
         onCancel={() => setConfirm({ open: false })}
+      />
+      <ConfirmModal
+        open={personalizedConfirm.open}
+        title="Meses con cantidad personalizada"
+        message={`${personalizedCount} mes(es) tienen una cantidad de mediciones personalizada. ¿Desea aplicar el nuevo valor a todos los meses o mantener los valores personalizados?`}
+        confirmText="Aplicar a todos"
+        cancelText="Mantener personalizados"
+        onConfirm={() => {
+          setPersonalizedConfirm({ open: false, applyToAll: true });
+          setApplyForceAll(true);
+          setTimeout(() => {
+            const changed = getCriticalChanges();
+            if (changed.length > 0) {
+              const list = changed.length === 1 ? `la ${changed[0]}` : `los campos críticos (${changed.join(", ")})`;
+              setConfirm({
+                open: true,
+                message: `Está intentando actualizar ${list}. Al modificar estos campos, se está alterando la naturaleza del objetivo, por lo que se perderán los cumplimientos asociados.`,
+              });
+            } else { doConfigure(); }
+          }, 100);
+        }}
+        onCancel={() => {
+          setPersonalizedConfirm({ open: false, applyToAll: false });
+          setApplyForceAll(false);
+          setTimeout(() => {
+            const changed = getCriticalChanges();
+            if (changed.length > 0) {
+              const isMeasChange = changed.includes("cantidad de mediciones") || changed.includes("periodicidad de medición");
+              const isCalcChange = changed.includes("método de cálculo");
+              const onlyCalcChange = isCalcChange && !isMeasChange && changed.length === 1;
+              const onlyMeasChange = isMeasChange && !isCalcChange && changed.length === 1;
+              const oldCount = data.indicator?.measurementCount;
+              const newCount = indicator?.measurementCount;
+              const countDiff = (oldCount != null && newCount != null) ? newCount - oldCount : 0;
+              const countReduced = countDiff < 0;
+              const countIncreased = countDiff > 0;
+              const methodLabels: Record<string, string> = { ACCUMULATIVE: "Acumulativo", AVERAGE: "Promedio", LAST_VALUE: "Último valor" };
+              const oldMethodLabel = data.indicator?.calculationMethod ? (methodLabels[data.indicator.calculationMethod] ?? data.indicator.calculationMethod) : null;
+              const newMethodLabel = indicator?.calculationMethod ? (methodLabels[indicator.calculationMethod] ?? indicator.calculationMethod) : null;
+              let message = "";
+              if (onlyMeasChange && countReduced) message = `Al reducir la cantidad de mediciones, se conservarán las últimas mediciones registradas y se eliminarán las sobrantes, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
+              else if (onlyMeasChange && countIncreased) message = `La cantidad de mediciones aumentará. Aparecerán nuevas filas vacías para completar, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
+              else if (onlyCalcChange && oldMethodLabel && newMethodLabel) message = `Se cambiará el método de cálculo de '${oldMethodLabel}' a '${newMethodLabel}'. Se recalcularán los meses con mediciones. ¿Desea continuar?`;
+              else {
+                const list = changed.length === 1 ? `la ${changed[0]}` : `los campos críticos (${changed.join(", ")})`;
+                message = `Está intentando actualizar ${list}. Al modificar estos campos, se está alterando la naturaleza del objetivo, por lo que se perderán los cumplimientos asociados.`;
+              }
+              setConfirm({ open: true, message });
+            } else { doConfigure(); }
+          }, 100);
+        }}
       />
     </Dialog>
   );

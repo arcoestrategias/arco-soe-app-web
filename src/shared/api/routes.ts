@@ -261,6 +261,10 @@ export const routes = {
 
   objectiveGoals: {
     update: (goalId: string) => prefixed(Modules.OBJECTIVE_GOALS, goalId),
+    measurements: (goalId: string) =>
+      prefixed(Modules.OBJECTIVE_GOALS, goalId, "measurements"),
+    measurementCount: (goalId: string) =>
+      prefixed(Modules.OBJECTIVE_GOALS, goalId, "measurement-count"),
   },
 
   files: {
