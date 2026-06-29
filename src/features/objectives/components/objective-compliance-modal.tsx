@@ -726,7 +726,7 @@ export function ObjectiveComplianceModal({
                   const k = keyOf(p);
                   const bg = p.lightColorHex ?? undefined;
 
-                  const hasMeasurements = weeklyConfig && p.id != null;
+                  const hasMeasurements = weeklyConfig && p.id != null && p.measurementCount != null;
                   const goalDrafts = hasMeasurements ? measDrafts[p.id!] : null;
 
                   // Consolidar desde mediciones internas si aplica
@@ -878,7 +878,7 @@ export function ObjectiveComplianceModal({
                           <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
                             {p.action ?? "—"}
                           </div>
-                          {weeklyConfig && p.id && (
+                          {weeklyConfig && p.id && p.measurementCount != null && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -901,7 +901,7 @@ export function ObjectiveComplianceModal({
                       </TableRow>
 
                       {/* Sub-filas de mediciones internas (solo si configurado) */}
-                      {weeklyConfig && p.id && (
+                      {weeklyConfig && p.id && p.measurementCount != null && (
                         <TableRow key={`${k}-meas`}>
                           <TableCell colSpan={9} className="bg-gray-50/70 p-3">
                             {loadingMeas[p.id] || !measInitialLoaded ? (

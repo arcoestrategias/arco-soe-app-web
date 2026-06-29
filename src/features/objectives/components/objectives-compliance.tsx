@@ -408,6 +408,9 @@ export default function ObjectivesCompliance({
         calculationMethod: ind.calculationMethod ?? null,
       },
       months: monthsFromIcoMonthly(icoMonthly),
+      measurementMonths: icoMonthly
+        .filter((m: any) => m.measurementCount != null)
+        .map((m: any) => ({ month: m.month, year: m.year })),
       monthsWithPersonalizedCount: icoMonthly.filter(
         (m: any) => m.measurementCount != null,
       ).length,

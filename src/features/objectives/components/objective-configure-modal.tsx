@@ -91,6 +91,7 @@ export type ObjectiveConfigureData = {
   rangeInacceptable?: number | null;
   isNew?: boolean;
   monthsWithPersonalizedCount?: number;
+  measurementMonths?: ConfigureObjectiveMonths[];
 };
 
 type Props = {
@@ -180,6 +181,10 @@ export default function ObjectiveConfigureModal({
   const [monthsSelected, setMonthsSelected] = useState<
     ConfigureObjectiveMonths[]
   >(() => sanitizeMonths(data.months));
+
+  const [measurementMonths, setMeasurementMonths] = useState<
+    ConfigureObjectiveMonths[]
+  >(() => sanitizeMonths(data.measurementMonths ?? data.months));
 
   const [rangeExceptional, setRangeExceptional] = useState<number | undefined>(
     data.rangeExceptional ?? undefined,
@@ -340,6 +345,19 @@ export default function ObjectiveConfigureModal({
       }
 
       if (applyForceAll) (payload as any).forceAll = true;
+      if (indicator?.weeklyConfigEnabled && indicator?.measurementCount) {
+        (payload as any).measurementMonths = measurementMonths.map((m) => ({
+          month: m.month,
+          year: m.year,
+        }));
+        payload.indicator = {
+          ...(payload.indicator ?? {}),
+          weeklyConfigEnabled: indicator.weeklyConfigEnabled,
+          measurementCount: indicator.measurementCount,
+          periodicity: indicator.periodicity ?? undefined,
+          calculationMethod: indicator.calculationMethod ?? undefined,
+        };
+      }
       return configureObjective(objective.id, payload);
     },
     onSuccess: () => {
@@ -1044,38 +1062,38 @@ export default function ObjectiveConfigureModal({
           </div>
         </section>
 
-        {/* Configuración de Medición Mensual (solo para MES) */}
-        {indicator?.frequency === "MES" && (
-          <section className="space-y-3 mt-4">
-            <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="weeklyConfigEnabled"
-                  checked={indicator?.weeklyConfigEnabled ?? false}
-                  onCheckedChange={(c) =>
-                    setIndicator((s) => ({
-                      ...s,
-                      weeklyConfigEnabled: !!c,
-                      ...(c
-                        ? {}
-                        : {
-                            periodicity: undefined,
-                            measurementCount: undefined,
-                            calculationMethod: undefined,
-                          }),
-                    }))
-                  }
-                />
-                <Label
-                  htmlFor="weeklyConfigEnabled"
-                  className="cursor-pointer text-sm font-semibold"
-                >
-                  Configuración de Medición Mensual
-                </Label>
-              </div>
+        {/* Configuración de Medición Mensual */}
+        <section className="space-y-3 mt-4">
+          <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="weeklyConfigEnabled"
+                checked={indicator?.weeklyConfigEnabled ?? false}
+                onCheckedChange={(c) =>
+                  setIndicator((s) => ({
+                    ...s,
+                    weeklyConfigEnabled: !!c,
+                    ...(c
+                      ? {}
+                      : {
+                          periodicity: undefined,
+                          measurementCount: undefined,
+                          calculationMethod: undefined,
+                        }),
+                  }))
+                }
+              />
+              <Label
+                htmlFor="weeklyConfigEnabled"
+                className="cursor-pointer text-sm font-semibold"
+              >
+                Configuración de Medición Mensual
+              </Label>
+            </div>
 
-              {indicator?.weeklyConfigEnabled && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {indicator?.weeklyConfigEnabled && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label className="mb-1 block text-xs font-medium text-foreground">
                       Periodicidad de medición
@@ -1152,10 +1170,68 @@ export default function ObjectiveConfigureModal({
                     </Select>
                   </div>
                 </div>
-              )}
-            </div>
-          </section>
-        )}
+
+                <div>
+                  <Label className="mb-1 block text-xs font-medium text-foreground">
+                    Meses con medición
+                  </Label>
+                  {(() => {
+                    const universe = indicator?.frequency === "PER"
+                      ? sanitizeMonths(monthsSelected)
+                      : indicator?.periodStart && indicator?.periodEnd
+                        ? deriveMonthsForPayload(
+                            indicator.periodStart,
+                            indicator.periodEnd,
+                            indicator.frequency ?? undefined,
+                          )
+                        : [];
+                    if (universe.length === 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground">
+                          {indicator?.periodStart && indicator?.periodEnd
+                            ? "No hay meses para la frecuencia seleccionada."
+                            : "Define las fechas de inicio y fin para ver los meses."}
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-1">
+                        {universe.map((m) => {
+                          const key = `${m.year}-${m.month}`;
+                          const checked = measurementMonths.some(
+                            (x) => `${x.year}-${x.month}` === key,
+                          );
+                          return (
+                            <label key={key} className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setMeasurementMonths((prev) => {
+                                    const exists = prev.some(
+                                      (x) => `${x.year}-${x.month}` === key,
+                                    );
+                                    return exists
+                                      ? prev.filter(
+                                          (x) => `${x.year}-${x.month}` !== key,
+                                        )
+                                      : [...prev, { year: m.year, month: m.month }];
+                                  });
+                                }}
+                                className="accent-blue-600"
+                              />
+                              {monthLabel(m.month, m.year)}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
 
         {indicator?.frequency === "PER" && (
           <section className="space-y-3 mt-4">

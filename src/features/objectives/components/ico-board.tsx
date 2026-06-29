@@ -368,7 +368,7 @@ export default function IcoBoard({ data, year, className }: IcoBoardProps) {
                             <div className={className} style={style}>
                               {text}
                             </div>
-                            {row.periodicityLabel && point.id && (
+                            {row.periodicityLabel && point.id && point.measurementCount != null && (
                               <div className="mt-5 flex justify-center">
                                 <span
                                   className="inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[11px] font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors"
