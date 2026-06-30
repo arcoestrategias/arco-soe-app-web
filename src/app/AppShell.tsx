@@ -35,18 +35,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
 
     const token = getAccessToken();
-    const canStay = isPublic || !!token;
+    const isGoogleCallback =
+      pathname?.startsWith("/login") && searchParams?.get("auth") === "success";
+
+    const canStay = isPublic || !!token || isGoogleCallback;
     setAllowed(canStay);
     setAuthChecked(true);
     if (canStay) {
-      redirectedRef.current = false; // reset guard
+      redirectedRef.current = false;
       return;
     }
 
     if (redirectedRef.current) return;
     redirectedRef.current = true;
 
-    // Construye el redirect SOLO si no hay token y la ruta no es pública
     const qs = searchParams?.toString();
     const dest = `${pathname}${qs ? `?${qs}` : ""}`;
     if (dest === "/" || dest === "") {

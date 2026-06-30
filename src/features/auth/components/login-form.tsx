@@ -100,6 +100,53 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     router.prefetch(go);
   }, [redirectTo, router]);
 
+  // ─── NUEVO: manejar callback de Google OAuth ───────────────────────────────
+  const googleCallbackHandled = React.useRef(false);
+  React.useEffect(() => {
+    const authParam = search?.get("auth");
+    const needsTerms = search?.get("needsTermsAcceptance") === "true";
+
+    if (authParam !== "success") return;
+    if (googleCallbackHandled.current) return;
+    googleCallbackHandled.current = true;
+
+    (async () => {
+      try {
+        if (needsTerms) {
+          const terms = await authService.getCurrentTerms();
+          setTermsData(terms as TermsData);
+          setPendingTokens({ accessToken: "" });
+          setShowTerms(true);
+        } else {
+          // Guardar tokens en localStorage para que AppShell los detecte
+          const token = search?.get("token");
+          const refreshToken = search?.get("refreshToken");
+          if (token) setTokens(token, refreshToken ?? null);
+
+          await reloadMe();
+          // Forzar selección de BU y redirigir desde aquí,
+          // ya que getAccessToken() es null con cookies HttpOnly
+          const meData = await authService.me();
+          const firstBU = meData.businessUnits?.[0];
+          if (firstBU) {
+            setBusinessUnitId(firstBU.id);
+            setPositionId(firstBU.positionId ?? null);
+            setCompanyId(meData.currentCompanyId ?? null);
+          }
+          toast.success("Inicio de sesión exitoso");
+          window.location.href =
+            redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+              ? redirectTo
+              : "/resume";
+        }
+      } catch (err) {
+        toast.error("Error al completar el inicio de sesión con Google");
+        console.error("[Google OAuth callback]", err);
+      }
+    })();
+  }, [search, reloadMe, redirectTo, router]);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
   const isLogged = !!getAccessToken();
@@ -113,7 +160,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
   const [adminCompanyId, setAdminCompanyId] = React.useState<string>("");
   const adminSelectedCompany = React.useMemo(
     () => adminCompanies?.find((c) => c.id === adminCompanyId) || null,
-    [adminCompanies, adminCompanyId]
+    [adminCompanies, adminCompanyId],
   );
   const adminCompanyBUs = adminSelectedCompany?.businessUnits ?? [];
   const [adminBuId, setAdminBuId] = React.useState<string>("");
@@ -237,10 +284,10 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     mode === "recover"
       ? recovering
       : adminNeedsSelector
-      ? applying
-      : nonAdminNeedsSelector
-      ? pendingBU
-      : loggingIn;
+        ? applying
+        : nonAdminNeedsSelector
+          ? pendingBU
+          : loggingIn;
 
   const primaryLabel =
     mode === "recover"
@@ -248,12 +295,12 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         ? "Enviando…"
         : "Recuperar contraseña"
       : busy || pendingBU
-      ? inSelectionPhase
-        ? "Aplicando..."
-        : "Ingresando..."
-      : inSelectionPhase
-      ? "Ingresar"
-      : "Iniciar sesión";
+        ? inSelectionPhase
+          ? "Aplicando..."
+          : "Ingresando..."
+        : inSelectionPhase
+          ? "Ingresar"
+          : "Iniciar sesión";
 
   const goAfter = React.useCallback(() => {
     const go =
@@ -542,7 +589,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
               )}
             </div>
 
-            {/* Separador */}
+            {/* Separador — solo visible cuando no hay sesión activa */}
             {mode === "login" && !isLogged && !inSelectionPhase && (
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
@@ -556,18 +603,16 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
               </div>
             )}
 
-            {/* Botón Google */}
-            {false && (
+            {/* ─── NUEVO: Botón Google habilitado ─────────────────────────── */}
+            {mode === "login" && !isLogged && !inSelectionPhase && (
               <Button
                 type="button"
                 variant="outline"
                 className="w-full h-11 text-base"
                 onClick={() => {
                   const baseUrl =
-                    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(
-                      /\/+$/,
-                      ""
-                    ) || "http://localhost:3000";
+                    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
+                    "http://localhost:4000";
                   window.location.href = `${baseUrl}/api/v1/auth/google`;
                 }}
               >
@@ -592,6 +637,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 Ingresar con Google
               </Button>
             )}
+            {/* ──────────────────────────────────────────────────────────────── */}
 
             {adminNeedsSelector && (
               <div className="grid grid-cols-1 gap-5 pt-2">
@@ -634,7 +680,9 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Unidad de Negocio</Label>
+                  <Label className="text-sm font-medium">
+                    Unidad de Negocio
+                  </Label>
                   <Select
                     value={adminBuId}
                     onValueChange={(v) => setAdminBuId(v)}
@@ -746,20 +794,25 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
         )}
       </Card>
 
-      {showTerms && termsData && pendingTokens && (
+      {showTerms && termsData && (
         <AcceptTermsModal
           open={showTerms}
           terms={termsData as TermsData}
-          accessToken={pendingTokens.accessToken}
-          refreshToken={pendingTokens.refreshToken}
-          onAccepted={() => {
+          // Cuando el login es por Google las cookies ya están seteadas,
+          // así que pasamos strings vacíos — AcceptTermsModal los usa solo
+          // para el flujo de email/password. Si el modal los necesita,
+          // ajusta según la implementación de modal-terms.tsx.
+          accessToken={pendingTokens?.accessToken ?? ""}
+          refreshToken={pendingTokens?.refreshToken}
+          onAccepted={async () => {
             setShowTerms(false);
-            login({
-              email: form.email.trim(),
-              password: form.password,
-            }).then(() => {
-              toast.success("Inicio de sesión exitoso");
-            });
+            await reloadMe();
+            toast.success("Inicio de sesión exitoso");
+            const go =
+              redirectTo && redirectTo !== "/login" && redirectTo !== "/"
+                ? redirectTo
+                : "/resume";
+            router.replace(go);
           }}
           onError={(msg: string) => {
             setErrors((p) => ({ ...p, root: msg }));
