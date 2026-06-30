@@ -106,6 +106,13 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
     const authParam = search?.get("auth");
     const needsTerms = search?.get("needsTermsAcceptance") === "true";
 
+    // Manejar error de OAuth (Google o Outlook)
+    if (authParam === "error") {
+      const message = search?.get("message") ?? "Error al iniciar sesión";
+      toast.error(decodeURIComponent(message));
+      return;
+    }
+
     if (authParam !== "success") return;
     if (googleCallbackHandled.current) return;
     googleCallbackHandled.current = true;
@@ -603,7 +610,7 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
               </div>
             )}
 
-            {/* ─── NUEVO: Botón Google habilitado ─────────────────────────── */}
+            {/* ─── Botón Google ─────────────────────────── */}
             {mode === "login" && !isLogged && !inSelectionPhase && (
               <Button
                 type="button"
@@ -635,6 +642,30 @@ export default function LoginForm({ defaultRedirectTo = "/" }: Props) {
                   />
                 </svg>
                 Ingresar con Google
+              </Button>
+            )}
+            {/* ──────────────────────────────────────────────────────────────── */}
+
+            {/* ─── Botón Outlook ─────────────────────────────────────────── */}
+            {mode === "login" && !isLogged && !inSelectionPhase && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 text-base"
+                onClick={() => {
+                  const baseUrl =
+                    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
+                    "http://localhost:4000";
+                  window.location.href = `${baseUrl}/api/v1/auth/outlook`;
+                }}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                  <path
+                    d="M0 0h11.377v11.372H0zm12.623 0H24v11.372H12.623zM0 12.623h11.377V24H0zm12.623 0H24V24H12.623z"
+                    fill="#0078D4"
+                  />
+                </svg>
+                Ingresar con Microsoft
               </Button>
             )}
             {/* ──────────────────────────────────────────────────────────────── */}
