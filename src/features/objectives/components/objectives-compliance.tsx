@@ -300,15 +300,18 @@ export default function ObjectivesCompliance({
 
   const qc = useQueryClient();
 
-  const openComplianceFor = async (objectiveId: string) => {
+  const refreshSelected = async (objectiveId: string) => {
     await qc.refetchQueries({ queryKey: ["objectives", "ico-board"] });
     const allCached = qc.getQueriesData({ queryKey: ["objectives", "ico-board"] });
-    const item = rows.find((it) => it.objective?.id === objectiveId) ?? null;
-    const cachedItem = allCached
+    const freshItem = allCached
       .map(([, d]) => (d as any)?.listObjectives ?? [])
       .flat()
       .find((it: any) => it.objective?.id === objectiveId) ?? null;
-    setSelected(cachedItem || item);
+    if (freshItem) setSelected(freshItem);
+  };
+
+  const openComplianceFor = async (objectiveId: string) => {
+    await refreshSelected(objectiveId);
     setOpenCompliance(true);
   };
 
@@ -920,6 +923,7 @@ export default function ObjectivesCompliance({
         icoMonthly={selected?.objective?.icoMonthly ?? []}
         objective={selected?.objective}
         onUpdate={onComplianceUpdate}
+        onMeasCountUpdated={() => selected?.objective?.id && refreshSelected(selected.objective.id)}
       />
       {openConfigure && configureData && (
         <ObjectiveConfigureModal

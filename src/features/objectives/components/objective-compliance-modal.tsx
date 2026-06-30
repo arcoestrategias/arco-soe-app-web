@@ -121,6 +121,7 @@ export function ObjectiveComplianceModal({
   icoMonthly,
   objective,
   onUpdate,
+  onMeasCountUpdated,
   title = "Cumplimiento del Objetivo",
   description = "",
 }: {
@@ -129,6 +130,7 @@ export function ObjectiveComplianceModal({
   icoMonthly: IcoMonthlyPoint[];
   objective?: ObjectiveHeader | null;
   onUpdate?: (changes: ObjectiveComplianceChange[]) => void;
+  onMeasCountUpdated?: () => void;
   title?: string;
   description?: string;
 }) {
@@ -160,8 +162,8 @@ export function ObjectiveComplianceModal({
   const [measInitialLoaded, setMeasInitialLoaded] = useState(false);
 
   const weeklyConfig =
-    objective?.indicator?.weeklyConfigEnabled &&
-    objective?.indicator?.frequency === "MES";
+    objective?.indicator?.weeklyConfigEnabled === true &&
+    !!objective?.indicator?.frequency;
   const measCount = weeklyConfig
     ? (objective?.indicator?.measurementCount ?? 4)
     : 0;
@@ -359,7 +361,7 @@ export function ObjectiveComplianceModal({
       }
       await qc.refetchQueries({ queryKey: ["objectives", "ico-board"] });
       toast.success("Cantidad de mediciones actualizada");
-      onOpenChange(false);
+      onMeasCountUpdated?.();
     } catch (e) {
       toast.error(getHumanErrorMessage(e));
     }

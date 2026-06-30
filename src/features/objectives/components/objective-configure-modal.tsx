@@ -200,13 +200,32 @@ export default function ObjectiveConfigureModal({
     { open: false } | { open: true; message: string }
   >({ open: false });
   const [personalizedConfirm, setPersonalizedConfirm] = useState<{
-    open: boolean; applyToAll: boolean;
-  }>({ open: false, applyToAll: false });
+    open: boolean; applyToAll: boolean; message: string; showPersonalizedButtons?: boolean;
+  }>({ open: false, applyToAll: false, message: "" });
   const [applyForceAll, setApplyForceAll] = useState(false);
   const personalizedCount = data.monthsWithPersonalizedCount ?? 0;
 
   const isDiffVal = (a: any, b: any) =>
     JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+
+  const hasChanges = useMemo(() => {
+    const cmp = (a: any, b: any) =>
+      JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+    if (cmp(data.objective?.goalValue, objective?.goalValue)) return true;
+    if (cmp(data.objective?.baseValue, objective?.baseValue)) return true;
+    if (cmp(data.indicator?.tendence, indicator?.tendence)) return true;
+    if (cmp(data.indicator?.measurement, indicator?.measurement)) return true;
+    if (cmp(data.indicator?.frequency, indicator?.frequency)) return true;
+    if (cmp(data.indicator?.weeklyConfigEnabled, indicator?.weeklyConfigEnabled)) return true;
+    if (cmp(data.indicator?.calculationMethod, indicator?.calculationMethod)) return true;
+    if (cmp(data.indicator?.periodicity, indicator?.periodicity)) return true;
+    if (cmp(data.indicator?.measurementCount, indicator?.measurementCount)) return true;
+    if (cmp(data.rangeExceptional, rangeExceptional)) return true;
+    if (cmp(data.rangeInacceptable, rangeInacceptable)) return true;
+    if (cmp(sanitizeMonths(data.months), monthsSelected)) return true;
+    if (cmp(sanitizeMonths(data.measurementMonths ?? data.months), measurementMonths)) return true;
+    return false;
+  }, [objective, indicator, monthsSelected, measurementMonths, rangeExceptional, rangeInacceptable, data]);
 
   const getCriticalChanges = () => {
     const changed: string[] = [];
@@ -271,6 +290,19 @@ export default function ObjectiveConfigureModal({
     );
     setMonthsSelected(sanitizeMonths(derived));
   }, [indicator?.periodStart, indicator?.periodEnd, indicator?.frequency]);
+
+  // Filtrar measurementMonths cuando cambian los meses disponibles (frecuencia, fechas)
+  useEffect(() => {
+    const start = indicator?.periodStart;
+    const end = indicator?.periodEnd;
+    const freq = indicator?.frequency;
+    if (!start || !end || !freq) return;
+    const available = freq === "PER"
+      ? sanitizeMonths(monthsSelected)
+      : deriveMonthsForPayload(start, end, freq);
+    const keys = new Set(available.map(m => `${m.year}-${m.month}`));
+    setMeasurementMonths((prev) => prev.filter(m => keys.has(`${m.year}-${m.month}`)));
+  }, [indicator?.periodStart, indicator?.periodEnd, indicator?.frequency, indicator?.weeklyConfigEnabled]);
 
   // Autocalcular fechas inicio/fin si es PER (basado en meses seleccionados)
   useEffect(() => {
@@ -345,18 +377,18 @@ export default function ObjectiveConfigureModal({
       }
 
       if (applyForceAll) (payload as any).forceAll = true;
-      if (indicator?.weeklyConfigEnabled && indicator?.measurementCount) {
+      if (!payload.indicator) payload.indicator = {};
+      if (indicator?.weeklyConfigEnabled) {
         (payload as any).measurementMonths = measurementMonths.map((m) => ({
           month: m.month,
           year: m.year,
         }));
-        payload.indicator = {
-          ...(payload.indicator ?? {}),
+        Object.assign(payload.indicator, {
           weeklyConfigEnabled: indicator.weeklyConfigEnabled,
-          measurementCount: indicator.measurementCount,
+          measurementCount: indicator.measurementCount ?? undefined,
           periodicity: indicator.periodicity ?? undefined,
           calculationMethod: indicator.calculationMethod ?? undefined,
-        };
+        });
       }
       return configureObjective(objective.id, payload);
     },
@@ -461,8 +493,73 @@ export default function ObjectiveConfigureModal({
 
     // 2.5) Verificar meses con cantidad personalizada
     if (personalizedCount > 0) {
-      setPersonalizedConfirm({ open: true, applyToAll: false });
-      return;
+      const oldSet = new Set(
+        (data.measurementMonths ?? []).map((m) => `${m.year}-${m.month}`),
+      );
+      const currentSet = new Set(
+        measurementMonths.map((m) => `${m.year}-${m.month}`),
+      );
+      const added: string[] = [];
+      const removed: string[] = [];
+      const kept: string[] = [];
+      const allKeys = new Set([...oldSet, ...currentSet]);
+      for (const key of allKeys) {
+        const [y, mo] = key.split("-").map(Number);
+        const inOld = oldSet.has(key);
+        const inCurrent = currentSet.has(key);
+        if (!inOld && inCurrent) added.push(monthLabel(mo, y));
+        else if (inOld && !inCurrent) removed.push(monthLabel(mo, y));
+        else if (inOld && inCurrent) kept.push(monthLabel(mo, y));
+      }
+
+      const freqLabels: Record<string, string> = {
+        MES: "Mensual", TRI: "Trimestral", QTR: "Cuatrimestral",
+        STR: "Semestral", ANU: "Anual", PER: "Personalizado",
+      };
+      const oldFreq = data.indicator?.frequency;
+      const newFreq = indicator?.frequency;
+      const freqChanged = oldFreq && newFreq && oldFreq !== newFreq;
+
+      const joinList = (arr: string[]) =>
+        arr.length > 1 ? arr.slice(0, -1).join(", ") + " y " + arr[arr.length - 1] : arr[0] || "";
+
+      const lines: string[] = [];
+
+      if (freqChanged) {
+        lines.push(`Al cambiar la frecuencia de ${freqLabels[oldFreq] ?? oldFreq} a ${freqLabels[newFreq] ?? newFreq}.`);
+      }
+
+      if (removed.length > 0) {
+        const prefix = freqChanged ? "" : "";
+        lines.push(`${prefix}${joinList(removed)} dejarán de tener mediciones y volverán a registro único.`);
+      }
+
+      if (kept.length > 0) {
+        lines.push(`Los meses ${joinList(kept)} mantendrán su configuración actual.`);
+      }
+
+      if (added.length > 0) {
+        lines.push(`${joinList(added)} tendrán mediciones configuradas.`);
+      }
+
+      if (freqChanged) {
+        lines.push(`Los meses que no coinciden con la nueva frecuencia ya no se visualizarán ni contarán en la pantalla de cumplimiento.`);
+      }
+
+      const mcDiff = isDiffVal(data.indicator?.measurementCount, indicator?.measurementCount);
+      if (mcDiff) {
+        lines.push(`La cantidad global de mediciones cambiará de ${data.indicator?.measurementCount ?? "—"} a ${indicator?.measurementCount}.`);
+      }
+
+      if (added.length > 0 || removed.length > 0 || mcDiff) {
+        setPersonalizedConfirm({
+          open: true,
+          applyToAll: false,
+          message: lines.join("\n") + "\n¿Desea continuar?",
+          showPersonalizedButtons: mcDiff,
+        });
+        return;
+      }
     }
 
     // 3) Objetivo ya configurado: sólo confirmación si hay cambios críticos
@@ -1331,11 +1428,11 @@ export default function ObjectiveConfigureModal({
           </div>
         </section>
 
-        <DialogFooter className="mt-6 gap-2">
+        <DialogFooter className="sticky bottom-0 bg-background pt-4 pb-2 mt-6 gap-2 z-10">
           <Button variant="outline" onClick={onClose} disabled={isPending}>
             Cancelar
           </Button>
-          <Button onClick={handleApply} disabled={isPending}>
+          <Button onClick={handleApply} disabled={isPending || !hasChanges}>
             {isPending ? "Aplicando..." : "Aplicar"}
           </Button>
         </DialogFooter>
@@ -1356,12 +1453,14 @@ export default function ObjectiveConfigureModal({
       <ConfirmModal
         open={personalizedConfirm.open}
         title="Meses con cantidad personalizada"
-        message={`${personalizedCount} mes(es) tienen una cantidad de mediciones personalizada. ¿Desea aplicar el nuevo valor a todos los meses o mantener los valores personalizados?`}
-        confirmText="Aplicar a todos"
-        cancelText="Mantener personalizados"
+        message={personalizedConfirm.message}
+        confirmText={personalizedConfirm.showPersonalizedButtons ? "Aplicar a todos" : "Sí, continuar"}
+        cancelText={personalizedConfirm.showPersonalizedButtons ? "Mantener personalizados" : "Cancelar"}
         onConfirm={() => {
-          setPersonalizedConfirm({ open: false, applyToAll: true });
-          setApplyForceAll(true);
+          setPersonalizedConfirm({ open: false, applyToAll: false, message: "" });
+          if (personalizedConfirm.showPersonalizedButtons) {
+            setApplyForceAll(true);
+          }
           setTimeout(() => {
             const changed = getCriticalChanges();
             if (changed.length > 0) {
@@ -1374,34 +1473,8 @@ export default function ObjectiveConfigureModal({
           }, 100);
         }}
         onCancel={() => {
-          setPersonalizedConfirm({ open: false, applyToAll: false });
+          setPersonalizedConfirm({ open: false, applyToAll: false, message: "" });
           setApplyForceAll(false);
-          setTimeout(() => {
-            const changed = getCriticalChanges();
-            if (changed.length > 0) {
-              const isMeasChange = changed.includes("cantidad de mediciones") || changed.includes("periodicidad de medición");
-              const isCalcChange = changed.includes("método de cálculo");
-              const onlyCalcChange = isCalcChange && !isMeasChange && changed.length === 1;
-              const onlyMeasChange = isMeasChange && !isCalcChange && changed.length === 1;
-              const oldCount = data.indicator?.measurementCount;
-              const newCount = indicator?.measurementCount;
-              const countDiff = (oldCount != null && newCount != null) ? newCount - oldCount : 0;
-              const countReduced = countDiff < 0;
-              const countIncreased = countDiff > 0;
-              const methodLabels: Record<string, string> = { ACCUMULATIVE: "Acumulativo", AVERAGE: "Promedio", LAST_VALUE: "Último valor" };
-              const oldMethodLabel = data.indicator?.calculationMethod ? (methodLabels[data.indicator.calculationMethod] ?? data.indicator.calculationMethod) : null;
-              const newMethodLabel = indicator?.calculationMethod ? (methodLabels[indicator.calculationMethod] ?? indicator.calculationMethod) : null;
-              let message = "";
-              if (onlyMeasChange && countReduced) message = `Al reducir la cantidad de mediciones, se conservarán las últimas mediciones registradas y se eliminarán las sobrantes, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
-              else if (onlyMeasChange && countIncreased) message = `La cantidad de mediciones aumentará. Aparecerán nuevas filas vacías para completar, y se recalculará nuevamente los meses con medición. ¿Desea continuar?`;
-              else if (onlyCalcChange && oldMethodLabel && newMethodLabel) message = `Se cambiará el método de cálculo de '${oldMethodLabel}' a '${newMethodLabel}'. Se recalcularán los meses con mediciones. ¿Desea continuar?`;
-              else {
-                const list = changed.length === 1 ? `la ${changed[0]}` : `los campos críticos (${changed.join(", ")})`;
-                message = `Está intentando actualizar ${list}. Al modificar estos campos, se está alterando la naturaleza del objetivo, por lo que se perderán los cumplimientos asociados.`;
-              }
-              setConfirm({ open: true, message });
-            } else { doConfigure(); }
-          }, 100);
         }}
       />
     </Dialog>
